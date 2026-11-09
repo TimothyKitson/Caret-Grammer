@@ -1,0 +1,40 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Hard layouts</title>
+<style>
+  body { font: 15px/1.5 Arial, sans-serif; margin: 16px; }
+  .box { margin-bottom: 18px; }
+  #padded {
+    font: 16px/1.7 Georgia, serif; width: 420px; height: 110px;
+    padding: 18px 22px; border: 6px solid #888; border-radius: 6px;
+  }
+  #right { font: 15px/1.4 Arial; width: 380px; padding: 6px; text-align: right; }
+  .scaled { transform: scale(0.75); transform-origin: top left; }
+  #scaled { font: 16px/1.5 Arial; width: 400px; height: 80px; padding: 10px; }
+  #rtl { font: 15px/1.4 Arial; width: 380px; padding: 6px; }
+  #rich { font: 15px/1.6 Arial; width: 420px; border: 1px solid #999; padding: 10px; }
+  #controlled { font: 15px/1.4 Arial; width: 380px; padding: 6px; }
+  iframe { width: 460px; height: 130px; border: 1px solid #bbb; }
+</style>
+</head>
+<body>
+  <div class="box"><textarea id="padded"></textarea></div>
+  <div class="box"><input id="right" type="text"></div>
+  <div class="box scaled"><textarea id="scaled"></textarea></div>
+  <div class="box"><input id="rtl" type="text" dir="rtl"></div>
+  <div class="box" id="rich" contenteditable="true"><div>Hello <b>there</b> friend.</div><div>I <i>recieved</i> you're note<br>about the feild trip.</div></div>
+  <div class="box"><input id="controlled" type="text"></div>
+  <div class="box"><iframe id="frame" src="/frame"></iframe></div>
+  <script>
+    // A minimal "controlled input": the page owns the value and writes it back
+    // on every input event, the way React does.
+    const controlled = document.getElementById('controlled');
+    let state = '';
+    controlled.addEventListener('input', (event) => {
+      state = event.target.value;
+      controlled.value = state;               // write-back
+      controlled.dataset.state = state;
+    });
+  </script>
+</body>
+</html>

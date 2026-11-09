@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Caret</title>
+  <link rel="stylesheet" href="popup.css">
+</head>
+<body>
+  <header>
+    <img src="../../icons/icon48.png" alt="" width="24" height="24">
+    <h1>Caret</h1>
+  </header>
+
+  <label class="row switch">
+    <span class="label">Check my writing</span>
+    <input type="checkbox" id="enabled">
+    <span class="track" aria-hidden="true"></span>
+  </label>
+
+  <label class="row switch">
+    <span class="label">On <b id="site">this site</b></span>
+    <input type="checkbox" id="site-enabled">
+    <span class="track" aria-hidden="true"></span>
+  </label>
+
+  <p class="status" id="status">Loading…</p>
+
+  <div class="hint">
+    <b>Alt+G</b> suggestions for the word at the cursor ·
+    <b>Alt+Shift+G</b> re-check now
+  </div>
+
+  <footer>
+    <button id="options" class="primary">Settings</button>
+    <button id="shortcuts">Shortcuts</button>
+  </footer>
+  <script src="popup.js" type="module"></script>
+</body>
+</html>

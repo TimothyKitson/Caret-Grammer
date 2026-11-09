@@ -1,0 +1,4 @@
+node_modules/
+tools/sources/
+*.zip
+!caret-store.zip

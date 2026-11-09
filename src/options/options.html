@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Caret settings</title>
+  <link rel="stylesheet" href="options.css">
+</head>
+<body>
+<main>
+  <header>
+    <img src="../../icons/icon128.png" alt="" width="44" height="44">
+    <div>
+      <h1>Caret</h1>
+      <p class="sub">Your own build. Nothing you type leaves this computer unless you switch on Claude proofreading below.</p>
+    </div>
+  </header>
+
+  <section>
+    <h2>What to check</h2>
+    <div id="categories"></div>
+    <label class="check">
+      <input type="checkbox" id="checkNames">
+      <span><b>Flag names and unusual words</b><i>Off means a capitalized word we do not recognize is left alone — fewer false alarms on names.</i></span>
+    </label>
+    <label class="check">
+      <input type="checkbox" id="showBadge">
+      <span><b>Show the count badge in the corner of the field</b><i>Click it for a list of everything found, with a “fix all” button.</i></span>
+    </label>
+    <div class="field row">
+      <div>
+        <label for="underlineStyle">Underline</label>
+        <select id="underlineStyle">
+          <option value="straight">straight line</option>
+          <option value="wavy">wavy line</option>
+        </select>
+      </div>
+    </div>
+  </section>
+
+  <section>
+    <h2>Autocorrect <span class="tag">off by default</span></h2>
+    <p class="note">
+      Caret normally underlines a mistake and waits for you. With this on, the
+      few mistakes that have exactly one right answer are fixed the moment you
+      finish the word — no click, no card. Anything with a judgement call in it
+      (their/there, your/you’re) is still only underlined.
+    </p>
+    <label class="check">
+      <input type="checkbox" id="autocorrectEnabled">
+      <span><b>Correct the obvious things as I type</b><i>Every correction is an ordinary edit, so Ctrl+Z undoes it — and a word you undo is left alone from then on.</i></span>
+    </label>
+    <div id="autocorrect-options"></div>
+  </section>
+
+  <section>
+    <h2>Claude proofreading <span class="tag">optional</span></h2>
+    <p class="note">
+      The built-in checks are instant, offline and free. This one sends the
+      contents of the field to the Anthropic API and adds what it finds to the
+      underlines, marked <b>checked by Claude</b>. It never rewrites anything:
+      it may swap a word or a short phrase, and nothing changes until you click
+      the suggestion. Password fields, card numbers and anything that looks
+      like a key are never sent.
+    </p>
+    <p class="note">
+      <b>Spending.</b> By default it only runs when you ask for it
+      (<b>Alt+Shift+G</b>, or right-click → <i>Check this field now</i>), on the
+      cheapest model, at the lowest effort, with a hard cap per day. A check of
+      a paragraph on Haiku costs a fraction of a cent.
+    </p>
+    <label class="check">
+      <input type="checkbox" id="aiEnabled">
+      <span><b>Also proofread with Claude</b></span>
+    </label>
+    <div class="field">
+      <label for="aiKey">Anthropic API key</label>
+      <input type="password" id="aiKey" placeholder="sk-ant-…" autocomplete="off" spellcheck="false">
+      <p class="hint">Stored in this browser profile's extension storage, unencrypted, and sent only to api.anthropic.com. Get one at console.anthropic.com.</p>
+    </div>
+    <div class="field row">
+      <div>
+        <label for="aiModel">Model</label>
+        <select id="aiModel"></select>
+      </div>
+      <div>
+        <label for="aiEffort">Effort</label>
+        <select id="aiEffort">
+          <option value="low">low — quick and cheap</option>
+          <option value="medium">medium</option>
+          <option value="high">high — most thorough</option>
+        </select>
+      </div>
+      <div class="grow">
+        <label>&nbsp;</label>
+        <button id="test">Test the key</button>
+      </div>
+    </div>
+    <div class="field row">
+      <div class="grow">
+        <label for="aiTrigger">When to run it</label>
+        <select id="aiTrigger">
+          <option value="manual">only when I ask — Alt+Shift+G or right-click</option>
+          <option value="auto">automatically, a second after I stop typing</option>
+        </select>
+      </div>
+      <div>
+        <label for="aiDailyLimit">Most checks per day</label>
+        <input type="text" id="aiDailyLimit" inputmode="numeric" size="5">
+      </div>
+    </div>
+    <p class="hint" id="ai-budget"></p>
+    <p class="result" id="ai-result"></p>
+  </section>
+
+  <section>
+    <h2>My dictionary <span class="count" id="words-count"></span></h2>
+    <div class="field row">
+      <div class="grow">
+        <label for="new-word">Add a word</label>
+        <input type="text" id="new-word" placeholder="Kitson" spellcheck="false">
+      </div>
+      <div>
+        <label>&nbsp;</label>
+        <button id="add-word">Add</button>
+      </div>
+    </div>
+    <ul class="chips" id="words"></ul>
+  </section>
+
+  <section>
+    <h2>Turned off on <span class="count" id="sites-count"></span></h2>
+    <ul class="chips" id="sites"></ul>
+    <p class="hint" id="sites-empty">Right-click any page and choose <b>Turn off on this site</b> to add one.</p>
+  </section>
+
+  <section>
+    <h2>Ignored suggestions <span class="count" id="ignored-count"></span></h2>
+    <p class="hint">Every time you press <b>Ignore</b> on a card, that exact suggestion for that exact word stops appearing.</p>
+    <button id="clear-ignored">Clear the ignore list</button>
+  </section>
+
+  <section>
+    <h2>Numbers</h2>
+    <p class="stats" id="stats"></p>
+    <button id="reset">Reset everything to defaults</button>
+  </section>
+
+  <footer>
+    <p>
+      Underline colors: <span class="swatch spelling"></span> spelling
+      <span class="swatch grammar"></span> grammar
+      <span class="swatch punctuation"></span> punctuation
+      <span class="swatch style"></span> clarity.
+      Hover an underline to fix it, or press <b>Alt+G</b> with the cursor in the word.
+    </p>
+    <p class="saved" id="saved"></p>
+  </footer>
+</main>
+<script src="options.js" type="module"></script>
+</body>
+</html>

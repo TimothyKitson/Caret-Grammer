@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head><meta charset="utf-8"><title>Grammar Checker test page</title>
+<style>
+  body { font: 15px/1.5 Arial, sans-serif; margin: 24px; max-width: 760px; }
+  textarea, input { font: 15px/1.4 Arial, sans-serif; width: 420px; padding: 8px; }
+  textarea { height: 90px; }
+  .editor {
+    font: 15px/1.5 Arial, sans-serif; width: 420px; min-height: 70px;
+    border: 1px solid #999; padding: 8px;
+  }
+  .scroller { height: 70px; overflow: auto; border: 1px dashed #bbb; width: 440px; }
+</style>
+</head>
+<body>
+  <h1>Test page</h1>
+  <p><textarea id="ta" placeholder="textarea"></textarea></p>
+  <p><input id="in" type="text" placeholder="input"></p>
+  <p><div id="ce" class="editor" contenteditable="true"></div></p>
+  <p><textarea id="clean" placeholder="clean"></textarea></p>
+  <p><input id="pw" type="password" placeholder="password"></p>
+  <p><textarea id="optout" data-gramm="false" placeholder="opted out"></textarea></p>
+  <div class="scroller"><textarea id="scrolled" placeholder="inside a scroller"></textarea></div>
+</body>
+</html>
