@@ -429,6 +429,53 @@ const RULES = [
     suggest: (m) => [m[0].replace(/weather/i, (w) => matchCase(w, 'whether'))],
   },
   {
+    // "they where at the store" - a subject pronoun cannot be followed by
+    // "where", so this one is unambiguous.
+    id: 'where-were-subject',
+    category: 'grammar',
+    short: 'Confused words',
+    re: /\b(?:they|we|you|who|these|those)\s+(where)\b(?!\s*\?)/gi,
+    group: 1,
+    message: '“Where” is a place. After a subject you want “were”.',
+    suggest: () => ['were'],
+  },
+  {
+    // The idiom is "couldn't care less" - caring less is the whole point.
+    id: 'could-care-less',
+    category: 'grammar',
+    short: 'Idiom',
+    re: /\b(could\s+care\s+less)\b/gi,
+    group: 1,
+    message: 'The phrase is “couldn’t care less” — you care so little it could not go lower.',
+    suggest: () => ["couldn't care less"],
+  },
+  {
+    // "he don't" -> "he doesn't". Only for third-person singular subjects.
+    id: 'dont-doesnt',
+    category: 'grammar',
+    short: 'Agreement',
+    re: /\b(?:he|she|it|that|this|everyone|everybody|someone|somebody|nobody|anyone)\s+(do\s*n['’]?o?t|dont|don['’]t)\b/gi,
+    group: 1,
+    message: 'A single person or thing “doesn’t”, not “don’t”.',
+    suggest: () => ["doesn't"],
+  },
+  {
+    // "Me and him went" -> "He and I went". Only when a verb follows, so
+    // "she told me and him" is left alone.
+    id: 'me-and-subject',
+    category: 'grammar',
+    short: 'Pronouns',
+    re: /\b(me\s+and\s+(him|her|them|he|she|they))\s+(?=\w*(?:ed|ing)\b|(?:went|are|were|was|is|will|would|can|could|should|have|has|had|did|do|got|saw|took|made|said|want|need|think|like|live|work|play|start|stay|left|came|run|ran)\b)/gi,
+    group: 1,
+    message: 'When they are the ones doing the action, it is “$$FIX$$”.',
+    suggest: (m) => {
+      const map = { him: 'he', her: 'she', them: 'they', he: 'he', she: 'she', they: 'they' };
+      const who = map[m[2].toLowerCase()] || m[2];
+      return [`${who[0].toUpperCase()}${who.slice(1)} and I`];
+    },
+    rawCase: true,
+  },
+  {
     id: 'were-where',
     category: 'grammar',
     short: 'Confused words',

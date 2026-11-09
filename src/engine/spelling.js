@@ -198,6 +198,10 @@ export function checkToken(token, dict, options = {}, doc = null) {
   // A capitalized word we do not know, with nothing close to it in the
   // dictionary, is almost always a name or a piece of jargon. Leave it alone
   // unless the user asked for those to be flagged too.
+  // An unknown run of capitals is an acronym - IEP, ADHD, FAFSA, HVAC. There is
+  // no way to spell-check one, and guessing at it is pure noise.
+  if (token.allCaps && token.text.length > 1 && !options.checkNames) return null;
+
   if (token.capitalized && !options.checkNames) {
     // Only flag a capitalized word when there is a common word right next to
     // it ("Teh" -> "The"). Otherwise it is a name or a piece of jargon.

@@ -4,8 +4,8 @@
 Reads three source lists from tools/sources/ (downloading them if missing) and
 writes three files into data/:
 
-    words.txt.gz        one lowercase word per line, sorted  -> the dictionary
-    frequency.txt.gz    most-common words first, one per line -> ranks suggestions
+    words.txt           one lowercase word per line, sorted  -> the dictionary
+    frequency.txt       most-common words first, one per line -> ranks suggestions
     misspellings.json   {"recieve": ["receive"], ...}         -> high-confidence fixes
 
 Run it again only if you want to rebuild them:  python3 tools/build-data.py
@@ -19,7 +19,6 @@ Sources (all freely redistributable):
                     /For_machines (CC BY-SA 4.0)
 """
 
-import gzip
 import json
 import os
 import re
@@ -215,16 +214,16 @@ def main():
     freq_words = freq_words[:40000]
     words = sorted(words)
 
-    def write_gz(name, lines):
+    def write_list(name, lines):
+        # Plain text, not gzip: the Edge store rejects a package that contains
+        # compressed files, and the service worker reads these with fetch().
         path = os.path.join(OUT, name)
-        blob = ("\n".join(lines) + "\n").encode("utf-8")
-        with gzip.GzipFile(path, "wb", compresslevel=9, mtime=0) as gz:
-            gz.write(blob)
-        print(f"{name}: {len(lines)} lines, {len(blob)/1e6:.2f} MB raw, "
-              f"{os.path.getsize(path)/1e6:.2f} MB gzipped")
+        with open(path, "w", encoding="utf8") as f:
+            f.write("\n".join(lines) + "\n")
+        print(f"wrote {name} ({len(lines)} lines)")
 
-    write_gz("words.txt.gz", words)
-    write_gz("frequency.txt.gz", freq_words)
+    write_list("words.txt", words)
+    write_list("frequency.txt", freq_words)
 
     path = os.path.join(OUT, "misspellings.json")
     with open(path, "w", encoding="utf-8") as f:

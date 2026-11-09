@@ -319,3 +319,52 @@ test('a name that is never an ordinary word is caught anywhere', () => {
     assert.equal(sentence.slice(found.start, found.end), word);
   }
 });
+
+// ------------------------------------------------------------ added rules
+
+test('a subject pronoun followed by "where" wants "were"', () => {
+  assert.ok(idsFor('They where at the store.').includes('where-were-subject'));
+  assert.deepEqual(idsFor('Where were you?'), []);
+  assert.deepEqual(idsFor('Where is the office?'), []);
+});
+
+test('"could care less" is the wrong way round', () => {
+  const found = findAt('I could care less about it.', 'could care less');
+  assert.ok(found);
+  assert.deepEqual(found.replacements, ["couldn't care less"]);
+});
+
+test('"he don\'t" wants "doesn\'t"', () => {
+  const found = findAt('She dont know yet.', 'dont');
+  assert.ok(found);
+  // The apostrophe fix is offered too, but agreement comes first.
+  assert.equal(found.replacements[0], "doesn't");
+  assert.deepEqual(idsFor("I don't know."), []);
+  assert.deepEqual(idsFor("They don't know."), []);
+});
+
+test('"me and him" is only wrong when it is the subject', () => {
+  const found = findAt('Me and him went together.', 'Me and him');
+  assert.ok(found);
+  assert.deepEqual(found.replacements, ['He and I']);
+  assert.deepEqual(findAt('Me and her are late.', 'Me and her').replacements, ['She and I']);
+  assert.deepEqual(idsFor('She told me and him about it.'), []);
+});
+
+test('an unknown run of capitals is an acronym, not a misspelling', () => {
+  assert.deepEqual(idsFor('Her IEP meeting is Tuesday.'), []);
+  assert.deepEqual(idsFor('The HVAC and FAFSA forms are late.'), []);
+});
+
+test('modern everyday words are in the dictionary', () => {
+  for (const sentence of [
+    'I took screenshots of the emojis and hashtags.',
+    'The teacher emailed the printables for homeschooling.',
+    'He is livestreaming the fundraiser.',
+    'Check the dropdown and the checkboxes on the website.',
+    'She unsubscribed from the podcast and the newsletter.',
+    'The paraprofessional updated the gradebook.',
+  ]) {
+    assert.deepEqual(idsFor(sentence).filter((id) => id === 'spelling-unknown'), [], sentence);
+  }
+});
