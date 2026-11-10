@@ -1,0 +1,35 @@
+# caretgrammar.com
+#
+# The site is the `site/` folder - plain HTML, no build step. Point Netlify at
+# this repository and it serves what is in there.
+
+[build]
+  publish = "site"
+  command = ""
+
+[build.processing]
+  skip_processing = false
+
+# Pretty URLs: /setup serves site/setup.html. Netlify does this by default for
+# a static publish directory, so these are only here for the two that moved.
+[[redirects]]
+  from = "/report.html"
+  to = "/report"
+  status = 301
+
+[[redirects]]
+  from = "/setup.html"
+  to = "/setup"
+  status = 301
+
+[[headers]]
+  for = "/assets/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
+    X-Frame-Options = "DENY"

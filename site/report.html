@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Report a problem with Caret</title>
+<meta name="description" content="Tell me what Caret got wrong.">
+<meta name="robots" content="noindex">
+<link rel="icon" href="/assets/icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/app.css">
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="/"><img src="/assets/icon.png" alt="" width="28" height="28">Caret</a>
+    <nav class="links">
+      <a href="/setup" class="hide-sm">Setup</a>
+      <a href="/#what" class="hide-sm">What it does</a>
+      <a class="btn small" href="https://microsoftedge.microsoft.com/addons/detail/caret/ejkpanfkmjkkolgdpampfljaangollpm" id="get-top">Get Caret</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+
+<section class="hero" style="padding-bottom:16px">
+  <div class="wrap narrow" style="text-align:left">
+    <p class="kicker">Feedback</p>
+    <h1 style="font-size:clamp(30px,4.2vw,42px)" id="headline">What went wrong?</h1>
+    <p class="lede" style="margin-left:0" id="sub">
+      Caret is made by one person, and nothing here is tracked — so this form is
+      genuinely the only way I find out something is broken. Say as much or as
+      little as you like.
+    </p>
+  </div>
+</section>
+
+<section style="padding-top:12px">
+  <div class="wrap narrow">
+    <form class="report" name="caret-problems" method="POST" data-netlify="true" netlify-honeypot="bot-field" action="/thanks">
+      <input type="hidden" name="form-name" value="caret-problems">
+      <input type="hidden" name="subject" value="caret problems">
+      <input type="hidden" name="came-from" id="came-from" value="">
+      <input type="hidden" name="version" id="version" value="">
+      <p class="hp"><label>Leave this empty <input name="bot-field"></label></p>
+
+      <div>
+        <span style="display:block;font-weight:600;color:var(--ink);font-size:15px;margin-bottom:8px">What happened?</span>
+        <div class="reasons">
+          <label><input type="radio" name="reason" value="It underlined things that were correct" checked><span><b>It underlined things that were correct</b><i>False alarms — the worst kind of bug. Please paste the sentence below.</i></span></label>
+          <label><input type="radio" name="reason" value="It missed a real mistake"><span><b>It missed a real mistake</b><i>Something wrong went past it.</i></span></label>
+          <label><input type="radio" name="reason" value="It did not work on a site"><span><b>It did not work on a particular site</b><i>No underlines where there should have been some.</i></span></label>
+          <label><input type="radio" name="reason" value="Autocorrect changed something it should not have"><span><b>Autocorrect changed something it should not have</b><i>Tell me the word and what it became.</i></span></label>
+          <label><input type="radio" name="reason" value="It got in the way"><span><b>It got in the way</b><i>Slow, distracting, or the card covered what I was doing.</i></span></label>
+          <label><input type="radio" name="reason" value="Something else"><span><b>Something else</b><i>Including: I just did not need it.</i></span></label>
+        </div>
+      </div>
+
+      <label class="f">
+        <span>Tell me more
+          <small>The sentence it got wrong is the single most useful thing you can paste here. Do not include anything private.</small>
+        </span>
+        <textarea name="details" placeholder="It underlined “…” in this sentence: …"></textarea>
+      </label>
+
+      <label class="f">
+        <span>Which site, if it matters
+          <small>Optional.</small>
+        </span>
+        <input type="text" name="site" placeholder="mail.google.com">
+      </label>
+
+      <label class="f">
+        <span>Your email
+          <small>Optional, and only used to reply to you about this.</small>
+        </span>
+        <input type="email" name="email" placeholder="you@example.com">
+      </label>
+
+      <div>
+        <button class="btn" type="submit">Send it</button>
+      </div>
+    </form>
+  </div>
+</section>
+
+<script>
+// The extension sends you here when it is uninstalled, with ?from=uninstall
+// and the version. Carry both into the form, and soften the headline.
+(function () {
+  var q = new URLSearchParams(location.search);
+  var from = q.get('from') || '';
+  document.getElementById('came-from').value = from;
+  document.getElementById('version').value = q.get('v') || '';
+  if (from === 'uninstall') {
+    document.getElementById('headline').textContent = 'Sorry to see it go.';
+    document.getElementById('sub').textContent = 'Caret is uninstalled — nothing here will bring it back or '
+      + 'keep anything of yours. If you have a minute, telling me why helps more than you would think.';
+  }
+})();
+</script>
+
+</main>
+
+<footer class="end">
+  <div class="wrap">
+    <span>Caret</span>
+    <span class="right">
+      <a href="/setup">Setup</a>
+      <a href="/report">Report a problem</a>
+      <a href="/privacy">Privacy</a>
+    </span>
+  </div>
+</footer>
+<script src="/assets/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Setting up Caret</title>
+<meta name="description" content="How to install and configure Caret, the grammar checker for Microsoft Edge.">
+<link rel="icon" href="/assets/icon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/assets/app.css">
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <a class="brand" href="/"><img src="/assets/icon.png" alt="" width="28" height="28">Caret</a>
+    <nav class="links">
+      <a href="/setup" class="hide-sm">Setup</a>
+      <a href="/#what" class="hide-sm">What it does</a>
+      <a class="btn small" href="https://microsoftedge.microsoft.com/addons/detail/caret/ejkpanfkmjkkolgdpampfljaangollpm" id="get-top">Get Caret</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+
+<section class="hero" style="padding-bottom:0">
+  <div class="wrap narrow" style="text-align:left">
+    <p class="kicker">Setup</p>
+    <h1 style="font-size:clamp(32px,4.6vw,46px)">Setting up Caret</h1>
+    <p class="lede" style="margin-left:0">
+      Caret works the moment it is installed. Everything on this page is
+      optional — it is here for when you want to change something.
+    </p>
+  </div>
+</section>
+
+<section>
+  <div class="wrap narrow">
+    <ol class="steps">
+      <li class="rise">
+        <h3>Install it</h3>
+        <p>Open <a href="https://microsoftedge.microsoft.com/addons/detail/caret/ejkpanfkmjkkolgdpampfljaangollpm">the Edge Add-ons listing</a>, press <b>Get</b>, then <b>Add extension</b>. Edge will ask once — that is the permission to read the text boxes it checks.</p>
+        <p><a class="btn small" href="https://microsoftedge.microsoft.com/addons/detail/caret/ejkpanfkmjkkolgdpampfljaangollpm">Get Caret for Edge</a></p>
+      </li>
+      <li class="rise">
+        <h3>Pin it to the toolbar</h3>
+        <p>Click the puzzle-piece icon beside the address bar, find Caret, and click the pin. The button gives you the on/off switches, a <b>Check with AI</b> button, and a way into the settings.</p>
+      </li>
+      <li class="rise">
+        <h3>Open the settings</h3>
+        <p>Click the Caret button, then <b>Settings</b>. The page has a search box at the top left — type what you are looking for rather than hunting for it.</p>
+        <p>At the very top is a live preview: a sentence run through the real checker. Change anything below and the preview updates, so you can see what a setting does before you commit to it.</p>
+      </li>
+      <li class="rise">
+        <h3>Decide what gets underlined</h3>
+        <p>Five switches under <b>What to check</b>: spelling, grammar, punctuation, clarity, and an <b>extra picky</b> one for passive voice and filler words, which is noisier and off by default.</p>
+        <p>If names keep getting underlined, leave <b>Flag names and unusual words</b> off — that is what it is for.</p>
+      </li>
+      <li class="rise">
+        <h3>Turn on autocorrect, if you want it</h3>
+        <p>Off until you switch it on. It only fixes mistakes with exactly one right answer:</p>
+        <p>
+          <b>Capitalize I</b> — <code>i</code> and <code>ive</code> become <code>I</code> and <code>I've</code>, never <code>ill</code> or <code>id</code>, because those are words.<br>
+          <b>Sentence capitals</b> — after a full stop, a question mark or a new line. Not after <code>Dr.</code> or a trailing-off <code>…</code>.<br>
+          <b>Apostrophes</b> — <code>dont</code> → <code>don't</code>, <code>wouldnt</code> → <code>wouldn't</code>.<br>
+          <b>Known typos</b> — <code>teh</code> → <code>the</code>.
+        </p>
+        <p>Anything with a judgement call in it — their/there, your/you're — is still only underlined. Every correction is an ordinary edit, so <kbd>Ctrl</kbd> <kbd>Z</kbd> undoes it, and a word you undo is left alone from then on.</p>
+      </li>
+      <li class="rise">
+        <h3>Add your own words</h3>
+        <p>Surnames, street names, anything Caret keeps underlining that is not wrong. Either add them under <b>My dictionary</b> in the settings, or right-click the word on the page and choose <b>Add to dictionary</b>.</p>
+      </li>
+      <li class="rise">
+        <h3>Switch Caret off where you do not want it</h3>
+        <p>Right-click any page and choose <b>Turn off on this site</b>. The list lives in the settings under <b>Turned off on</b>, and you can remove one with the × beside it.</p>
+      </li>
+    </ol>
+  </div>
+</section>
+
+<section class="wash">
+  <div class="wrap narrow">
+    <p class="kicker">Optional</p>
+    <h2>The AI pass</h2>
+    <p>
+      The built-in checks handle spelling, confused words, apostrophes,
+      agreement and capitals on their own, offline and free. The AI pass is for
+      the sentence-level things a rule cannot see — and it is genuinely optional.
+    </p>
+    <p>
+      It needs an API key, which is yours and not Caret's. Caret works out which
+      service a key belongs to from the key itself, so there is nothing to
+      choose:
+    </p>
+
+    <div class="grid" style="margin:26px 0 30px">
+      <div class="card rise">
+        <h3>Google Gemini<span class="badge-free">free tier</span></h3>
+        <p>A key from <a href="https://aistudio.google.com/apikey">aistudio.google.com/apikey</a> needs no card and no credits. There is a cap per minute and per day, which proofreading one field at a time does not come near. Keys start <code>AIza</code>.</p>
+      </div>
+      <div class="card rise d1">
+        <h3>OpenAI</h3>
+        <p>Pay as you go — you have to buy credits before the key does anything. There is no free allowance. Keys start <code>sk-</code>.</p>
+      </div>
+      <div class="card rise d2">
+        <h3>Anthropic</h3>
+        <p>Also pay as you go. Keys start <code>sk-ant-</code>.</p>
+      </div>
+    </div>
+
+    <ol class="steps">
+      <li class="rise">
+        <h3>Paste the key in</h3>
+        <p>Settings → <b>AI proofreading</b> → switch it on, then paste the key. It is kept in your browser profile and sent only to the service it belongs to.</p>
+      </li>
+      <li class="rise">
+        <h3>Choose when it runs</h3>
+        <p>This is the setting that decides your bill, so it is a real choice:</p>
+        <p>
+          <b>Only when I ask</b> — press <kbd>Alt</kbd> <kbd>Shift</kbd> <kbd>G</kbd>, or use the <b>Check with AI</b> button in the toolbar popup. Nothing is sent until you do. This is the default.<br>
+          <b>Every minute while I am typing</b> — one check a minute at most, and only in a field you are actually working in.<br>
+          <b>After every pause</b> — the most thorough and by far the most expensive.
+        </p>
+      </li>
+      <li class="rise">
+        <h3>Leave the daily cap on</h3>
+        <p>Caret refuses to run more than a set number of AI checks a day, whatever the setting above says. It is there so a stuck key cannot quietly run up a bill.</p>
+      </li>
+    </ol>
+
+    <p style="margin-top:26px">
+      Whatever the model suggests, it may only swap a word or a short phrase —
+      never rewrite a sentence — and it is told to keep your vocabulary plain
+      rather than make it sound more formal. Nothing is applied until you click
+      it.
+    </p>
+  </div>
+</section>
+
+<section>
+  <div class="wrap narrow">
+    <p class="kicker">Reference</p>
+    <h2>Keyboard shortcuts</h2>
+    <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr))">
+      <div class="card"><h3><kbd>Alt</kbd> <kbd>G</kbd></h3><p>Suggestions for the word the cursor is in.</p></div>
+      <div class="card"><h3><kbd>Alt</kbd> <kbd>Shift</kbd> <kbd>G</kbd></h3><p>Re-check this field now, including the AI pass.</p></div>
+      <div class="card"><h3><kbd>Esc</kbd></h3><p>Close the suggestion card.</p></div>
+    </div>
+    <p style="margin-top:20px">You can change any of these: settings → <b>Keyboard and buttons</b> → <b>Change the shortcuts</b>.</p>
+    <p style="margin-top:34px">Still stuck? <a href="/report">Tell me what happened</a> and I will take a look.</p>
+  </div>
+</section>
+
+</main>
+
+<footer class="end">
+  <div class="wrap">
+    <span>Caret</span>
+    <span class="right">
+      <a href="/setup">Setup</a>
+      <a href="/report">Report a problem</a>
+      <a href="/privacy">Privacy</a>
+    </span>
+  </div>
+</footer>
+<script src="/assets/app.js"></script>
+</body>
+</html>
