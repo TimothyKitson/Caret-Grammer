@@ -223,3 +223,84 @@ test('no list means the prompt is the plain one', async () => {
   const { SYSTEM_PROMPT } = await import('../src/shared/proofread.js');
   assert.equal(env.calls[0].body.messages[0].content, SYSTEM_PROMPT);
 });
+
+// ------------------------------------------------------ models come and go
+
+test('a retired model is skipped and the next one answers', async () => {
+  const tried = [];
+  const env = fakeEnv({
+    ai: (model) => {
+      tried.push(model);
+      // Exactly what Cloudflare said when llama-3.1-8b-instruct was retired.
+      if (tried.length === 1) {
+        throw new Error('5028: @cf/meta/infire-llama-3.1-8b-instruct was deprecated on 2026-05-30.');
+      }
+      return { response: JSON.stringify(CORRECTIONS) };
+    },
+  });
+  env.MODEL = '@cf/meta/llama-3.1-8b-instruct';
+
+  const res = await worker.fetch(post({ text: 'I teh cat' }, KEY), env);
+  assert.equal(res.status, 200);
+  const body = await res.json();
+  assert.deepEqual(body.corrections, CORRECTIONS.corrections);
+  assert.equal(tried[0], '@cf/meta/llama-3.1-8b-instruct', 'the configured one is tried first');
+  assert.notEqual(body.model, tried[0], 'it should have moved on');
+  assert.equal(body.model, tried[1]);
+});
+
+test('a retired model is not retried without the schema first', async () => {
+  // Dropping response_format cannot revive a model that no longer exists, and
+  // every wasted call is one off a small daily allowance.
+  const tried = [];
+  const env = fakeEnv({
+    ai: (model, body) => {
+      tried.push({ model, schema: !!body.response_format });
+      if (tried.length < 3) throw new Error('5028: deprecated');
+      return { response: JSON.stringify(CORRECTIONS) };
+    },
+  });
+  await worker.fetch(post({ text: 'I teh cat' }, KEY), env);
+  assert.deepEqual(tried.map((t) => t.schema), [true, true, true], 'no pointless no-schema retries');
+  assert.equal(new Set(tried.map((t) => t.model)).size, 3, 'three different models');
+});
+
+test('a model that refuses the schema is retried without it', async () => {
+  const tried = [];
+  const env = fakeEnv({
+    ai: (model, body) => {
+      tried.push(!!body.response_format);
+      if (body.response_format) throw new Error('response_format is not supported for this model');
+      return { response: '```json\n' + JSON.stringify(CORRECTIONS) + '\n```' };
+    },
+  });
+  const res = await worker.fetch(post({ text: 'I teh cat' }, KEY), env);
+  assert.equal(res.status, 200);
+  assert.deepEqual(tried, [true, false], 'same model, second time without the schema');
+  assert.deepEqual((await res.json()).corrections, CORRECTIONS.corrections);
+});
+
+test('running out of allowance stops immediately, it does not try every model', async () => {
+  let calls = 0;
+  const env = fakeEnv({
+    ai: () => { calls += 1; throw new Error('out of neurons for today (3040)'); },
+  });
+  const res = await worker.fetch(post({ text: 'I teh cat' }, KEY), env);
+  assert.equal(res.status, 429);
+  assert.equal((await res.json()).spent, true);
+  assert.equal(calls, 1, 'burning the whole list on a spent account helps nobody');
+});
+
+test('when nothing answers, the last reason is passed on', async () => {
+  const env = fakeEnv({ ai: () => { throw new Error('everything is on fire'); } });
+  const res = await worker.fetch(post({ text: 'I teh cat' }, KEY), env);
+  assert.equal(res.status, 502);
+  assert.match((await res.json()).error, /everything is on fire/);
+});
+
+test('/health names the model it would reach for', async () => {
+  const res = await worker.fetch(new Request('https://w.example/health'), fakeEnv());
+  const body = await res.json();
+  assert.match(body.model, /^@cf\//);
+  assert.ok(body.fallbacks >= 3, 'there should be several to fall back on');
+});

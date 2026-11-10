@@ -18,10 +18,27 @@ import {
   SYSTEM_PROMPT, SCHEMA, userPrompt, parseCorrections, leaveAloneNote,
 } from '../../src/shared/proofread.js';
 
-// Workers AI's documented JSON-mode list does NOT include every model, so this
-// is configurable rather than hardcoded - set MODEL in wrangler.toml and
-// compare candidates with test/quality.mjs before settling on one.
-const DEFAULT_MODEL = '@cf/meta/llama-3.1-8b-instruct';
+// Models get retired, and when one does every request fails with a 5028 until
+// somebody notices and edits a setting. So this is a list, tried in order, and
+// a retired or unknown model costs one wasted call rather than a day of
+// outage. Set MODEL in the dashboard to force a particular one to the front.
+//
+// Ordered best-first among models that are on the free plan. Verify with
+// test/quality.mjs before reordering: a bigger model is not automatically
+// better at leaving correct writing alone, which is the thing that matters.
+const MODELS = [
+  '@cf/meta/llama-3.3-70b-instruct-fp8-fast',
+  '@cf/google/gemma-4-26b-a4b-it',
+  '@cf/zai-org/glm-4.7-flash',
+  '@cf/meta/llama-3.1-8b-instruct-fp8',
+  '@cf/meta/llama-3.2-3b-instruct',
+];
+
+/** A model that is gone, renamed or not on this plan. Try the next one. */
+const DEAD_MODEL = /5028|deprecat|not found|no such model|unknown model|does not exist|invalid model|7000|7001/i;
+
+/** The account is out of allowance. Trying another model will not help. */
+const OUT_OF_ALLOWANCE = /neuron|quota|exceeded|capacity|3040/i;
 
 // Matches the extension's own ceiling, so a long field is cut the same way.
 const MAX_CHARS = 6000;
@@ -83,7 +100,11 @@ export default {
 
     // A liveness check that says nothing about any key.
     if (request.method === 'GET' && url.pathname === '/health') {
-      return json({ ok: true, model: env.MODEL || DEFAULT_MODEL });
+      return json({
+        ok: true,
+        model: env.MODEL || MODELS[0],
+        fallbacks: (env.MODEL ? [env.MODEL, ...MODELS.filter((m) => m !== env.MODEL)] : MODELS).length,
+      });
     }
 
     if (request.method !== 'POST' || url.pathname !== '/check') {
@@ -110,30 +131,54 @@ export default {
     const gate = await spendKey(env, request.headers.get('x-caret-key') || body.key);
     if (!gate.ok) return json({ error: gate.error }, gate.status);
 
-    const model = env.MODEL || DEFAULT_MODEL;
+    // Try the configured model first, then the rest of the list.
+    const candidates = env.MODEL
+      ? [env.MODEL, ...MODELS.filter((m) => m !== env.MODEL)]
+      : MODELS;
+
+    const ask = (model, withSchema) => env.AI.run(model, {
+      messages: [
+        { role: 'system', content: SYSTEM_PROMPT + leaveAloneNote(leaveAlone) },
+        { role: 'user', content: userPrompt(text) },
+      ],
+      // Asked for, not relied on: Workers AI says it cannot guarantee the
+      // schema is met, and fewer models support it than not. parseCorrections
+      // picks up the pieces either way, so a model that rejects the parameter
+      // outright is retried without it rather than written off.
+      ...(withSchema ? { response_format: { type: 'json_schema', json_schema: SCHEMA } } : {}),
+      max_tokens: 1200,
+      temperature: 0,
+    });
+
     let reply;
-    try {
-      reply = await env.AI.run(model, {
-        messages: [
-          { role: 'system', content: SYSTEM_PROMPT + leaveAloneNote(leaveAlone) },
-          { role: 'user', content: userPrompt(text) },
-        ],
-        // Asked for, not relied on: Workers AI says it cannot guarantee the
-        // schema is met, and the model list that supports this at all is
-        // shorter than the model list. parseCorrections picks up the pieces.
-        response_format: { type: 'json_schema', json_schema: SCHEMA },
-        max_tokens: 1200,
-        temperature: 0,
-      });
-    } catch (error) {
-      const message = String(error && error.message);
-      // The account's day is spent. Say so plainly so the extension can go
-      // quiet rather than show the user an error they cannot act on.
-      if (/neuron|quota|limit|capacity|3040/i.test(message)) {
-        return json({ error: 'The shared daily allowance is used up. It resets at midnight UTC.', spent: true }, 429);
+    let model;
+    let lastError = '';
+    for (const candidate of candidates) {
+      for (const withSchema of [true, false]) {
+        try {
+          reply = await ask(candidate, withSchema);
+          model = candidate;
+          break;
+        } catch (error) {
+          lastError = String((error && error.message) || error);
+          // No point trying anything else: the day is spent, not the model
+          // broken. Say so plainly so the extension can go quiet rather than
+          // show an error nobody can act on.
+          if (OUT_OF_ALLOWANCE.test(lastError)) {
+            return json({
+              error: 'The shared daily allowance is used up. It resets at midnight UTC.',
+              spent: true,
+            }, 429);
+          }
+          // A retired model is worth skipping immediately; anything else gets
+          // the no-schema retry first.
+          if (DEAD_MODEL.test(lastError)) break;
+        }
       }
-      return json({ error: `The model did not answer: ${message}` }, 502);
+      if (model) break;
     }
+
+    if (!model) return json({ error: `No model would answer. Last said: ${lastError}` }, 502);
 
     const raw = typeof reply === 'string' ? reply : (reply.response ?? reply.result ?? '');
     const corrections = parseCorrections(typeof raw === 'string' ? raw : JSON.stringify(raw));
