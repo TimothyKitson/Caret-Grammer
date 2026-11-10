@@ -1,15 +1,16 @@
 {
-  "name": "grammar-checker-extension",
-  "version": "1.0.0",
+  "name": "caret",
+  "version": "1.2.0",
   "private": true,
-  "description": "Personal Edge/Chrome extension that underlines spelling and grammar mistakes as you type.",
+  "description": "Edge/Chrome extension that underlines spelling and grammar mistakes as you type.",
   "type": "module",
   "scripts": {
     "test": "node --test test/*.test.mjs",
     "test:e2e": "node test/e2e.mjs && node test/e2e-hard.mjs",
     "lint": "eslint src test",
     "data": "python3 tools/build-data.py",
+    "quality": "node test/quality.mjs",
     "icons": "python3 tools/make-icons.py",
-    "zip": "cd .. && zip -r grammar-checker-extension.zip grammar-checker-extension -x '*/node_modules/*' -x '*/tools/sources/*' -x '*/.git/*'"
+    "zip": "rm -f ../caret-store.zip && zip -rq ../caret-store.zip manifest.json icons src data"
   }
 }

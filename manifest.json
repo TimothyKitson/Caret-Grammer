@@ -2,8 +2,8 @@
   "manifest_version": 3,
   "name": "Caret",
   "short_name": "Caret",
-  "version": "1.1.0",
-  "description": "Underlines spelling and grammar mistakes as you type, anywhere in Edge. Fix them from a hover card, or let it autocorrect.",
+  "version": "1.2.0",
+  "description": "Underlines spelling and grammar mistakes as you type, anywhere in Edge. Fix from a hover card, autocorrect, or ask an AI.",
   "homepage_url": "https://caretgrammar.com",
   "minimum_chrome_version": "116",
   "icons": {

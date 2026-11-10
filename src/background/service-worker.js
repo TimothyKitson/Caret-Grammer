@@ -5,10 +5,11 @@
 // down when idle and starts it again on the next message; the dictionary is
 // rebuilt on demand, which takes about half a second once per wake-up.
 
-import { STORAGE_KEY, mergeSettings, siteKey } from '../shared/defaults.js';
+import { DEFAULT_SETTINGS, STORAGE_KEY, mergeSettings, siteKey } from '../shared/defaults.js';
 import { createDictionary } from '../engine/dictionary.js';
 import { check } from '../engine/engine.js';
-import { checkWithClaude } from '../engine/ai.js';
+import { checkWithAi, DEFAULT_MODEL } from '../engine/ai.js';
+import { BUILT_IN_KEY, providerFor } from '../shared/apikey.js';
 
 const DATA = {
   words: 'data/words.txt',
@@ -111,12 +112,27 @@ let aiLastCall = 0;
 let aiRecent = [];               // timestamps, for a per-minute ceiling
 const AI_MAX_PER_MINUTE = 20;
 
+/**
+ * Which key, which provider, which model.
+ *
+ * A key pasted into the options page wins over one baked into the build, so a
+ * baked-in key can always be overridden without editing the extension. The
+ * provider comes from the key itself - sk-ant-… is Anthropic, anything else
+ * starting sk- is OpenAI - so there is no provider setting to get wrong.
+ */
+function aiCredentials(settings) {
+  const key = (settings.aiKey || '').trim() || BUILT_IN_KEY;
+  const provider = providerFor(key);
+  const model = settings.aiModel || (provider ? DEFAULT_MODEL[provider] : '');
+  return { key, provider, model, baked: !settings.aiKey && !!BUILT_IN_KEY };
+}
+
 function today() {
   const now = new Date();
   return `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`;
 }
 
-/** How many Claude requests are left today. */
+/** How many AI requests are left today. */
 function budgetLeft(settings) {
   const usage = settings.aiUsage || {};
   const used = usage.day === today() ? (usage.count || 0) : 0;
@@ -139,16 +155,18 @@ async function aiIssuesFor(text, settings) {
   }
   if (budgetLeft(settings) <= 0) {
     await patchSettings({
-      lastAiError: `Daily limit of ${settings.aiDailyLimit} Claude checks reached. It resets tomorrow, or raise it in settings.`,
+      lastAiError: `Daily limit of ${settings.aiDailyLimit} AI checks reached. It resets tomorrow, or raise it in settings.`,
     });
     return { issues: [], ran: false, capped: true };
   }
   aiLastCall = now;
   aiRecent.push(now);
   try {
-    const result = await checkWithClaude(text, {
-      apiKey: settings.aiKey,
-      model: settings.aiModel,
+    const { key, provider, model } = aiCredentials(settings);
+    const result = await checkWithAi(text, {
+      apiKey: key,
+      provider,
+      model,
       effort: settings.aiEffort,
     });
     if (aiCache.size >= AI_CACHE_MAX) aiCache.clear();
@@ -202,11 +220,11 @@ async function handleCheck(message, sender) {
 
   let extra = [];
   let aiRan = false;
-  if (message.wantAi && settings.aiEnabled && settings.aiKey) {
+  if (message.wantAi && settings.aiEnabled && aiCredentials(settings).key) {
     const outcome = await aiIssuesFor(text, settings);
     extra = outcome.issues;
     aiRan = outcome.ran;
-  } else if (settings.aiEnabled && settings.aiKey && aiCache.has(text)) {
+  } else if (settings.aiEnabled && aiCredentials(settings).key && aiCache.has(text)) {
     extra = aiCache.get(text);
   }
 
@@ -237,8 +255,9 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
             underlineStyle: settings.underlineStyle,
             autocorrect: settings.autocorrect,
             customWords: settings.customWords,
-            aiEnabled: !!(settings.aiEnabled && settings.aiKey),
+            aiEnabled: !!(settings.aiEnabled && aiCredentials(settings).key),
             aiTrigger: settings.aiTrigger,
+            aiIntervalMinutes: settings.aiIntervalMinutes,
           },
           siteEnabled: siteEnabled(settings, message.hrefs || message.href || ''),
           site: siteKey((message.hrefs && message.hrefs[0]) || message.href || ''),
@@ -306,7 +325,41 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
       }
       case 'get-settings': {
         const settings = await getSettings();
-        respond({ settings, aiLeftToday: budgetLeft(settings) });
+        const { key, provider, baked } = aiCredentials(settings);
+        respond({
+          settings,
+          aiLeftToday: budgetLeft(settings),
+          // Never the key itself - only what the settings page needs to know
+          // to decide between a switch and a key box.
+          ai: { provider, baked, hasKey: !!key },
+        });
+        return;
+      }
+      case 'reset-settings': {
+        const saved = await saveSettings({ ...DEFAULT_SETTINGS });
+        aiCache.clear();
+        await broadcast({ type: 'settings-changed' });
+        respond({ settings: saved });
+        return;
+      }
+      case 'preview': {
+        // The settings page checks one fixed sentence so it can show what the
+        // current settings actually do. No stats, no badge, no AI.
+        const settings = await getSettings();
+        const text = typeof message.text === 'string' ? message.text : '';
+        if (!settings.enabled || !text.trim()) { respond({ issues: [] }); return; }
+        try {
+          const dictionary = await getDictionary();
+          dictionary.setUserWords(settings.customWords);
+          const result = check(text, { dict: dictionary }, {
+            categories: settings.categories,
+            checkNames: settings.checkNames,
+            ignored: new Set(settings.ignored),
+          });
+          respond({ issues: result.issues });
+        } catch (error) {
+          respond({ issues: [], error: error.message });
+        }
         return;
       }
       case 'patch-settings': {
@@ -339,11 +392,12 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
       }
       case 'test-ai': {
         const settings = await getSettings();
-        if (!settings.aiKey) { respond({ error: 'Put your API key in the box first.' }); return; }
+        if (!aiCredentials(settings).key) { respond({ error: 'No API key. Put one in the box, or bake one into src/shared/apikey.js.' }); return; }
         try {
-          const result = await checkWithClaude(
+          const { key, provider, model } = aiCredentials(settings);
+          const result = await checkWithAi(
             'Their is to many mistake in this sentance, and i has not fixed it yet.',
-            { apiKey: settings.aiKey, model: settings.aiModel, effort: settings.aiEffort },
+            { apiKey: key, provider, model, effort: settings.aiEffort },
           );
           await patchSettings({ lastAiError: '' });
           respond({ ok: true, found: result.issues.length, model: result.model });

@@ -7,9 +7,10 @@ const browser = {
   clearInterval: 'readonly', requestAnimationFrame: 'readonly',
   cancelAnimationFrame: 'readonly', DecompressionStream: 'readonly',
   Event: 'readonly', InputEvent: 'readonly', ResizeObserver: 'readonly',
-  MutationObserver: 'readonly', HTMLInputElement: 'readonly',
+  MutationObserver: 'readonly', IntersectionObserver: 'readonly',
+  HTMLInputElement: 'readonly',
   HTMLTextAreaElement: 'readonly', confirm: 'readonly', self: 'readonly',
-  process: 'readonly',
+  process: 'readonly', performance: 'readonly',
 };
 
 export default [

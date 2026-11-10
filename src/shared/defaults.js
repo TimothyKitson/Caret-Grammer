@@ -24,12 +24,18 @@ export const DEFAULT_SETTINGS = {
   showBadge: true,       // the little count in the corner of the field
   underlineStyle: 'straight',   // or 'wavy'
   aiEnabled: false,
+  // Left empty when the key is baked into src/shared/apikey.js, which is what
+  // turns the settings page from a key box into a single switch.
   aiKey: '',
   // Cheapest model and lowest effort by default: this runs while you type, so
   // the bill is what matters most. The options page explains the trade.
-  aiModel: 'claude-haiku-4-5',
+  aiModel: '',           // empty = the cheapest one for whichever key is set
   aiEffort: 'low',
-  aiTrigger: 'manual',   // 'manual' = only when you ask; 'auto' = as you type
+  // 'manual'   only when you ask - the keyboard shortcut, or the toolbar button
+  // 'interval' every few minutes while you are typing in a field
+  // 'auto'     after every pause in typing (the expensive one)
+  aiTrigger: 'manual',
+  aiIntervalMinutes: 1,
   aiDailyLimit: 40,      // hard stop, per day, whatever the trigger
   aiUsage: { day: '', count: 0 },
   disabledSites: [],
@@ -44,6 +50,24 @@ export const AUTOCORRECT_INFO = [
   { key: 'sentenceCaps', label: 'Capitalize the first word of a sentence', hint: 'After a full stop, a question mark or a new line. Not after “Dr.” or an ellipsis.' },
   { key: 'apostrophes', label: 'Add missing apostrophes', hint: 'dont → don’t, wouldnt → wouldn’t, youre → you’re. Only where the word is not something else.' },
   { key: 'commonTypos', label: 'Fix well-known typos', hint: 'teh → the, recieve → receive. Only typos with a single documented correction.' },
+];
+
+export const AI_TRIGGER_INFO = [
+  {
+    value: 'manual',
+    label: 'Only when I ask',
+    hint: 'Press Alt+Shift+G, or open the Caret button and choose “Check with AI”. Nothing is sent until you do.',
+  },
+  {
+    value: 'interval',
+    label: 'Every minute while I am typing',
+    hint: 'One check a minute at most, and only in a field you are actually working in. Stops as soon as you leave it.',
+  },
+  {
+    value: 'auto',
+    label: 'After every pause in typing',
+    hint: 'The most thorough and by far the most expensive. Watch the daily limit.',
+  },
 ];
 
 export const CATEGORY_INFO = [

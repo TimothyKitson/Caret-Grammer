@@ -37,6 +37,7 @@
   let hideTimer = null;
   let frame = null;
   let version = 0;
+  let lastAiAt = 0;
   let lastAiText = null;
   let dead = false;
   let pointer = { x: -1, y: -1 };
@@ -115,11 +116,21 @@
     clearTimeout(localTimer);
     localTimer = setTimeout(runCheck, immediate ? 0 : LOCAL_DELAY);
     clearTimeout(aiTimer);
-    // Automatic Claude passes cost money on every pause, so they are opt-in.
-    // On 'manual' it only runs when you ask (Alt+Shift+G or the right-click
-    // menu), which arrives here as ai: true.
-    if (settings.aiEnabled && (ai || settings.aiTrigger === 'auto')) {
-      aiTimer = setTimeout(() => runCheck({ ai: true }), ai ? 0 : AI_DELAY);
+    // An AI pass costs money every time, so when it happens is the user's call.
+    //   manual    only when asked - Alt+Shift+G, the toolbar button, or the
+    //             right-click menu. Arrives here as ai: true.
+    //   interval  at most once every aiIntervalMinutes in this field.
+    //   auto      after every pause in typing.
+    if (!settings.aiEnabled) return;
+    if (ai) { aiTimer = setTimeout(() => runCheck({ ai: true }), 0); return; }
+    if (settings.aiTrigger === 'auto') {
+      aiTimer = setTimeout(() => runCheck({ ai: true }), AI_DELAY);
+      return;
+    }
+    if (settings.aiTrigger === 'interval') {
+      const gap = Math.max(1, Number(settings.aiIntervalMinutes) || 1) * 60000;
+      const due = Math.max(AI_DELAY, gap - (Date.now() - lastAiAt));
+      aiTimer = setTimeout(() => runCheck({ ai: true }), due);
     }
   }
 
@@ -152,7 +163,7 @@
     }
     // Only remember it as checked if the request really went out: the worker
     // drops calls that hit its rate limit, and that text deserves another go.
-    if (wantAi && response.aiRan) lastAiText = text;
+    if (wantAi && response.aiRan) { lastAiText = text; lastAiAt = Date.now(); }
     active.text = text;
     active.issues = response.issues || [];
     render();
@@ -464,7 +475,7 @@
     }
     if (el === active.adapter.element || active.adapter.element.contains(el)) {
       // isTrusted separates a person typing from a script setting .value,
-      // which is what gates the (paid, off-computer) Claude pass.
+      // which is what gates the (paid, off-computer) AI pass.
       if (event.isTrusted) active.userEdited = true;
       overlay.hidePanel();
       autocorrect(event);

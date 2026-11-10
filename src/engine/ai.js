@@ -1,6 +1,8 @@
-// Optional second opinion from the Claude API.
+// Optional second opinion from an AI model - OpenAI or Anthropic, whichever
+// the key belongs to.
 //
-// Off unless you put your own API key in the options page. The local checks
+// Off unless there is a key: either one pasted into the options page or one
+// baked into src/shared/apikey.js. The local checks
 // above catch spelling and the mechanical mistakes; this catches the rest -
 // tense, agreement across a long sentence, awkward phrasing - the things a
 // regular expression cannot see.
@@ -9,15 +11,47 @@
 // from any web page's JavaScript, and cross-origin requests from a content
 // script would be attributed to the page's own origin.
 
-const ENDPOINT = 'https://api.anthropic.com/v1/messages';
+const ANTHROPIC_ENDPOINT = 'https://api.anthropic.com/v1/messages';
+const OPENAI_ENDPOINT = 'https://api.openai.com/v1/chat/completions';
+const GEMINI_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models';
 const API_VERSION = '2023-06-01';
 const MAX_CHARS = 6000;
 
-export const AI_MODELS = [
-  { id: 'claude-haiku-4-5', label: 'Haiku 4.5 - cheapest, about $1 per million words in' },
-  { id: 'claude-sonnet-5', label: 'Sonnet 5 - middle' },
-  { id: 'claude-opus-5', label: 'Opus 5 - most careful, most expensive' },
-];
+export const AI_MODELS = {
+  // Google is first because its free tier is the only one that will proofread
+  // all day without a card on file.
+  gemini: [
+    { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash - free tier, plenty for this' },
+    { id: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash - free tier, older and quicker' },
+  ],
+  openai: [
+    { id: 'gpt-4o-mini', label: 'GPT-4o mini - cheapest, fine for proofreading' },
+    { id: 'gpt-4o', label: 'GPT-4o - more careful, several times the price' },
+  ],
+  anthropic: [
+    { id: 'claude-haiku-4-5', label: 'Haiku 4.5 - cheapest, about $1 per million words in' },
+    { id: 'claude-sonnet-5', label: 'Sonnet 5 - middle' },
+    { id: 'claude-opus-5', label: 'Opus 5 - most careful, most expensive' },
+  ],
+};
+
+export const DEFAULT_MODEL = {
+  gemini: 'gemini-2.5-flash',
+  openai: 'gpt-4o-mini',
+  anthropic: 'claude-haiku-4-5',
+};
+
+/** Gemini's responseSchema is an OpenAPI subset: no additionalProperties. */
+function geminiSchema(schema) {
+  if (Array.isArray(schema)) return schema.map(geminiSchema);
+  if (!schema || typeof schema !== 'object') return schema;
+  const out = {};
+  for (const [key, value] of Object.entries(schema)) {
+    if (key === 'additionalProperties') continue;
+    out[key] = geminiSchema(value);
+  }
+  return out;
+}
 
 // Effort is an Opus/Sonnet control. Haiku 4.5 rejects it with a 400, so the
 // parameter is left off for models that do not take it.
@@ -52,6 +86,17 @@ const SYSTEM_PROMPT = [
   '- "replacement" must be the corrected version of "original" alone.',
   '- Explanations are one short sentence, in plain language.',
   '- If the text is already correct, return an empty list.',
+  '',
+  'Vocabulary:',
+  '- Use plain, everyday words. Do NOT replace an ordinary word with a fancier',
+  '  or more formal one. "use" does not become "utilize", "help" does not',
+  '  become "facilitate", "about" does not become "regarding".',
+  '- Never make the writing sound more advanced, more academic or more',
+  '  professional than it already is. That is not a mistake to fix.',
+  '- Only propose a different word when the one written is actually WRONG:',
+  '  misspelled, the wrong word entirely (their/there), or the wrong form',
+  '  (verb tense, singular/plural). Never for sounding better.',
+  '- A replacement should be as simple as, or simpler than, what it replaces.',
 ].join('\n');
 
 const SCHEMA = {
@@ -142,7 +187,7 @@ export function toIssues(text, corrections) {
     issues.push({
       id: `ai-${category}`,
       category,
-      short: 'Claude',
+      short: 'AI',
       start: at.start,
       end: at.end,
       text: text.slice(at.start, at.end),
@@ -159,31 +204,57 @@ export function toIssues(text, corrections) {
  * @returns {Promise<{issues: object[], truncated: boolean, usage: object}>}
  * @throws {Error} with .status set for HTTP failures
  */
-export async function checkWithClaude(text, {
-  apiKey,
-  model = 'claude-opus-5',
-  effort = 'low',
-  fetchImpl = fetch,
-  signal,
-} = {}) {
-  if (!apiKey) throw Object.assign(new Error('No API key set.'), { code: 'no-key' });
-  const truncated = text.length > MAX_CHARS;
-  const supportsEffort = !NO_EFFORT_MODELS.has(model);
-  const body = {
-    model,
-    max_tokens: supportsEffort ? 6000 : 2000,
-    system: SYSTEM_PROMPT,
-    output_config: {
-      ...(supportsEffort ? { effort } : {}),
-      format: { type: 'json_schema', schema: SCHEMA },
-    },
-    messages: [{
-      role: 'user',
-      content: `Proofread the text between the markers.\n\n<text>\n${truncated ? text.slice(0, MAX_CHARS) : text}\n</text>`,
-    }],
-  };
+/** Ask OpenAI. Returns the raw JSON string the model produced. */
+async function callOpenAi(text, { apiKey, model, fetchImpl, signal }) {
+  const response = await fetchImpl(OPENAI_ENDPOINT, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', authorization: `Bearer ${apiKey}` },
+    body: JSON.stringify({
+      model,
+      // Proofreading is not a reasoning task; keep it cheap and literal.
+      temperature: 0,
+      messages: [
+        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'user', content: `Proofread the text between the markers.\n\n<text>\n${text}\n</text>` },
+      ],
+      response_format: {
+        type: 'json_schema',
+        json_schema: { name: 'corrections', strict: true, schema: SCHEMA },
+      },
+    }),
+    signal,
+  });
 
-  const response = await fetchImpl(ENDPOINT, {
+  if (!response.ok) {
+    let detail = '';
+    try {
+      const error = await response.json();
+      detail = error?.error?.message || '';
+    } catch (_) { /* body was not JSON */ }
+    const message = response.status === 401 || response.status === 403
+      ? 'OpenAI rejected the API key.'
+      : response.status === 429
+        ? 'OpenAI says you are out of quota or going too fast.'
+        : `OpenAI error ${response.status}${detail ? `: ${detail}` : ''}`;
+    throw Object.assign(new Error(message), { status: response.status });
+  }
+
+  const payload = await response.json();
+  const choice = (payload.choices || [])[0];
+  if (choice?.message?.refusal) {
+    throw Object.assign(new Error('The model declined to check that text.'), { code: 'refusal' });
+  }
+  return {
+    json: choice?.message?.content || '',
+    usage: payload.usage || {},
+    model: payload.model || model,
+  };
+}
+
+/** Ask Anthropic. Returns the raw JSON string the model produced. */
+async function callAnthropic(text, { apiKey, model, effort, fetchImpl, signal }) {
+  const supportsEffort = !NO_EFFORT_MODELS.has(model);
+  const response = await fetchImpl(ANTHROPIC_ENDPOINT, {
     method: 'POST',
     headers: {
       'content-type': 'application/json',
@@ -193,7 +264,19 @@ export async function checkWithClaude(text, {
       // from an extension does.
       'anthropic-dangerous-direct-browser-access': 'true',
     },
-    body: JSON.stringify(body),
+    body: JSON.stringify({
+      model,
+      max_tokens: supportsEffort ? 6000 : 2000,
+      system: SYSTEM_PROMPT,
+      output_config: {
+        ...(supportsEffort ? { effort } : {}),
+        format: { type: 'json_schema', schema: SCHEMA },
+      },
+      messages: [{
+        role: 'user',
+        content: `Proofread the text between the markers.\n\n<text>\n${text}\n</text>`,
+      }],
+    }),
     signal,
   });
 
@@ -213,22 +296,105 @@ export async function checkWithClaude(text, {
   if (payload.stop_reason === 'refusal') {
     throw Object.assign(new Error('Claude declined to check that text.'), { code: 'refusal' });
   }
-  const textBlock = (payload.content || []).find((block) => block.type === 'text' && block.text);
-  if (!textBlock) return { issues: [], truncated, usage: payload.usage || {} };
+  const block = (payload.content || []).find((b) => b.type === 'text' && b.text);
+  return {
+    json: block ? block.text : '',
+    usage: payload.usage || {},
+    model: payload.model || model,
+  };
+}
+
+/** Ask Google. Returns the raw JSON string the model produced. */
+async function callGemini(text, { apiKey, model, fetchImpl, signal }) {
+  // The key goes in a header, not the query string: a URL can end up in logs.
+  const response = await fetchImpl(`${GEMINI_ENDPOINT}/${encodeURIComponent(model)}:generateContent`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'x-goog-api-key': apiKey },
+    body: JSON.stringify({
+      systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
+      contents: [{
+        role: 'user',
+        parts: [{ text: `Proofread the text between the markers.\n\n<text>\n${text}\n</text>` }],
+      }],
+      generationConfig: {
+        temperature: 0,
+        responseMimeType: 'application/json',
+        responseSchema: geminiSchema(SCHEMA),
+      },
+    }),
+    signal,
+  });
+
+  if (!response.ok) {
+    let detail = '';
+    try {
+      const error = await response.json();
+      detail = error?.error?.message || '';
+    } catch (_) { /* body was not JSON */ }
+    const message = response.status === 400 && /API key/i.test(detail)
+      ? 'Google rejected the API key.'
+      : response.status === 401 || response.status === 403
+        ? 'Google rejected the API key.'
+        : response.status === 429
+          ? 'Google free tier limit reached. It resets on its own - try again in a minute.'
+          : `Google API error ${response.status}${detail ? `: ${detail}` : ''}`;
+    throw Object.assign(new Error(message), { status: response.status });
+  }
+
+  const payload = await response.json();
+  const candidate = (payload.candidates || [])[0];
+  if (candidate?.finishReason === 'SAFETY' || candidate?.finishReason === 'PROHIBITED_CONTENT') {
+    throw Object.assign(new Error('The model declined to check that text.'), { code: 'refusal' });
+  }
+  const part = (candidate?.content?.parts || []).find((p) => typeof p.text === 'string');
+  return {
+    json: part ? part.text : '',
+    usage: payload.usageMetadata || {},
+    model,
+  };
+}
+
+/**
+ * Proofread `text` with whichever provider the key belongs to.
+ *
+ * @returns {Promise<{issues: object[], truncated: boolean, usage: object}>}
+ * @throws {Error} with .status set for HTTP failures
+ */
+export async function checkWithAi(text, {
+  apiKey,
+  provider,
+  model,
+  effort = 'low',
+  fetchImpl = fetch,
+  signal,
+} = {}) {
+  if (!apiKey) throw Object.assign(new Error('No API key set.'), { code: 'no-key' });
+  if (!provider) {
+    throw Object.assign(
+      new Error('That key does not look like a Google, OpenAI or Anthropic key.'),
+      { code: 'bad-key' },
+    );
+  }
+  const truncated = text.length > MAX_CHARS;
+  const body = truncated ? text.slice(0, MAX_CHARS) : text;
+  const call = { openai: callOpenAi, gemini: callGemini, anthropic: callAnthropic }[provider];
+  const result = await call(body, {
+    apiKey, model: model || DEFAULT_MODEL[provider], effort, fetchImpl, signal,
+  });
 
   let parsed;
   try {
-    parsed = JSON.parse(textBlock.text);
+    parsed = JSON.parse(result.json);
   } catch (_) {
-    // output_config.format guarantees valid JSON, but never trust a remote
+    // The schema is meant to guarantee valid JSON, but never trust a remote
     // shape: a bad response should be a no-op, not a broken field.
-    return { issues: [], truncated, usage: payload.usage || {} };
+    return { issues: [], truncated, usage: result.usage };
   }
 
   return {
     issues: toIssues(text, parsed.corrections),
     truncated,
-    usage: payload.usage || {},
-    model: payload.model || model,
+    usage: result.usage,
+    model: result.model,
   };
 }

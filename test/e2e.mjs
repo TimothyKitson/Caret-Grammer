@@ -328,18 +328,83 @@ await step('the options page loads and renders its controls', async () => {
     if (message.type() === 'error') errors.push(message.text());
   });
   await options.goto(`chrome-extension://${extensionId}/src/options/options.html`);
-  await options.waitForSelector('#categories input[type=checkbox]');
+  await options.waitForSelector('#categories input[type=checkbox]', { state: 'attached' });
   const boxes = await options.locator('#categories input[type=checkbox]').count();
   const models = await options.locator('#aiModel option').count();
+  const sections = await options.locator('main > section').count();
+  const navLinks = await options.locator('nav a').count();
   await options.locator('#new-word').fill('kitson');
   await options.locator('#add-word').click();
-  await options.waitForSelector('#words li');
+  // #words always has an li in it - the "nothing added yet" placeholder - so
+  // wait for the word itself, not for a list item.
+  await options.waitForFunction(() => /kitson/i.test(document.getElementById('words').textContent));
   const chip = await options.locator('#words li').first().innerText();
   await options.close();
   assert.equal(errors.length, 0, `console errors: ${errors.join(' | ')}`);
   assert.equal(boxes, 5, `expected 5 category switches, saw ${boxes}`);
-  assert.ok(models >= 3, `expected the model list, saw ${models}`);
+  assert.ok(models >= 5, `expected models for every provider, saw ${models}`);
+  assert.ok(sections >= 8, `expected the full page, saw ${sections} sections`);
+  assert.equal(navLinks, sections, 'every section needs a nav link');
   assert.match(chip, /kitson/);
+});
+
+await step('the preview shows real underlines from the real engine', async () => {
+  const options = await context.newPage();
+  await options.goto(`chrome-extension://${extensionId}/src/options/options.html`);
+  await options.waitForFunction(() => document.querySelectorAll('#preview .u').length > 0, null, { timeout: 15000 });
+  const marks = await options.locator('#preview .u').allInnerTexts();
+  const wavyBefore = await options.locator('#preview .u.wavy').count();
+  // Switching the underline style must change the preview, not just the page.
+  await options.locator('#underlineStyle button[data-value="wavy"]').click();
+  await options.waitForFunction(() => document.querySelectorAll('#preview .u.wavy').length > 0);
+  const wavyAfter = await options.locator('#preview .u.wavy').count();
+  await options.locator('#underlineStyle button[data-value="straight"]').click();
+  await options.close();
+  assert.ok(marks.length >= 3, `expected several underlines, saw ${marks.length}`);
+  assert.ok(marks.some((m) => /Teh|definately|recieve|Their/.test(m)), `preview marked: ${marks.join(', ')}`);
+  assert.equal(wavyBefore, 0, 'straight is the default');
+  assert.ok(wavyAfter > 0, 'the wavy switch did not reach the preview');
+});
+
+await step('searching the settings hides what does not match', async () => {
+  const options = await context.newPage();
+  await options.goto(`chrome-extension://${extensionId}/src/options/options.html`);
+  await options.waitForSelector('#categories input[type=checkbox]', { state: 'attached' });
+  const allSections = await options.locator('main > section:visible').count();
+  await options.locator('#search').fill('apostrophe');
+  await options.waitForFunction(() => document.querySelectorAll('main > section:not([hidden])').length < 4);
+  const narrowed = await options.locator('main > section:visible').count();
+  const shownRow = await options.locator('[data-search]:visible').first().innerText();
+  await options.locator('#search').fill('');
+  await options.waitForFunction((n) => document.querySelectorAll('main > section:not([hidden])').length === n, allSections);
+  await options.close();
+  assert.ok(narrowed < allSections, `search narrowed ${allSections} -> ${narrowed}`);
+  assert.ok(narrowed >= 1, 'search hid everything');
+  assert.match(shownRow.toLowerCase(), /apostrophe/);
+});
+
+await step('the AI section asks for a key and offers the free provider', async () => {
+  const options = await context.newPage();
+  await options.goto(`chrome-extension://${extensionId}/src/options/options.html`);
+  await options.waitForSelector('#aiEnabled', { state: 'attached' });
+  const keyDisabled = await options.locator('#aiKey').isDisabled();
+  await options.locator('label:has(#aiEnabled)').click();
+  await options.waitForFunction(() => !document.getElementById('aiKey').disabled);
+  const triggers = await options.locator('#aiTrigger input[type=radio]').count();
+  const intervalHiddenAtFirst = await options.locator('#interval-row').isHidden();
+  // Choosing the every-minute trigger reveals the minutes box.
+  await options.locator('#aiTrigger label:has(input[value="interval"])').click();
+  await options.waitForFunction(() => !document.getElementById('interval-row').hidden);
+  const minutes = await options.locator('#aiIntervalMinutes').inputValue();
+  const providers = await options.locator('.providers li').allInnerTexts();
+  await options.locator('label:has(#aiEnabled)').click();
+  await options.close();
+  assert.equal(keyDisabled, true, 'the key box should be dead until AI is switched on');
+  assert.equal(triggers, 3, `expected 3 trigger choices, saw ${triggers}`);
+  assert.equal(intervalHiddenAtFirst, true);
+  assert.equal(minutes, '1');
+  assert.equal(providers.length, 3, 'expected all three providers listed');
+  assert.ok(providers.some((p) => /free tier/i.test(p)), 'the free one is not marked free');
 });
 
 await step('a word added in options stops being flagged', async () => {
@@ -348,6 +413,79 @@ await step('a word added in options stops being flagged', async () => {
   await page.locator('#clean').fill('Kitson signed the form.');
   await new Promise((r) => setTimeout(r, 1200));
   assert.deepEqual(await UNDERLINES(), []);
+});
+
+// ------------------------------------------------------------- autocorrect
+
+const typeInto = async (selector, text) => {
+  await page.bringToFront();
+  await page.locator(selector).fill('');
+  await page.locator(selector).click();
+  await page.keyboard.type(text, { delay: 40 });
+  await new Promise((r) => setTimeout(r, 900));
+  return page.locator(selector).inputValue();
+};
+
+await step('autocorrect does nothing until it is switched on', async () => {
+  const value = await typeInto('#ta', 'i dont think teh cat ');
+  assert.equal(value, 'i dont think teh cat ');
+});
+
+await step('the autocorrect switches are in options and turn it on', async () => {
+  const options = await context.newPage();
+  await options.goto(`chrome-extension://${extensionId}/src/options/options.html`);
+  await options.waitForSelector('#autocorrectEnabled', { state: 'attached' });
+  const subs = await options.locator('#autocorrect-options input[type=checkbox]').count();
+  const disabledBefore = await options.locator('#autocorrect-options input').first().isDisabled();
+  await options.locator('label:has(#autocorrectEnabled)').click();
+  await options.waitForFunction(() => !document.querySelector('#autocorrect-options input').disabled);
+  await options.close();
+  assert.equal(subs, 4, `expected 4 autocorrect switches, saw ${subs}`);
+  assert.equal(disabledBefore, true, 'sub-switches should be dead while it is off');
+});
+
+await step('typing fixes the obvious things on its own', async () => {
+  const value = await typeInto('#ta', 'i dont think teh cat ');
+  assert.equal(value, "I don't think the cat ");
+});
+
+await step('it capitalizes the start of the next sentence', async () => {
+  const value = await typeInto('#ta', 'that works. then we go. ');
+  assert.equal(value, 'That works. Then we go. ');
+});
+
+await step('it leaves the ambiguous ones for the underline', async () => {
+  const value = await typeInto('#ta', 'ill wait and were done ');
+  assert.equal(value, 'Ill wait and were done ');
+});
+
+await step('it works in a contenteditable too, caret and all', async () => {
+  await page.bringToFront();
+  await page.evaluate(() => { document.getElementById('ce').textContent = ''; });
+  await page.locator('#ce').click();
+  await page.keyboard.type('i dont know ', { delay: 40 });
+  await new Promise((r) => setTimeout(r, 900));
+  await page.keyboard.type('yet', { delay: 40 });
+  await new Promise((r) => setTimeout(r, 400));
+  const text = await page.locator('#ce').innerText();
+  assert.equal(text.replace(/\u00a0/g, ' ').trim(), "I don't know yet");
+});
+
+await step('undo puts the word back and it is not corrected again', async () => {
+  await page.bringToFront();
+  await page.locator('#ta').fill('');
+  await page.locator('#ta').click();
+  await page.keyboard.type('i dont ', { delay: 40 });
+  await new Promise((r) => setTimeout(r, 400));
+  assert.equal(await page.locator('#ta').inputValue(), "I don't ");
+  await page.keyboard.press('Control+z');
+  await new Promise((r) => setTimeout(r, 400));
+  const undone = await page.locator('#ta').inputValue();
+  assert.ok(undone.includes('dont'), `undo left "${undone}"`);
+  // Start clean, so what is asserted is the refusal and not where the browser
+  // happened to leave the caret after its undo.
+  const after = await typeInto('#ta', 'say dont ');
+  assert.equal(after, 'Say dont ', 'a refused word was corrected again');
 });
 
 await step('the popup loads and shows the switches', async () => {

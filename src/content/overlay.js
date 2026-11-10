@@ -301,7 +301,7 @@
         if (issue.source === 'ai') {
           const src = document.createElement('span');
           src.className = 'src';
-          src.textContent = 'checked by Claude';
+          src.textContent = 'found by AI';
           head.appendChild(src);
         }
         card.appendChild(head);

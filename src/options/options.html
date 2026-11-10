@@ -6,156 +6,247 @@
   <link rel="stylesheet" href="options.css">
 </head>
 <body>
-<main>
-  <header>
-    <img src="../../icons/icon128.png" alt="" width="44" height="44">
-    <div>
-      <h1>Caret</h1>
-      <p class="sub">Your own build. Nothing you type leaves this computer unless you switch on Claude proofreading below.</p>
-    </div>
-  </header>
+<div class="shell">
 
-  <section>
-    <h2>What to check</h2>
-    <div id="categories"></div>
-    <label class="check">
-      <input type="checkbox" id="checkNames">
-      <span><b>Flag names and unusual words</b><i>Off means a capitalized word we do not recognize is left alone — fewer false alarms on names.</i></span>
-    </label>
-    <label class="check">
-      <input type="checkbox" id="showBadge">
-      <span><b>Show the count badge in the corner of the field</b><i>Click it for a list of everything found, with a “fix all” button.</i></span>
-    </label>
-    <div class="field row">
+  <aside class="side">
+    <div class="brand">
+      <img src="../../icons/icon128.png" alt="" width="34" height="34">
       <div>
-        <label for="underlineStyle">Underline</label>
-        <select id="underlineStyle">
-          <option value="straight">straight line</option>
-          <option value="wavy">wavy line</option>
-        </select>
+        <strong>Caret</strong>
+        <span id="version"></span>
       </div>
     </div>
-  </section>
 
-  <section>
-    <h2>Autocorrect <span class="tag">off by default</span></h2>
-    <p class="note">
-      Caret normally underlines a mistake and waits for you. With this on, the
-      few mistakes that have exactly one right answer are fixed the moment you
-      finish the word — no click, no card. Anything with a judgement call in it
-      (their/there, your/you’re) is still only underlined.
+    <div class="search">
+      <input type="search" id="search" placeholder="Search settings" spellcheck="false" autocomplete="off">
+    </div>
+
+    <nav id="nav">
+      <a href="#sec-preview">Preview</a>
+      <a href="#sec-checks">What to check</a>
+      <a href="#sec-autocorrect">Autocorrect</a>
+      <a href="#sec-ai">AI proofreading</a>
+      <a href="#sec-words">My dictionary</a>
+      <a href="#sec-sites">Sites</a>
+      <a href="#sec-keys">Keyboard</a>
+      <a href="#sec-about">Numbers</a>
+    </nav>
+
+    <p class="side-foot">
+      <span class="dot" id="master-dot"></span>
+      <span id="master-text">Checking</span>
     </p>
-    <label class="check">
-      <input type="checkbox" id="autocorrectEnabled">
-      <span><b>Correct the obvious things as I type</b><i>Every correction is an ordinary edit, so Ctrl+Z undoes it — and a word you undo is left alone from then on.</i></span>
-    </label>
-    <div id="autocorrect-options"></div>
-  </section>
+  </aside>
 
-  <section>
-    <h2>Claude proofreading <span class="tag">optional</span></h2>
-    <p class="note">
-      The built-in checks are instant, offline and free. This one sends the
-      contents of the field to the Anthropic API and adds what it finds to the
-      underlines, marked <b>checked by Claude</b>. It never rewrites anything:
-      it may swap a word or a short phrase, and nothing changes until you click
-      the suggestion. Password fields, card numbers and anything that looks
-      like a key are never sent.
-    </p>
-    <p class="note">
-      <b>Spending.</b> By default it only runs when you ask for it
-      (<b>Alt+Shift+G</b>, or right-click → <i>Check this field now</i>), on the
-      cheapest model, at the lowest effort, with a hard cap per day. A check of
-      a paragraph on Haiku costs a fraction of a cent.
-    </p>
-    <label class="check">
-      <input type="checkbox" id="aiEnabled">
-      <span><b>Also proofread with Claude</b></span>
-    </label>
-    <div class="field">
-      <label for="aiKey">Anthropic API key</label>
-      <input type="password" id="aiKey" placeholder="sk-ant-…" autocomplete="off" spellcheck="false">
-      <p class="hint">Stored in this browser profile's extension storage, unencrypted, and sent only to api.anthropic.com. Get one at console.anthropic.com.</p>
-    </div>
-    <div class="field row">
-      <div>
-        <label for="aiModel">Model</label>
-        <select id="aiModel"></select>
-      </div>
-      <div>
-        <label for="aiEffort">Effort</label>
-        <select id="aiEffort">
-          <option value="low">low — quick and cheap</option>
-          <option value="medium">medium</option>
-          <option value="high">high — most thorough</option>
-        </select>
-      </div>
-      <div class="grow">
-        <label>&nbsp;</label>
-        <button id="test">Test the key</button>
-      </div>
-    </div>
-    <div class="field row">
-      <div class="grow">
-        <label for="aiTrigger">When to run it</label>
-        <select id="aiTrigger">
-          <option value="manual">only when I ask — Alt+Shift+G or right-click</option>
-          <option value="auto">automatically, a second after I stop typing</option>
-        </select>
-      </div>
-      <div>
-        <label for="aiDailyLimit">Most checks per day</label>
-        <input type="text" id="aiDailyLimit" inputmode="numeric" size="5">
-      </div>
-    </div>
-    <p class="hint" id="ai-budget"></p>
-    <p class="result" id="ai-result"></p>
-  </section>
+  <main>
+    <p class="no-results" id="no-results" hidden>Nothing matches that.</p>
 
-  <section>
-    <h2>My dictionary <span class="count" id="words-count"></span></h2>
-    <div class="field row">
-      <div class="grow">
-        <label for="new-word">Add a word</label>
+    <!-- ---------------------------------------------------------- preview -->
+    <section id="sec-preview">
+      <h2>Preview</h2>
+      <p class="note">A real check, run with your settings as they are right now. Change anything below and this updates.</p>
+      <div class="preview" id="preview" aria-live="polite"></div>
+      <p class="legend">
+        <span class="swatch spelling"></span>spelling
+        <span class="swatch grammar"></span>grammar
+        <span class="swatch punctuation"></span>punctuation
+        <span class="swatch style"></span>clarity
+        <span class="swatch ai"></span>AI
+      </p>
+    </section>
+
+    <!-- ----------------------------------------------------------- checks -->
+    <section id="sec-checks">
+      <h2>What to check</h2>
+      <div id="categories"></div>
+
+      <div class="rule"></div>
+
+      <label class="row" data-search="names capitalized unknown false alarms">
+        <span class="text"><b>Flag names and unusual words</b><i>Off means a capitalized word we do not recognize is left alone — fewer false alarms on names and jargon.</i></span>
+        <input type="checkbox" id="checkNames" class="sw">
+        <span class="track" aria-hidden="true"></span>
+      </label>
+
+      <label class="row" data-search="badge count corner list fix all">
+        <span class="text"><b>Show the count badge in the corner of the field</b><i>Click it for a list of everything found, with a “fix all” button.</i></span>
+        <input type="checkbox" id="showBadge" class="sw">
+        <span class="track" aria-hidden="true"></span>
+      </label>
+
+      <div class="row stack" data-search="underline style straight wavy squiggly line">
+        <span class="text"><b>Underline style</b><i>Straight is quieter and lines up with the text better.</i></span>
+        <div class="seg" id="underlineStyle" role="radiogroup" aria-label="Underline style">
+          <button type="button" role="radio" data-value="straight">Straight</button>
+          <button type="button" role="radio" data-value="wavy">Wavy</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- ------------------------------------------------------ autocorrect -->
+    <section id="sec-autocorrect">
+      <h2>Autocorrect <span class="tag">off by default</span></h2>
+      <p class="note">
+        Caret normally underlines a mistake and waits for you. With this on, the
+        few mistakes that have exactly one right answer get fixed the moment you
+        finish the word — no click, no card. Anything with a judgement call in it
+        (their/there, your/you’re) is still only underlined.
+      </p>
+
+      <label class="row lead" data-search="autocorrect as i type automatic fix">
+        <span class="text"><b>Correct the obvious things as I type</b><i>Every correction is an ordinary edit, so Ctrl+Z undoes it — and a word you undo is left alone from then on.</i></span>
+        <input type="checkbox" id="autocorrectEnabled" class="sw">
+        <span class="track" aria-hidden="true"></span>
+      </label>
+
+      <div id="autocorrect-options" class="sub-rows"></div>
+    </section>
+
+    <!-- --------------------------------------------------------------- ai -->
+    <section id="sec-ai">
+      <h2>AI proofreading <span class="tag">optional</span></h2>
+      <p class="note">
+        The built-in checks are instant, offline and free. This one sends the
+        contents of the field to <b id="ai-host">an AI provider</b> and adds what
+        it finds to the underlines. It never rewrites anything: it may swap a
+        word or a short phrase, it is told to keep your vocabulary plain rather
+        than make it sound fancier, and nothing changes until you click the
+        suggestion. Password fields, card numbers and anything that looks like a
+        key are never sent.
+      </p>
+      <p class="note">
+        <b>You do not need this.</b> The built-in checks handle spelling,
+        confused words, apostrophes, agreement and capitals on their own, for
+        free, with no account. This is for the sentence-level things a rule
+        cannot see.
+      </p>
+
+      <label class="row lead" data-search="ai claude chatgpt openai proofread enable">
+        <span class="text"><b>Also proofread with AI</b><i id="ai-state">No key yet.</i></span>
+        <input type="checkbox" id="aiEnabled" class="sw">
+        <span class="track" aria-hidden="true"></span>
+      </label>
+
+      <div id="ai-body" class="sub-rows">
+        <div class="row stack" id="ai-key-row" data-search="api key google gemini free openai chatgpt anthropic claude sk- aiza">
+          <span class="text">
+            <b>API key</b>
+            <i>Paste any one of three. Caret works out which from the key itself and sends it nowhere else.</i>
+          </span>
+          <ul class="providers">
+            <li>
+              <b>Google Gemini</b> <span class="free">free tier</span>
+              <i>A key from <code>aistudio.google.com/apikey</code> needs no card and no credits. There is a cap per minute and per day, which proofreading one field at a time does not come near. Starts <code>AIza</code>.</i>
+            </li>
+            <li>
+              <b>OpenAI</b>
+              <i>Pay as you go — you have to buy credits first, there is no free allowance. Starts <code>sk-</code>.</i>
+            </li>
+            <li>
+              <b>Anthropic</b>
+              <i>Also pay as you go. Starts <code>sk-ant-</code>.</i>
+            </li>
+          </ul>
+          <div class="inline">
+            <input type="password" id="aiKey" placeholder="sk-…" autocomplete="off" spellcheck="false">
+            <button type="button" id="test">Test</button>
+          </div>
+        </div>
+
+        <div class="row stack" data-search="model gpt claude haiku cost">
+          <span class="text"><b>Model</b><i id="model-hint">The cheapest one is plenty for proofreading.</i></span>
+          <select id="aiModel"></select>
+        </div>
+
+        <div class="row stack" id="effort-row" data-search="effort thorough low medium high">
+          <span class="text"><b>Effort</b><i>Anthropic models only. Low is quick and cheap.</i></span>
+          <select id="aiEffort">
+            <option value="low">Low — quick and cheap</option>
+            <option value="medium">Medium</option>
+            <option value="high">High — most thorough</option>
+          </select>
+        </div>
+
+        <div class="row stack" data-search="when to run trigger every minute manual keybind button">
+          <span class="text"><b>When to run it</b><i>Each run costs money, so this is the setting that decides your bill.</i></span>
+          <div id="aiTrigger" class="choices" role="radiogroup" aria-label="When to run AI proofreading"></div>
+        </div>
+
+        <div class="row" id="interval-row" data-search="interval minutes how often">
+          <span class="text"><b>How often</b><i>Minutes between checks while you are typing in a field.</i></span>
+          <input type="text" id="aiIntervalMinutes" inputmode="numeric" size="3" class="num">
+        </div>
+
+        <div class="row" data-search="daily limit cap spend budget">
+          <span class="text"><b>Hard stop per day</b><i id="ai-budget">Caret refuses to run more than this many AI checks in a day, whatever the setting above.</i></span>
+          <input type="text" id="aiDailyLimit" inputmode="numeric" size="4" class="num">
+        </div>
+
+        <p class="result" id="ai-result"></p>
+      </div>
+    </section>
+
+    <!-- ------------------------------------------------------------ words -->
+    <section id="sec-words">
+      <h2>My dictionary <span class="count" id="words-count"></span></h2>
+      <p class="note">Words Caret should always accept — surnames, street names, anything it keeps underlining that is not wrong.</p>
+      <div class="inline" data-search="add word dictionary custom">
         <input type="text" id="new-word" placeholder="Kitson" spellcheck="false">
+        <button type="button" id="add-word" class="primary">Add</button>
       </div>
-      <div>
-        <label>&nbsp;</label>
-        <button id="add-word">Add</button>
+      <ul class="chips" id="words"></ul>
+    </section>
+
+    <!-- ------------------------------------------------------------ sites -->
+    <section id="sec-sites">
+      <h2>Turned off on <span class="count" id="sites-count"></span></h2>
+      <ul class="chips" id="sites"></ul>
+      <p class="hint" id="sites-empty">Right-click any page and choose <b>Turn off on this site</b> to add one.</p>
+
+      <div class="rule"></div>
+
+      <div class="row" data-search="ignored suggestions clear">
+        <span class="text"><b>Ignored suggestions <span class="count" id="ignored-count"></span></b><i>Every time you press <b>Ignore</b> on a card, that exact suggestion for that exact word stops appearing.</i></span>
+        <button type="button" id="clear-ignored">Clear</button>
       </div>
-    </div>
-    <ul class="chips" id="words"></ul>
-  </section>
+    </section>
 
-  <section>
-    <h2>Turned off on <span class="count" id="sites-count"></span></h2>
-    <ul class="chips" id="sites"></ul>
-    <p class="hint" id="sites-empty">Right-click any page and choose <b>Turn off on this site</b> to add one.</p>
-  </section>
+    <!-- --------------------------------------------------------- keyboard -->
+    <section id="sec-keys">
+      <h2>Keyboard and buttons</h2>
+      <dl class="keys">
+        <dt><kbd>Alt</kbd><kbd>G</kbd></dt>
+        <dd>Suggestions for the word the cursor is in</dd>
+        <dt><kbd>Alt</kbd><kbd>Shift</kbd><kbd>G</kbd></dt>
+        <dd>Re-check this field now, including the AI pass</dd>
+        <dt><kbd>Esc</kbd></dt>
+        <dd>Close the suggestion card</dd>
+        <dt>Toolbar</dt>
+        <dd>The Caret button has a <b>Check with AI</b> button in it</dd>
+        <dt>Right-click</dt>
+        <dd>Check this field now, add a word, or turn Caret off on this site</dd>
+      </dl>
+      <button type="button" id="shortcuts">Change the shortcuts</button>
+    </section>
 
-  <section>
-    <h2>Ignored suggestions <span class="count" id="ignored-count"></span></h2>
-    <p class="hint">Every time you press <b>Ignore</b> on a card, that exact suggestion for that exact word stops appearing.</p>
-    <button id="clear-ignored">Clear the ignore list</button>
-  </section>
+    <!-- ------------------------------------------------------------ about -->
+    <section id="sec-about">
+      <h2>Numbers</h2>
+      <p class="stats" id="stats"></p>
+      <div class="rule"></div>
+      <div class="row" data-search="reset defaults">
+        <span class="text"><b>Reset everything to defaults</b><i>Your dictionary, your turned-off sites and your ignore list go too.</i></span>
+        <button type="button" id="reset" class="danger">Reset</button>
+      </div>
+    </section>
 
-  <section>
-    <h2>Numbers</h2>
-    <p class="stats" id="stats"></p>
-    <button id="reset">Reset everything to defaults</button>
-  </section>
+    <footer>
+      <p>Nothing you type leaves this computer unless you switch on AI proofreading.</p>
+    </footer>
+  </main>
 
-  <footer>
-    <p>
-      Underline colors: <span class="swatch spelling"></span> spelling
-      <span class="swatch grammar"></span> grammar
-      <span class="swatch punctuation"></span> punctuation
-      <span class="swatch style"></span> clarity.
-      Hover an underline to fix it, or press <b>Alt+G</b> with the cursor in the word.
-    </p>
-    <p class="saved" id="saved"></p>
-  </footer>
-</main>
+  <p class="toast" id="saved" aria-live="polite"></p>
+</div>
 <script src="options.js" type="module"></script>
 </body>
 </html>

@@ -52,3 +52,26 @@ button {
 }
 button.primary { background: var(--accent); border-color: transparent; color: #fff; font-weight: 600; }
 button:hover { filter: brightness(1.06); }
+
+/* The ask-for-an-AI-pass button. Hidden unless AI is switched on. */
+button.ai {
+  display: block;
+  width: 100%;
+  margin: 2px 0 10px;
+  padding: 9px 12px;
+  border: 1px solid var(--line, #d8d8e0);
+  border-radius: 10px;
+  background: var(--card, #fff);
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  transition: border-color .12s, background .12s;
+}
+button.ai:hover:not(:disabled) { border-color: #5b4bff; background: #f6f5ff; }
+button.ai:disabled { opacity: .6; cursor: default; }
+button.ai .ai-label { display: block; font-weight: 600; }
+button.ai .ai-sub { display: block; font-size: 11px; opacity: .65; margin-top: 1px; }
+
+@media (prefers-color-scheme: dark) {
+  button.ai:hover:not(:disabled) { background: #221f3a; }
+}

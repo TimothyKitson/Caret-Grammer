@@ -47,13 +47,20 @@ async function load() {
     text = found
       ? `${found} suggestion${found === 1 ? '' : 's'} in the field you were typing in.`
       : 'Watching. Click into a text box and start typing.';
-    if (settings.aiEnabled && settings.aiKey) {
-      text += settings.aiTrigger === 'auto'
-        ? ' Claude checks automatically.'
-        : ' Claude checks on Alt+Shift+G.';
-    }
   }
-  if (settings.lastAiError) text += `\nClaude: ${settings.lastAiError}`;
+
+  // The button is the third way to ask for an AI pass, next to Alt+Shift+G and
+  // the right-click menu. It only appears when there is something to ask.
+  const canAi = !!settings.aiEnabled && settings.enabled && state.siteEnabled && !!host;
+  $('check-ai').hidden = !canAi;
+  if (canAi) {
+    $('check-ai-sub').textContent = settings.aiTrigger === 'auto'
+      ? 'also runs on its own after each pause'
+      : settings.aiTrigger === 'interval'
+        ? `also runs every ${settings.aiIntervalMinutes || 1} min while you type`
+        : 'or press Alt+Shift+G';
+  }
+  if (settings.lastAiError) text += `\nAI: ${settings.lastAiError}`;
   $('status').textContent = text;
 
 }
@@ -68,6 +75,21 @@ $('enabled').addEventListener('change', async (event) => {
 $('site-enabled').addEventListener('change', async () => {
   await ask({ type: 'toggle-site', href: (tab && tab.url) || '' });
   load();
+});
+
+$('check-ai').addEventListener('click', async () => {
+  const button = $('check-ai');
+  button.disabled = true;
+  $('check-ai-sub').textContent = 'checking…';
+  try {
+    await chrome.tabs.sendMessage(tab.id, { type: 'command', name: 'check-now' });
+    window.close();
+  } catch (_) {
+    // No content script in this tab - a PDF viewer, or a page that loaded
+    // before the extension did.
+    button.disabled = false;
+    $('check-ai-sub').textContent = 'reload the page and try again';
+  }
 });
 
 $('options').addEventListener('click', () => {
