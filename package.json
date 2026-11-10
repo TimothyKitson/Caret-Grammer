@@ -10,6 +10,7 @@
     "lint": "eslint src test",
     "data": "python3 tools/build-data.py",
     "quality": "node test/quality.mjs",
+    "worker": "python3 tools/bundle-worker.py",
     "icons": "python3 tools/make-icons.py",
     "zip": "rm -f ../caret-store.zip && zip -rq ../caret-store.zip manifest.json icons src data"
   }

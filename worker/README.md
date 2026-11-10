@@ -25,7 +25,28 @@ and changing it later is awkward, so choose one you like.
 
 ### 2. Deploy it
 
-From this folder, with Node installed:
+**If you do not have Node installed, use this way.** No tooling at all:
+
+1. **Compute** → **Workers** → **Create** → **Start from Hello World** → Deploy.
+   Name it `caret-ai`. It asks for a workers.dev subdomain here if you have not
+   picked one.
+2. Open the Worker → **Edit code**. Delete what is there, paste the whole of
+   [`dist/worker.js`](dist/worker.js), and Deploy.
+3. Open the Worker → **Settings** → **Bindings**, and add two:
+   - **Workers AI**, variable name `AI`
+   - **KV namespace**, variable name `KEYS` — click *Create* to make a new
+     namespace if you have none; call it `CARET_KEYS`
+4. Still in Settings, add two **plain text variables** (optional, these are the
+   defaults): `MODEL` = `@cf/meta/llama-3.1-8b-instruct`, `PER_KEY_DAILY` = `120`
+5. Deploy again so the bindings take effect.
+
+Then make keys from **Storage & databases** → **KV** → your namespace → **Add
+entry**: key `key:caret_` plus a dozen random characters, value
+`{"name":"Dad","daily":120}`.
+
+---
+
+**With Node**, from this folder:
 
 ```sh
 npx wrangler login                              # opens a browser, approve once
