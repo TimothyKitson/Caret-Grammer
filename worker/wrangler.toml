@@ -1,0 +1,26 @@
+# The Caret Worker. Deploy with:  npx wrangler deploy
+#
+# Needs two bindings, both set up by `npx wrangler kv namespace create CARET_KEYS`
+# and the Workers AI binding below. Neither costs anything on the free plan.
+
+name = "caret-ai"
+main = "src/index.js"
+compatibility_date = "2026-01-15"
+
+# Workers AI. No account id or token needed - the binding is the credential.
+[ai]
+binding = "AI"
+
+# Where the Caret keys and the per-key day counters live.
+# Replace the id with the one `wrangler kv namespace create` prints.
+[[kv_namespaces]]
+binding = "KEYS"
+id = "REPLACE_WITH_YOUR_KV_NAMESPACE_ID"
+
+[vars]
+# Workers AI's JSON-mode list does not cover every model. These are on it:
+#   @cf/meta/llama-3.1-8b-instruct          small, cheapest in neurons
+#   @cf/meta/llama-3.3-70b-instruct-fp8-fast  much better, costs more per call
+# Compare them with `npm run quality` before settling.
+MODEL = "@cf/meta/llama-3.1-8b-instruct"
+PER_KEY_DAILY = "120"

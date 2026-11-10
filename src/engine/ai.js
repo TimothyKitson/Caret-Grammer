@@ -11,6 +11,9 @@
 // from any web page's JavaScript, and cross-origin requests from a content
 // script would be attributed to the page's own origin.
 
+import { SYSTEM_PROMPT, SCHEMA, userPrompt, parseCorrections } from '../shared/proofread.js';
+import { CARET_ENDPOINT } from '../shared/apikey.js';
+
 const ANTHROPIC_ENDPOINT = 'https://api.anthropic.com/v1/messages';
 const OPENAI_ENDPOINT = 'https://api.openai.com/v1/chat/completions';
 const GEMINI_ENDPOINT = 'https://generativelanguage.googleapis.com/v1beta/models';
@@ -18,6 +21,8 @@ const API_VERSION = '2023-06-01';
 const MAX_CHARS = 6000;
 
 export const AI_MODELS = {
+  // The shared Worker picks its own model, so there is nothing to choose here.
+  caret: [{ id: '', label: 'Chosen by the Caret server' }],
   // Google is first because its free tier is the only one that will proofread
   // all day without a card on file.
   gemini: [
@@ -36,6 +41,7 @@ export const AI_MODELS = {
 };
 
 export const DEFAULT_MODEL = {
+  caret: '',
   gemini: 'gemini-2.5-flash',
   openai: 'gpt-4o-mini',
   anthropic: 'claude-haiku-4-5',
@@ -62,65 +68,7 @@ const NO_EFFORT_MODELS = new Set(['claude-haiku-4-5']);
 const MAX_ORIGINAL_CHARS = 60;
 const MAX_ORIGINAL_WORDS = 6;
 
-const SYSTEM_PROMPT = [
-  'You are a meticulous copy editor working inside a browser extension.',
-  'You are given the raw contents of a text field the user is writing in.',
-  'Report only real mistakes and clear improvements a careful editor would',
-  'mark: spelling, grammar, verb tense, agreement, pronouns, punctuation,',
-  'and sentences that are genuinely confusing.',
-  '',
-  'Rules:',
-  '- NEVER rewrite a sentence, a clause, or a paragraph. The only thing you',
-  '  may propose is swapping a word, or at most a short phrase of a few',
-  '  words, for a better one. If a sentence can only be improved by rewriting',
-  '  it, say nothing about it.',
-  '- Never rewrite for taste. Leave voice, tone, dialect and formatting alone.',
-  '- Ignore missing capitals or full stops in short fragments; people write',
-  '  notes, search terms and chat messages in this box too.',
-  '- Never comment on names, addresses, URLs, code, or anything in brackets',
-  '  that looks like a template or placeholder.',
-  '- "original" must be copied character for character from the text, and be',
-  '  as short as possible while still being fixable on its own.',
-  '- "before" must be the 10 characters that immediately precede "original"',
-  '  in the text (fewer only at the very start). Copy them exactly.',
-  '- "replacement" must be the corrected version of "original" alone.',
-  '- Explanations are one short sentence, in plain language.',
-  '- If the text is already correct, return an empty list.',
-  '',
-  'Vocabulary:',
-  '- Use plain, everyday words. Do NOT replace an ordinary word with a fancier',
-  '  or more formal one. "use" does not become "utilize", "help" does not',
-  '  become "facilitate", "about" does not become "regarding".',
-  '- Never make the writing sound more advanced, more academic or more',
-  '  professional than it already is. That is not a mistake to fix.',
-  '- Only propose a different word when the one written is actually WRONG:',
-  '  misspelled, the wrong word entirely (their/there), or the wrong form',
-  '  (verb tense, singular/plural). Never for sounding better.',
-  '- A replacement should be as simple as, or simpler than, what it replaces.',
-].join('\n');
 
-const SCHEMA = {
-  type: 'object',
-  properties: {
-    corrections: {
-      type: 'array',
-      items: {
-        type: 'object',
-        properties: {
-          before: { type: 'string' },
-          original: { type: 'string' },
-          replacement: { type: 'string' },
-          kind: { type: 'string', enum: ['spelling', 'grammar', 'punctuation', 'style'] },
-          explanation: { type: 'string' },
-        },
-        required: ['before', 'original', 'replacement', 'kind', 'explanation'],
-        additionalProperties: false,
-      },
-    },
-  },
-  required: ['corrections'],
-  additionalProperties: false,
-};
 
 /** Turn one model correction into an issue with real offsets, or null. */
 function locate(text, correction, taken) {
@@ -215,7 +163,7 @@ async function callOpenAi(text, { apiKey, model, fetchImpl, signal }) {
       temperature: 0,
       messages: [
         { role: 'system', content: SYSTEM_PROMPT },
-        { role: 'user', content: `Proofread the text between the markers.\n\n<text>\n${text}\n</text>` },
+        { role: 'user', content: userPrompt(text) },
       ],
       response_format: {
         type: 'json_schema',
@@ -274,7 +222,7 @@ async function callAnthropic(text, { apiKey, model, effort, fetchImpl, signal })
       },
       messages: [{
         role: 'user',
-        content: `Proofread the text between the markers.\n\n<text>\n${text}\n</text>`,
+        content: userPrompt(text),
       }],
     }),
     signal,
@@ -304,6 +252,50 @@ async function callAnthropic(text, { apiKey, model, effort, fetchImpl, signal })
   };
 }
 
+/**
+ * Ask the shared Caret Worker, which runs the model on its own account.
+ *
+ * The point of this one is that the person has no API key of their own and no
+ * account anywhere: they paste a short caret_ key and that is the whole setup.
+ * The allowance behind it is small and shared, so a refusal here is normal and
+ * has to read like an ordinary pause rather than a fault.
+ */
+async function callCaret(text, { apiKey, fetchImpl, signal }) {
+  if (!CARET_ENDPOINT) {
+    throw Object.assign(
+      new Error('This build has no Caret server set, so a caret_ key has nothing to talk to.'),
+      { code: 'no-endpoint' },
+    );
+  }
+  const response = await fetchImpl(`${CARET_ENDPOINT.replace(/\/$/, '')}/check`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json', 'x-caret-key': apiKey },
+    body: JSON.stringify({ text }),
+    signal,
+  });
+
+  let payload = null;
+  try {
+    payload = await response.json();
+  } catch (_) { /* handled below */ }
+
+  if (!response.ok) {
+    const detail = (payload && payload.error) || `error ${response.status}`;
+    const error = new Error(detail);
+    error.status = response.status;
+    // Out of allowance is not a fault to shout about: the local checks carry
+    // on, and tomorrow it works again.
+    if (response.status === 429) error.code = 'quiet';
+    throw error;
+  }
+
+  return {
+    json: JSON.stringify({ corrections: (payload && payload.corrections) || [] }),
+    usage: payload && typeof payload.left === 'number' ? { left: payload.left } : {},
+    model: (payload && payload.model) || 'caret',
+  };
+}
+
 /** Ask Google. Returns the raw JSON string the model produced. */
 async function callGemini(text, { apiKey, model, fetchImpl, signal }) {
   // The key goes in a header, not the query string: a URL can end up in logs.
@@ -312,10 +304,7 @@ async function callGemini(text, { apiKey, model, fetchImpl, signal }) {
     headers: { 'content-type': 'application/json', 'x-goog-api-key': apiKey },
     body: JSON.stringify({
       systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
-      contents: [{
-        role: 'user',
-        parts: [{ text: `Proofread the text between the markers.\n\n<text>\n${text}\n</text>` }],
-      }],
+      contents: [{ role: 'user', parts: [{ text: userPrompt(text) }] }],
       generationConfig: {
         temperature: 0,
         responseMimeType: 'application/json',
@@ -371,28 +360,26 @@ export async function checkWithAi(text, {
   if (!apiKey) throw Object.assign(new Error('No API key set.'), { code: 'no-key' });
   if (!provider) {
     throw Object.assign(
-      new Error('That key does not look like a Google, OpenAI or Anthropic key.'),
+      new Error('That key does not look like a Caret, Google, OpenAI or Anthropic key.'),
       { code: 'bad-key' },
     );
   }
   const truncated = text.length > MAX_CHARS;
   const body = truncated ? text.slice(0, MAX_CHARS) : text;
-  const call = { openai: callOpenAi, gemini: callGemini, anthropic: callAnthropic }[provider];
+  const call = {
+    caret: callCaret, openai: callOpenAi, gemini: callGemini, anthropic: callAnthropic,
+  }[provider];
   const result = await call(body, {
     apiKey, model: model || DEFAULT_MODEL[provider], effort, fetchImpl, signal,
   });
 
-  let parsed;
-  try {
-    parsed = JSON.parse(result.json);
-  } catch (_) {
-    // The schema is meant to guarantee valid JSON, but never trust a remote
-    // shape: a bad response should be a no-op, not a broken field.
-    return { issues: [], truncated, usage: result.usage };
-  }
+  // The schema is meant to guarantee valid JSON, but never trust a remote
+  // shape: a bad response should be a no-op, not a broken field.
+  const corrections = parseCorrections(result.json);
+  if (!corrections) return { issues: [], truncated, usage: result.usage };
 
   return {
-    issues: toIssues(text, parsed.corrections),
+    issues: toIssues(text, corrections),
     truncated,
     usage: result.usage,
     model: result.model,

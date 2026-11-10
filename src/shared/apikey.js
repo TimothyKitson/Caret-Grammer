@@ -26,10 +26,16 @@
 
 export const BUILT_IN_KEY = '';
 
-/** 'gemini' | 'openai' | 'anthropic' | null - worked out from the key itself. */
+// The Caret Worker this build talks to, if there is one. Not a secret: it is
+// the per-person caret_ key that decides who may use it, and that is why the
+// Worker checks one on every request.
+export const CARET_ENDPOINT = '';
+
+/** 'caret' | 'gemini' | 'openai' | 'anthropic' | null - from the key itself. */
 export function providerFor(key) {
   const k = (key || '').trim();
   if (!k) return null;
+  if (/^caret_[A-Za-z0-9_-]{8,64}$/.test(k)) return 'caret';
   if (k.startsWith('sk-ant-')) return 'anthropic';
   if (k.startsWith('sk-')) return 'openai';
   // Google AI Studio keys: always this prefix, 39 characters.

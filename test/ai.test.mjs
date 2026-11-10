@@ -159,6 +159,13 @@ test('every provider has models and a default that is one of them', () => {
     anthropic: /^claude-(opus|sonnet|haiku)-[0-9-]+$/,
   };
   for (const [provider, models] of Object.entries(AI_MODELS)) {
+    if (provider === 'caret') {
+      // The shared Worker picks its own model, so there is nothing to offer.
+      assert.equal(models.length, 1);
+      assert.equal(models[0].id, '');
+      assert.equal(DEFAULT_MODEL.caret, '');
+      continue;
+    }
     assert.ok(models.length >= 2, provider);
     for (const model of models) {
       assert.match(model.id, shape[provider], `${provider}: ${model.id}`);
@@ -233,4 +240,48 @@ test('the prompt tells the model not to reach for fancier words', () => {
     assert.match(system, /utilize/);
     assert.match(system, /more advanced, more academic/);
   });
+});
+
+// ------------------------------------------------------- the shared Worker
+
+test('a caret_ key is recognised as its own provider', async () => {
+  const { providerFor } = await import('../src/shared/apikey.js');
+  assert.equal(providerFor('caret_a1b2c3d4e5f6'), 'caret');
+  assert.equal(providerFor('caret_short'), null, 'too short to be a key');
+  assert.equal(providerFor('caret'), null);
+});
+
+test('the Worker is not called when the build has no endpoint set', async () => {
+  // CARET_ENDPOINT ships empty, so a caret_ key in the published build has
+  // nothing to talk to and must say so rather than fetch some default host.
+  let called = false;
+  await assert.rejects(
+    () => checkWithAi('x y z', {
+      provider: 'caret',
+      apiKey: 'caret_a1b2c3d4e5f6',
+      fetchImpl: async () => { called = true; },
+    }),
+    /no Caret server/,
+  );
+  assert.equal(called, false);
+});
+
+test('the proofreading contract is one copy, shared with the Worker', async () => {
+  const contract = await import('../src/shared/proofread.js');
+  assert.match(contract.SYSTEM_PROMPT, /plain, everyday words/);
+  assert.match(contract.userPrompt('hello'), /<text>\nhello\n<\/text>/);
+  // The Worker imports these same two, so a change reaches both at once.
+  assert.ok(contract.SCHEMA.properties.corrections);
+});
+
+test('a model that wraps its JSON in chatter is still understood', async () => {
+  const { parseCorrections } = await import('../src/shared/proofread.js');
+  const wanted = [{ before: 'I ', original: 'teh', replacement: 'the', kind: 'spelling', explanation: 'typo' }];
+  const body = JSON.stringify({ corrections: wanted });
+  // Small models do all three of these.
+  assert.deepEqual(parseCorrections(body), wanted);
+  assert.deepEqual(parseCorrections('```json\n' + body + '\n```'), wanted);
+  assert.deepEqual(parseCorrections('Sure! Here you go:\n' + body), wanted);
+  assert.equal(parseCorrections('I could not do that.'), null);
+  assert.equal(parseCorrections(''), null);
 });

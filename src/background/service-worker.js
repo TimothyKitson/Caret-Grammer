@@ -178,6 +178,13 @@ async function aiIssuesFor(text, settings) {
     }
     return { issues: result.issues, ran: true };
   } catch (error) {
+    // Running out of a shared free allowance is an ordinary pause, not a
+    // fault: the local checks carry on and it works again tomorrow. Showing it
+    // as an error every time would train people to ignore the error line.
+    if (error.code === 'quiet') {
+      await patchSettings({ lastAiError: '' });
+      return { issues: [], ran: false };
+    }
     bumpStats({ aiErrors: 1 });
     await spendBudget(settings);      // a failed call still costs a request
     await patchSettings({ lastAiError: `${new Date().toISOString().slice(0, 16).replace('T', ' ')} — ${error.message}` });

@@ -97,3 +97,10 @@ tools/           data builders - only needed if you rebuild the word lists
 One warning for anyone editing `src/background/`: **no top-level `await`** in
 the service worker. It loads, dies silently, and every content script then sits
 there waiting for an answer that never comes.
+
+## The shared Worker (optional, in progress)
+
+`worker/` is a Cloudflare Worker that runs the AI pass on one account so a
+small group can use it without anybody getting their own API key. It is not
+deployed yet — `worker/README.md` has the steps, and `CARET_ENDPOINT` in
+`src/shared/apikey.js` stays empty until there is a URL to put in it.
