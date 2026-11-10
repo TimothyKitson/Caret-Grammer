@@ -23,4 +23,5 @@ id = "REPLACE_WITH_YOUR_KV_NAMESPACE_ID"
 #   @cf/meta/llama-3.3-70b-instruct-fp8-fast  much better, costs more per call
 # Compare them with `npm run quality` before settling.
 MODEL = "@cf/meta/llama-3.1-8b-instruct"
-PER_KEY_DAILY = "120"
+# 0 = no per-key cap. The extension limits each person instead.
+PER_KEY_DAILY = "0"

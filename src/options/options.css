@@ -491,3 +491,26 @@ main > section:nth-of-type(n+5) { animation-delay: .18s; }
   border-radius: 20px;
   margin-left: 4px;
 }
+
+/* The chosen provider gets a tag: free, free tier, paid. */
+.choices .tag {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: .02em;
+  padding: 1px 7px;
+  border-radius: 20px;
+  margin-left: 6px;
+  vertical-align: 1px;
+  background: var(--chip);
+  color: var(--muted);
+  text-transform: none;
+}
+.choices .tag.free { background: color-mix(in srgb, var(--mint) 15%, transparent); color: var(--mint); }
+.choices .tag.paid { background: color-mix(in srgb, var(--bad) 12%, transparent); color: var(--bad); }
+
+.warn {
+  margin: 2px 0 0;
+  font-size: 12.5px;
+  color: var(--bad);
+}
+.warn[hidden] { display: none; }

@@ -71,6 +71,10 @@
         <p>Anything with a judgement call in it — their/there, your/you're — is still only underlined. Every correction is an ordinary edit, so <kbd>Ctrl</kbd> <kbd>Z</kbd> undoes it, and a word you undo is left alone from then on.</p>
       </li>
       <li class="rise">
+        <h3>Stop the double underlines</h3>
+        <p>Edge underlines in red too, and two sets of underlines disagreeing with each other is worse than either alone. <b>Turn off the browser's own spell check</b> is on by default: Caret silences Edge in the fields it is checking, and puts it back when you move on. A site that ships its own checker — Google Docs, say — cannot be switched off from here.</p>
+      </li>
+      <li class="rise">
         <h3>Add your own words</h3>
         <p>Surnames, street names, anything Caret keeps underlining that is not wrong. Either add them under <b>My dictionary</b> in the settings, or right-click the word on the page and choose <b>Add to dictionary</b>.</p>
       </li>
@@ -92,21 +96,25 @@
       the sentence-level things a rule cannot see — and it is genuinely optional.
     </p>
     <p>
-      It needs an API key, which is yours and not Caret's. Caret works out which
-      service a key belongs to from the key itself, so there is nothing to
-      choose:
+      Pick which one you want in the settings. Caret's own is free; the others
+      use a key of your own, and Caret works out which service a key belongs to
+      from the key itself:
     </p>
 
     <div class="grid" style="margin:26px 0 30px">
       <div class="card rise">
+        <h3>Caret<span class="badge-free">free</span></h3>
+        <p>Nothing to sign up for and nothing to pay. Someone gives you a key starting <code>caret_</code> and you paste it once. It runs on a small shared allowance, so Caret holds you to <b>50 checks a day</b>; when they are gone it goes quiet until midnight UTC and the built-in checks carry on as normal.</p>
+      </div>
+      <div class="card rise d1">
         <h3>Google Gemini<span class="badge-free">free tier</span></h3>
         <p>A key from <a href="https://aistudio.google.com/apikey">aistudio.google.com/apikey</a> needs no card and no credits. There is a cap per minute and per day, which proofreading one field at a time does not come near. Keys start <code>AIza</code>.</p>
       </div>
-      <div class="card rise d1">
+      <div class="card rise d2">
         <h3>OpenAI</h3>
         <p>Pay as you go — you have to buy credits before the key does anything. There is no free allowance. Keys start <code>sk-</code>.</p>
       </div>
-      <div class="card rise d2">
+      <div class="card rise">
         <h3>Anthropic</h3>
         <p>Also pay as you go. Keys start <code>sk-ant-</code>.</p>
       </div>
@@ -114,21 +122,21 @@
 
     <ol class="steps">
       <li class="rise">
-        <h3>Paste the key in</h3>
-        <p>Settings → <b>AI proofreading</b> → switch it on, then paste the key. It is kept in your browser profile and sent only to the service it belongs to.</p>
+        <h3>Pick one, then paste the key</h3>
+        <p>Settings → <b>AI proofreading</b> → switch it on, choose which AI, then paste the key. It is kept in your browser profile and sent only to the service it belongs to. If the key does not match the service you picked, Caret says so rather than letting the API fail at you later.</p>
       </li>
       <li class="rise">
         <h3>Choose when it runs</h3>
         <p>This is the setting that decides your bill, so it is a real choice:</p>
         <p>
-          <b>Only when I ask</b> — press <kbd>Alt</kbd> <kbd>Shift</kbd> <kbd>G</kbd>, or use the <b>Check with AI</b> button in the toolbar popup. Nothing is sent until you do. This is the default.<br>
+          <b>Only when I ask</b> — right-click the box and choose <b>Proofread with AI</b>, press <kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>.</kbd>, or use the <b>Check with AI</b> button in the toolbar popup. Nothing is sent until you do. This is the default.<br>
           <b>Every minute while I am typing</b> — one check a minute at most, and only in a field you are actually working in.<br>
           <b>After every pause</b> — the most thorough and by far the most expensive.
         </p>
       </li>
       <li class="rise">
-        <h3>Leave the daily cap on</h3>
-        <p>Caret refuses to run more than a set number of AI checks a day, whatever the setting above says. It is there so a stuck key cannot quietly run up a bill.</p>
+        <h3>Know what the limit is</h3>
+        <p>On a free option Caret holds you to <b>50 checks a day</b> on this computer — you can set it lower, not higher, because the allowance behind it belongs to somebody else. On a paid key of your own it does not limit you at all, though you can still set a number so a stuck key cannot quietly run up a bill.</p>
       </li>
     </ol>
 
@@ -146,8 +154,9 @@
     <p class="kicker">Reference</p>
     <h2>Keyboard shortcuts</h2>
     <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr))">
-      <div class="card"><h3><kbd>Alt</kbd> <kbd>G</kbd></h3><p>Suggestions for the word the cursor is in.</p></div>
-      <div class="card"><h3><kbd>Alt</kbd> <kbd>Shift</kbd> <kbd>G</kbd></h3><p>Re-check this field now, including the AI pass.</p></div>
+      <div class="card"><h3><kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>Space</kbd></h3><p>Suggestions for the word the cursor is in.</p></div>
+      <div class="card"><h3><kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>.</kbd></h3><p>Proofread this field with AI.</p></div>
+      <div class="card"><h3>Right-click</h3><p><b>Proofread with AI</b>, right there in the menu — no shortcut to remember.</p></div>
       <div class="card"><h3><kbd>Esc</kbd></h3><p>Close the suggestion card.</p></div>
     </div>
     <p style="margin-top:20px">You can change any of these: settings → <b>Keyboard and buttons</b> → <b>Change the shortcuts</b>.</p>

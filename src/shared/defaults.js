@@ -2,6 +2,21 @@
 
 export const STORAGE_KEY = 'settings';
 
+// The free options run on an allowance somebody else is paying for - Caret's
+// own server shares one between everybody, and Google rate limits its free
+// tier - so Caret holds each install to this many checks a day. It is counted
+// here, in the extension, per person: the server is not asked to police it.
+//
+// A paid key is the user's own money and their own decision, so it is not
+// capped at all. 0 means no limit.
+export const MAX_FREE_DAILY = 50;
+export const FREE_PROVIDERS = new Set(['caret', 'gemini']);
+
+/** The most checks a day this provider may be set to. 0 means no limit. */
+export function dailyCeiling(provider) {
+  return FREE_PROVIDERS.has(provider) ? MAX_FREE_DAILY : 0;
+}
+
 export const DEFAULT_SETTINGS = {
   enabled: true,
   categories: {
@@ -39,7 +54,12 @@ export const DEFAULT_SETTINGS = {
   // 'auto'     after every pause in typing (the expensive one)
   aiTrigger: 'manual',
   aiIntervalMinutes: 1,
-  aiDailyLimit: 40,      // hard stop, per day, whatever the trigger
+  // Which service to use. Empty means "work it out from the key", which is how
+  // it behaved before there was a chooser.
+  aiProvider: '',
+  // Hard stop per day, whatever the trigger. The free options are shared or
+  // rate limited, so this is capped rather than open-ended.
+  aiDailyLimit: MAX_FREE_DAILY,
   aiUsage: { day: '', count: 0 },
   disabledSites: [],
   customWords: [],
@@ -53,6 +73,40 @@ export const AUTOCORRECT_INFO = [
   { key: 'sentenceCaps', label: 'Capitalize the first word of a sentence', hint: 'After a full stop, a question mark or a new line. Not after “Dr.” or an ellipsis.' },
   { key: 'apostrophes', label: 'Add missing apostrophes', hint: 'dont → don’t, wouldnt → wouldn’t, youre → you’re. Only where the word is not something else.' },
   { key: 'commonTypos', label: 'Fix well-known typos', hint: 'teh → the, recieve → receive. Only typos with a single documented correction.' },
+];
+
+export const AI_PROVIDER_INFO = [
+  {
+    value: 'caret',
+    label: 'Caret',
+    tag: 'free',
+    hint: 'Free, and there is nothing to sign up for. It runs on a small shared '
+      + 'allowance, so there is a limit on how many checks a day you get — and if '
+      + 'everyone uses it up, it goes quiet until midnight UTC and the built-in '
+      + 'checks carry on as normal. Needs a key starting caret_, unless this copy '
+      + 'already has one.',
+  },
+  {
+    value: 'gemini',
+    label: 'Google Gemini',
+    tag: 'free tier',
+    hint: 'Your own key from aistudio.google.com/apikey. No card and no credits, '
+      + 'with a cap per minute and per day that proofreading one field at a time '
+      + 'does not come near. Keys start AIza.',
+  },
+  {
+    value: 'openai',
+    label: 'OpenAI',
+    tag: 'paid',
+    hint: 'Your own key. Pay as you go — you have to buy credits before it does '
+      + 'anything, and there is no free allowance. Keys start sk-.',
+  },
+  {
+    value: 'anthropic',
+    label: 'Anthropic',
+    tag: 'paid',
+    hint: 'Your own key, also pay as you go. Keys start sk-ant-.',
+  },
 ];
 
 export const AI_TRIGGER_INFO = [

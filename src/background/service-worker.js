@@ -5,7 +5,9 @@
 // down when idle and starts it again on the next message; the dictionary is
 // rebuilt on demand, which takes about half a second once per wake-up.
 
-import { DEFAULT_SETTINGS, STORAGE_KEY, mergeSettings, siteKey } from '../shared/defaults.js';
+import {
+  DEFAULT_SETTINGS, STORAGE_KEY, mergeSettings, siteKey, dailyCeiling,
+} from '../shared/defaults.js';
 import { createDictionary } from '../engine/dictionary.js';
 import { check } from '../engine/engine.js';
 import { checkWithAi, DEFAULT_MODEL } from '../engine/ai.js';
@@ -121,10 +123,39 @@ const AI_MAX_PER_MINUTE = 20;
  * starting sk- is OpenAI - so there is no provider setting to get wrong.
  */
 function aiCredentials(settings) {
-  const key = (settings.aiKey || '').trim() || BUILT_IN_KEY;
-  const provider = providerFor(key);
-  const model = settings.aiModel || (provider ? DEFAULT_MODEL[provider] : '');
-  return { key, provider, model, baked: !settings.aiKey && !!BUILT_IN_KEY };
+  const typed = (settings.aiKey || '').trim();
+  const chosen = settings.aiProvider || '';
+
+  // Nothing chosen: work it out from whatever key there is, which is how this
+  // behaved before there was a chooser.
+  if (!chosen) {
+    const key = typed || BUILT_IN_KEY;
+    const provider = providerFor(key);
+    return {
+      key, provider, chosen,
+      model: settings.aiModel || (provider ? DEFAULT_MODEL[provider] : ''),
+      baked: !typed && !!BUILT_IN_KEY,
+    };
+  }
+
+  // Caret's own server. A key baked into this copy is used first, so most
+  // people never see a key box at all.
+  if (chosen === 'caret') {
+    const key = providerFor(BUILT_IN_KEY) === 'caret' ? BUILT_IN_KEY
+      : providerFor(typed) === 'caret' ? typed : '';
+    return { key, provider: 'caret', chosen, model: '', baked: key === BUILT_IN_KEY && !!key };
+  }
+
+  // A named provider needs a key that belongs to it. Pasting a Google key
+  // while OpenAI is selected should read as "no key yet", not fail at the API.
+  const key = providerFor(typed) === chosen ? typed : '';
+  return {
+    key,
+    provider: chosen,
+    chosen,
+    model: settings.aiModel || DEFAULT_MODEL[chosen] || '',
+    baked: false,
+  };
 }
 
 function today() {
@@ -132,11 +163,21 @@ function today() {
   return `${now.getFullYear()}-${now.getMonth() + 1}-${now.getDate()}`;
 }
 
-/** How many AI requests are left today. */
-function budgetLeft(settings) {
+/**
+ * How many AI requests are left today. Infinity means no limit.
+ *
+ * The ceiling is applied here as well as in the settings page, so a stored
+ * number from an older version - or an edited one - cannot lift a free
+ * provider's cap.
+ */
+function budgetLeft(settings, provider) {
+  const ceiling = dailyCeiling(provider || aiCredentials(settings).provider);
+  let limit = Number(settings.aiDailyLimit) || 0;
+  if (ceiling > 0) limit = limit > 0 ? Math.min(limit, ceiling) : ceiling;
+  if (limit <= 0) return Infinity;
   const usage = settings.aiUsage || {};
   const used = usage.day === today() ? (usage.count || 0) : 0;
-  return Math.max(0, (settings.aiDailyLimit || 0) - used);
+  return Math.max(0, limit - used);
 }
 
 async function spendBudget(settings) {
@@ -176,8 +217,13 @@ async function aiIssuesFor(text, settings) {
     return { issues: [], ran: false };
   }
   if (budgetLeft(settings) <= 0) {
+    const ceiling = dailyCeiling(aiCredentials(settings).provider);
+    const limit = ceiling > 0
+      ? Math.min(Number(settings.aiDailyLimit) || ceiling, ceiling)
+      : Number(settings.aiDailyLimit) || 0;
     await patchSettings({
-      lastAiError: `Daily limit of ${settings.aiDailyLimit} AI checks reached. It resets tomorrow, or raise it in settings.`,
+      lastAiError: `That is ${limit} AI checks today. It resets tomorrow, `
+        + `${ceiling > 0 ? 'or use your own paid key for no limit.' : 'or raise the limit in settings.'}`,
     });
     return { issues: [], ran: false, capped: true };
   }
@@ -356,13 +402,20 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
       }
       case 'get-settings': {
         const settings = await getSettings();
-        const { key, provider, baked } = aiCredentials(settings);
+        const { key, provider, baked, chosen } = aiCredentials(settings);
         respond({
           settings,
-          aiLeftToday: budgetLeft(settings),
+          aiLeftToday: budgetLeft(settings, provider),
           // Never the key itself - only what the settings page needs to know
           // to decide between a switch and a key box.
-          ai: { provider, baked, hasKey: !!key },
+          ai: {
+            provider,
+            chosen,
+            baked,
+            hasKey: !!key,
+            // A key is stored but does not belong to the chosen provider.
+            keyMismatch: !!(settings.aiKey || '').trim() && !key && chosen !== 'caret',
+          },
         });
         return;
       }

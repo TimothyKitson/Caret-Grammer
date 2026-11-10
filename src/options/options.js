@@ -1,5 +1,6 @@
 import {
-  CATEGORY_INFO, AUTOCORRECT_INFO, AI_TRIGGER_INFO, DEFAULT_SETTINGS,
+  CATEGORY_INFO, AUTOCORRECT_INFO, AI_TRIGGER_INFO, AI_PROVIDER_INFO,
+  DEFAULT_SETTINGS, MAX_FREE_DAILY, dailyCeiling,
 } from '../shared/defaults.js';
 import { AI_MODELS, DEFAULT_MODEL } from '../engine/ai.js';
 
@@ -133,6 +134,38 @@ function paintAutocorrect() {
   }
 }
 
+function paintProviders() {
+  const host = $('aiProvider');
+  host.textContent = '';
+  const current = settings.aiProvider || aiInfo.provider || '';
+  for (const option of AI_PROVIDER_INFO) {
+    const label = document.createElement('label');
+    label.classList.toggle('on', option.value === current);
+
+    const input = document.createElement('input');
+    input.type = 'radio';
+    input.name = 'aiProvider';
+    input.value = option.value;
+    input.checked = option.value === current;
+    input.disabled = !settings.aiEnabled;
+    input.addEventListener('change', () => save({ aiProvider: option.value }));
+
+    const text = document.createElement('span');
+    const strong = document.createElement('b');
+    strong.textContent = option.label;
+    const tag = document.createElement('span');
+    tag.className = `tag ${option.tag === 'paid' ? 'paid' : 'free'}`;
+    tag.textContent = option.tag;
+    strong.appendChild(tag);
+    const hint = document.createElement('i');
+    hint.textContent = option.hint;
+    text.append(strong, hint);
+
+    label.append(input, text);
+    host.appendChild(label);
+  }
+}
+
 function paintTriggers() {
   const host = $('aiTrigger');
   host.textContent = '';
@@ -238,6 +271,7 @@ function schedulePreview() {
 function paint() {
   paintCategories();
   paintAutocorrect();
+  paintProviders();
   paintTriggers();
   paintModels();
 
@@ -263,9 +297,31 @@ function paint() {
   for (const field of $('ai-body').querySelectorAll('input, select, button')) {
     field.disabled = !on;
   }
-  $('ai-key-row').hidden = aiInfo.baked;
-  $('effort-row').hidden = aiInfo.provider !== null && aiInfo.provider !== 'anthropic';
-  $('model-row').hidden = aiInfo.provider === 'caret';
+  const picked = settings.aiProvider || aiInfo.provider || '';
+  const free = picked === 'caret' || picked === 'gemini';
+
+  // Nothing to paste when this copy already carries a Caret key.
+  $('ai-key-row').hidden = picked === 'caret' && aiInfo.baked;
+  $('effort-row').hidden = picked !== 'anthropic';
+  $('model-row').hidden = picked === 'caret' || !picked;
+  $('interval-row').hidden = settings.aiTrigger !== 'interval';
+
+  const KEY_SHAPE = {
+    caret: ['Caret key', 'caret_…', 'Someone gives you this. Nothing to sign up for and nothing to pay.'],
+    gemini: ['Google API key', 'AIza…', 'From aistudio.google.com/apikey — no card, no credits.'],
+    openai: ['OpenAI API key', 'sk-…', 'From platform.openai.com. You have to buy credits first.'],
+    anthropic: ['Anthropic API key', 'sk-ant-…', 'From console.anthropic.com. Pay as you go.'],
+  }[picked] || ['API key', 'sk-…', 'Pick which AI you are using first.'];
+  $('key-label').textContent = KEY_SHAPE[0];
+  $('aiKey').placeholder = KEY_SHAPE[1];
+  $('key-hint').textContent = `${KEY_SHAPE[2]} Kept in this browser profile and sent nowhere else.`;
+
+  // A key for the wrong service is the most likely mistake once there is a
+  // chooser, and the API's own error for it is not a helpful one.
+  $('key-warn').hidden = !aiInfo.keyMismatch;
+  $('key-warn').textContent = aiInfo.keyMismatch
+    ? `That key does not look like a ${KEY_SHAPE[0].replace(' key', '')}. Check which AI is selected above.`
+    : '';
   $('interval-row').hidden = settings.aiTrigger !== 'interval';
 
   const PROVIDER_NAME = {
@@ -281,9 +337,20 @@ function paint() {
       ? `Using your ${PROVIDER_NAME[aiInfo.provider] || ''} key.`.replace(/\s+/g, ' ')
       : 'Needs an API key, below.';
 
-  $('ai-budget').textContent = settings.aiEnabled
-    ? `${aiLeftToday} of ${settings.aiDailyLimit} AI checks left today. Caret stops at the limit whatever the setting above.`
-    : 'Caret refuses to run more than this many AI checks in a day, whatever the setting above.';
+  // A free allowance belongs to somebody else, so Caret holds each person to a
+  // number. A paid key is the user's own money, so it does not.
+  const ceiling = dailyCeiling(picked);
+  const limitBox = $('aiDailyLimit');
+  limitBox.value = ceiling > 0
+    ? String(Math.min(Number(settings.aiDailyLimit) || ceiling, ceiling))
+    : String(Number(settings.aiDailyLimit) || 0);
+  $('limit-label').textContent = ceiling > 0 ? 'Checks a day' : 'Checks a day (optional)';
+  $('ai-budget').textContent = ceiling > 0
+    ? `Free, with a limit: at most ${ceiling} AI checks a day on this computer, `
+      + `and you can set it lower. ${settings.aiEnabled ? `${aiLeftToday} left today. ` : ''}`
+      + 'When it runs out the built-in checks carry on as normal.'
+    : 'Your own key, so Caret does not limit it. Set a number to stop a runaway '
+      + 'from costing you, or 0 for no limit at all.';
 
   $('master-dot').classList.toggle('off', !settings.enabled);
   $('master-text').textContent = settings.enabled ? 'Checking' : 'Switched off';
@@ -337,7 +404,15 @@ const clampNumber = (id, key, min, max, fallback) => {
     save({ [key]: value });
   });
 };
-clampNumber('aiDailyLimit', 'aiDailyLimit', 0, 1000, DEFAULT_SETTINGS.aiDailyLimit);
+$('aiDailyLimit').addEventListener('change', (e) => {
+  const picked = settings.aiProvider || aiInfo.provider || '';
+  const ceiling = dailyCeiling(picked);
+  const asked = Number(e.target.value);
+  const value = ceiling > 0
+    ? Math.max(1, Math.min(ceiling, asked || ceiling))
+    : Math.max(0, Math.min(99999, Number.isFinite(asked) ? asked : 0));
+  save({ aiDailyLimit: value });
+});
 clampNumber('aiIntervalMinutes', 'aiIntervalMinutes', 1, 120, 1);
 
 async function addWord() {

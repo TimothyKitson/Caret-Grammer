@@ -43,9 +43,14 @@ const OUT_OF_ALLOWANCE = /neuron|quota|exceeded|capacity|3040/i;
 // Matches the extension's own ceiling, so a long field is cut the same way.
 const MAX_CHARS = 6000;
 
-// Per key, per UTC day. The account-wide allowance is the real limit; this one
-// is so that one person cannot spend all of it.
-const DEFAULT_PER_KEY_DAILY = 120;
+// No per-key cap by default: the extension holds each person to its own daily
+// limit, so capping here as well would just be a second number to keep in step
+// with the first. Set "daily" on a key, or PER_KEY_DAILY, only to rein in a
+// particular person - say, one whose key has got out.
+//
+// The account-wide Workers AI allowance is still the real ceiling, and running
+// into it is handled separately.
+const DEFAULT_PER_KEY_DAILY = 0;
 
 const CORS = {
   'access-control-allow-origin': '*',
@@ -74,11 +79,14 @@ async function spendKey(env, key) {
   if (!record) return { ok: false, status: 401, error: 'This Caret key is not recognised.' };
   if (record.revoked) return { ok: false, status: 403, error: 'This Caret key has been turned off.' };
 
-  const limit = Number(record.daily) > 0 ? Number(record.daily)
+  // "daily": 0, or no "daily" at all, means this key is not capped here.
+  const limit = Number(record.daily) > 0
+    ? Number(record.daily)
     : Number(env.PER_KEY_DAILY) || DEFAULT_PER_KEY_DAILY;
+
   const counter = `use:${key}:${today()}`;
   const used = Number(await env.KEYS.get(counter)) || 0;
-  if (used >= limit) {
+  if (limit > 0 && used >= limit) {
     return {
       ok: false,
       status: 429,
@@ -86,10 +94,16 @@ async function spendKey(env, key) {
     };
   }
 
-  // Two checks landing together can both read the same number; losing one off
-  // the count matters far less than making every request wait on a lock.
+  // Counted either way, so a key that is being hammered can be spotted in KV
+  // and given a "daily" of its own. Two checks landing together can both read
+  // the same number; losing one off the count matters far less than making
+  // every request wait on a lock.
   await env.KEYS.put(counter, String(used + 1), { expirationTtl: 60 * 60 * 36 });
-  return { ok: true, name: record.name || 'someone', left: limit - used - 1 };
+  return {
+    ok: true,
+    name: record.name || 'someone',
+    left: limit > 0 ? limit - used - 1 : null,
+  };
 }
 
 export default {

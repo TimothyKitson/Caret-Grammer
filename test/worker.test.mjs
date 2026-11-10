@@ -304,3 +304,27 @@ test('/health names the model it would reach for', async () => {
   assert.match(body.model, /^@cf\//);
   assert.ok(body.fallbacks >= 3, 'there should be several to fall back on');
 });
+
+test('a key with no "daily" is not capped by the Worker', async () => {
+  // Caret limits each person in the extension now, so the server only caps a
+  // key that has been given a number of its own.
+  const env = fakeEnv({
+    kv: fakeKv({ 'key:caret_abcdef123456': JSON.stringify({ name: 'Tim' }) }),
+  });
+  for (let i = 0; i < 8; i += 1) {
+    const res = await worker.fetch(post({ text: 'I teh cat' }, KEY), env);
+    assert.equal(res.status, 200, `call ${i + 1}`);
+  }
+  // Still counted, so a key being hammered can be spotted and given a cap.
+  assert.equal(env.KEYS.store.get(`use:caret_abcdef123456:${new Date().toISOString().slice(0, 10)}`), '8');
+});
+
+test('an explicit "daily" on a key still caps it', async () => {
+  const env = fakeEnv({
+    kv: fakeKv({ 'key:caret_abcdef123456': JSON.stringify({ name: 'Noisy', daily: 2 }) }),
+  });
+  await worker.fetch(post({ text: 'x y' }, KEY), env);
+  await worker.fetch(post({ text: 'x y' }, KEY), env);
+  const res = await worker.fetch(post({ text: 'x y' }, KEY), env);
+  assert.equal(res.status, 429);
+});

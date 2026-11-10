@@ -142,33 +142,24 @@
       </label>
 
       <div id="ai-body" class="sub-rows">
-        <div class="row stack" id="ai-key-row" data-search="api key caret_ google gemini free openai chatgpt anthropic claude sk- aiza">
+        <div class="row stack" data-search="which ai provider caret google gemini openai chatgpt anthropic claude choose pick">
           <span class="text">
-            <b>API key</b>
-            <i>Paste any one of these. Caret works out which from the key itself and sends it nowhere else.</i>
+            <b>Which AI</b>
+            <i>Pick one. Caret's own is free; the others use a key of your own.</i>
           </span>
-          <ul class="providers">
-            <li>
-              <b>A Caret key</b> <span class="free">nothing to sign up for</span>
-              <i>If someone gave you a key starting <code>caret_</code>, paste that and you are done — no account anywhere, nothing to pay. It runs on a small shared allowance, so it goes quiet for the rest of the day if that runs out.</i>
-            </li>
-            <li>
-              <b>Google Gemini</b> <span class="free">free tier</span>
-              <i>A key from <code>aistudio.google.com/apikey</code> needs no card and no credits. There is a cap per minute and per day, which proofreading one field at a time does not come near. Starts <code>AIza</code>.</i>
-            </li>
-            <li>
-              <b>OpenAI</b>
-              <i>Pay as you go — you have to buy credits first, there is no free allowance. Starts <code>sk-</code>.</i>
-            </li>
-            <li>
-              <b>Anthropic</b>
-              <i>Also pay as you go. Starts <code>sk-ant-</code>.</i>
-            </li>
-          </ul>
+          <div id="aiProvider" class="choices" role="radiogroup" aria-label="Which AI to use"></div>
+        </div>
+
+        <div class="row stack" id="ai-key-row" data-search="api key paste sk- aiza caret_">
+          <span class="text">
+            <b id="key-label">API key</b>
+            <i id="key-hint">Kept in this browser profile and sent only to the service it belongs to.</i>
+          </span>
           <div class="inline">
             <input type="password" id="aiKey" placeholder="sk-…" autocomplete="off" spellcheck="false">
             <button type="button" id="test">Test</button>
           </div>
+          <p class="warn" id="key-warn" hidden></p>
         </div>
 
         <div class="row stack" id="model-row" data-search="model gpt claude haiku cost">
@@ -195,8 +186,8 @@
           <input type="text" id="aiIntervalMinutes" inputmode="numeric" size="3" class="num">
         </div>
 
-        <div class="row" data-search="daily limit cap spend budget">
-          <span class="text"><b>Hard stop per day</b><i id="ai-budget">Caret refuses to run more than this many AI checks in a day, whatever the setting above.</i></span>
+        <div class="row" data-search="daily limit cap spend budget free rate limit 50">
+          <span class="text"><b id="limit-label">Checks a day</b><i id="ai-budget"></i></span>
           <input type="text" id="aiDailyLimit" inputmode="numeric" size="4" class="num">
         </div>
 

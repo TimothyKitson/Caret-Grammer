@@ -396,15 +396,47 @@ await step('the AI section asks for a key and offers the free provider', async (
   await options.locator('#aiTrigger label:has(input[value="interval"])').click();
   await options.waitForFunction(() => !document.getElementById('interval-row').hidden);
   const minutes = await options.locator('#aiIntervalMinutes').inputValue();
-  const providers = await options.locator('.providers li').allInnerTexts();
+  const providers = await options.locator('#aiProvider label').allInnerTexts();
+  // Read the tags as their own elements: innerText runs the name and the tag
+  // together ("OpenAIpaid"), because the gap between them is a CSS margin.
+  const tags = await options.locator('#aiProvider .tag').allInnerTexts();
+
+  // Picking a provider has to drive the rest of the section: a Caret key is
+  // free and has no model to choose, an Anthropic one is paid and has effort.
+  await options.locator('#aiProvider label:has(input[value="caret"])').click();
+  await options.waitForFunction(() => document.getElementById('key-label').textContent === 'Caret key');
+  const caret = await options.evaluate(() => ({
+    placeholder: document.getElementById('aiKey').placeholder,
+    model: document.getElementById('model-row').hidden,
+    limit: document.getElementById('aiDailyLimit').value,
+    budget: document.getElementById('ai-budget').textContent,
+  }));
+
+  await options.locator('#aiProvider label:has(input[value="anthropic"])').click();
+  await options.waitForFunction(() => document.getElementById('key-label').textContent === 'Anthropic API key');
+  const paid = await options.evaluate(() => ({
+    placeholder: document.getElementById('aiKey').placeholder,
+    effort: document.getElementById('effort-row').hidden,
+    budget: document.getElementById('ai-budget').textContent,
+  }));
+
   await options.locator('label:has(#aiEnabled)').click();
   await options.close();
   assert.equal(keyDisabled, true, 'the key box should be dead until AI is switched on');
   assert.equal(triggers, 3, `expected 3 trigger choices, saw ${triggers}`);
   assert.equal(intervalHiddenAtFirst, true);
   assert.equal(minutes, '1');
-  assert.equal(providers.length, 4, 'expected every provider listed');
-  assert.ok(providers.some((p) => /free tier/i.test(p)), 'the free one is not marked free');
+  assert.equal(providers.length, 4, `expected 4 providers, saw ${providers.length}`);
+  assert.deepEqual(tags, ['free', 'free tier', 'paid', 'paid'], 'provider tags');
+
+  assert.equal(caret.placeholder, 'caret_…');
+  assert.equal(caret.model, true, 'the Caret server picks its own model');
+  assert.equal(caret.limit, '50', 'the free option is capped at 50 a day');
+  assert.match(caret.budget, /Free, with a limit/);
+
+  assert.equal(paid.placeholder, 'sk-ant-…');
+  assert.equal(paid.effort, false, 'effort is an Anthropic setting');
+  assert.match(paid.budget, /does not limit it/);
 });
 
 await step('a word added in options stops being flagged', async () => {
