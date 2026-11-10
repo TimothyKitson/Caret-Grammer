@@ -128,19 +128,27 @@ export function suggest(word, dict, limit = 5, preferNames = false) {
   return best.map((s) => matchCase(word, canonical(s, dict)));
 }
 
-// Is the next word a name? Two very different questions, so two tests.
+// Is the next word a name? Three different questions, so three tests.
 //
-// An INTRODUCTION says so outright - "my name is Will", "Dear Rose", "Mr. Good"
-// - and it is worth acting on however ordinary the word usually is.
-export const NAME_INTRODUCTION = new RegExp(
+// STATED: the sentence says outright that a name is coming - "my name is
+// Will", "Dear Rose", "Sincerely, Grace" - and that is worth acting on however
+// ordinary the word usually is.
+export const NAME_STATED = new RegExp(
   '\\b(?:'
   + "names?\\s*['’]?s?\\s+(?:is|are|was|were)"
   + '|call(?:ed)?\\s+me|goes\\s+by|named|signed'
   + '|yours\\s+(?:truly|sincerely)|sincerely|regards|attn'
   + '|dear'
-  + '|m[rs]|mrs|mx|dr|prof|rev|sgt|capt|lt|gov|sen|rep|hon|fr|st'
   + ')\\s*\\.?[\\s,]*$', 'i',
 );
+
+// TITLED: "Mr. Good", "Dr Smith". Deliberately case-sensitive, because these
+// little words are also ordinary ones: "my sales rep will call", "the gov will
+// decide", "it takes 500 ms", "my prof will email us". Written as a title it
+// has a capital; in lowercase it only counts with its full stop, and only for
+// the handful that are never anything but titles. "St" is not here at all:
+// "Main St. will be closed" is a street.
+export const NAME_TITLE = /(?:\b(?:Mr|Mrs|Ms|Mx|Dr|Prof|Rev|Sgt|Capt|Lt|Gov|Sen|Rep|Hon|Fr)\.?|\b(?:mr|mrs|ms|mx|dr)\.)[ \t]+$/;
 
 // A GREETING only names someone when that is the whole of what is said to them:
 // "Hi rose," is Rose, but "Hi, good to hear from you" is not Mr Good. So the

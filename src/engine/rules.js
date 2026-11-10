@@ -12,9 +12,76 @@
 
 import { inSkipRange } from './tokenize.js';
 import { matchCase, fillTemplate } from './text-util.js';
-import { NAME_INTRODUCTION, NAME_GREETING, NAME_ADDRESSED } from './spelling.js';
+import { NAME_STATED, NAME_TITLE, NAME_GREETING, NAME_ADDRESSED } from './spelling.js';
 
 const alt = (words) => words.join('|');
+
+// Is the word at `index` the first word of a clause: the start of the text or
+// of a line, after sentence punctuation, an opening quote or bracket, or a
+// conjunction?
+//
+// Rules about a SUBJECT need this. "It don't matter" is a mistake; "people who
+// try it don't regret it" is not, and neither is "a photo of me and my dad
+// fishing". The pronoun is the same word in both - what differs is whether it
+// is doing the action, and in English the one doing the action opens the
+// clause. Without this check those rules underlined ordinary correct
+// sentences, which is the one thing this checker must not do.
+const CLAUSE_OPENER = new RegExp(
+  '(?:^|[.!?;:\\n(\\[“"‘—–]\\s*|\\b(?:'
+  + 'and|but|or|so|yet|because|cause|cos|if|when|while|though|although|since|unless|whether'
+  + '|then|that|as|once|after|before|until'
+  // verbs that introduce a whole clause: whatever follows them is its subject
+  + '|think|thinks|thought|know|knows|knew|say|says|said|hope|hopes|hoped|guess'
+  + '|believe|believes|believed|feel|feels|felt|mean|means|reckon|realize|realized'
+  + '|realise|realised|bet|swear|heard|noticed'
+  + ')\\s+)$', 'i',
+);
+const CLAUSE_OPENER_OR_COMMA = /(?:,\s+)$/;
+
+function atClauseStart(doc, index, { comma = true } = {}) {
+  const haystack = doc.normalized || doc.text;
+  const before = haystack.slice(Math.max(0, index - 14), index);
+  return CLAUSE_OPENER.test(before) || (comma && CLAUSE_OPENER_OR_COMMA.test(before));
+}
+
+// An auxiliary, or a verb like let / make / see / help, puts the next verb in
+// its plain form whatever the subject: "does he have", "will it have", "let it
+// have a rest", "did she do".
+const TAKES_PLAIN_VERB = /\b(?:do|does|did|will|would|can|could|shall|should|may|might|must|let|lets|make|makes|made|help|helps|helped|see|sees|saw|watch|watches|watched|hear|hears|heard|have|has|had)(?:n['’]t)?\s+(?:not\s+)?$/i;
+// "I suggest that he have a look" - the subjunctive after asking or insisting.
+const MANDATIVE = /\b(?:suggest|recommend|insist|demand|request|propose|require|ask|urge|prefer|important|essential|vital|necessary|crucial|imperative)\w*\s+(?:that\s+)?$/i;
+// "if it were", "as though he were", "I wish it were Friday".
+const IRREALIS = /\b(?:if|though|wish|wished|wishes|suppose|imagine|unless)\s+$/i;
+// Only ever subjects, so no position test is needed for these.
+const SUBJECT_ONLY = /^(?:he|she|they|we|i)$/i;
+// A determiner in front of a noun subject: "the kids", "our parents".
+const DETERMINER = /\b(?:the|these|those|our|my|your|their|his|her|its|all\s+the|some|many|most|both)\s+$/i;
+
+/**
+ * Is `word`, sitting at `index`, really the subject that `verb` agrees with?
+ *
+ * The agreement rules are all "word next to verb" patterns, and a word next to
+ * a verb is often not its subject at all: "things that don't work", "one of
+ * the teachers was", "does he have time", "thank you is not enough", "if it
+ * were true". Each of those was being underlined. This says no for all of
+ * them, and yes for "he don't know", "the kids is outside", "it were broken".
+ */
+function isTheSubject(doc, index, word, verb) {
+  const haystack = doc.normalized || doc.text;
+  const before = haystack.slice(Math.max(0, index - 40), index);
+  if (TAKES_PLAIN_VERB.test(before) || MANDATIVE.test(before)) return false;
+  if (/^were$/i.test(verb) && IRREALIS.test(before)) return false;
+  if (SUBJECT_ONLY.test(word)) return true;
+
+  // it, you, this, these, those and nouns can all be objects too, so they only
+  // count as the subject when they open the clause - or, for a noun, when its
+  // determiner does.
+  if (/\bof\s+$/i.test(before) || /\bof\s+\S+\s+$/i.test(before)) return false;   // "one of the kids is"
+  if (/^thank$/i.test(before.trim().split(/\s+/).pop() || '') && /^you$/i.test(word)) return false;
+  if (atClauseStart(doc, index)) return true;
+  const det = before.match(DETERMINER);
+  return !!det && atClauseStart(doc, index - (before.length - det.index) + (det[0].length - det[0].trimStart().length));
+}
 
 // ---------------------------------------------------------------------------
 // word lists
@@ -434,10 +501,19 @@ const RULES = [
     id: 'where-were-subject',
     category: 'grammar',
     short: 'Confused words',
-    re: /\b(?:they|we|you|who|these|those)\s+(where)\b(?!\s*\?)/gi,
-    group: 1,
+    // "they", "we" and "who" are only ever subjects, so "they where" is wrong
+    // wherever it turns up - except straight after a form of "be", as in
+    // "were they where it happened?".
+    //
+    // "you" is the awkward one: it is also an object, and "I'll show you where
+    // it is" is perfectly good English. So "you where" only counts when "you"
+    // opens the clause. "these" and "those" are not here at all: "those where
+    // the answer is known can be skipped" is correct.
+    re: /(?<!\b(?:were|was|are|is|am|be|been)\s)\b(they|we|who|you)\s+(where)\b(?!\s*\?)/gi,
+    group: 2,
     message: '“Where” is a place. After a subject you want “were”.',
     suggest: () => ['were'],
+    exclude: (m, doc) => m[1].toLowerCase() === 'you' && !atClauseStart(doc, m.index),
   },
   {
     // The idiom is "couldn't care less" - caring less is the whole point.
@@ -454,24 +530,43 @@ const RULES = [
     id: 'dont-doesnt',
     category: 'grammar',
     short: 'Agreement',
-    re: /\b(?:he|she|it|that|this|everyone|everybody|someone|somebody|nobody|anyone)\s+(do\s*n['’]?o?t|dont|don['’]t)\b/gi,
-    group: 1,
+    // Only he, she and it, and only when they open the clause. "that" and
+    // "this" used to be in this list and flagged "things that don't work" and
+    // "things like this don't happen"; "it" without the clause check flagged
+    // "people who try it don't regret it". The indefinite pronouns are gone
+    // too: "everybody don't move!" is an order, not a mistake.
+    re: /\b(he|she|it)\s+(dont|do\s*nt)\b/gi,
+    group: 2,
     message: 'A single person or thing “doesn’t”, not “don’t”.',
     suggest: () => ["doesn't"],
+    exclude: (m, doc) => !isTheSubject(doc, m.index, m[1], m[2]),
   },
   {
     // "neither of us have" -> has. Neither is singular, however many people it
-    // is talking about. Same for either, each and none in this shape.
+    // is talking about. Same for either and each.
+    //
+    // Not "none": "none of them were ready" is standard English and always
+    // has been.
     id: 'neither-of-us-have',
     category: 'grammar',
     short: 'Agreement',
-    re: /\b(?:neither|either|each|none)\s+of\s+(?:us|them|you|the\s+\w+|my\s+\w+|our\s+\w+|these|those)\s+(have|were|are|do|want|know|seem|need)\b/gi,
+    re: /\b(?:neither|either|each)\s+of\s+(?:us|them|you|the\s+\w+|my\s+\w+|our\s+\w+|these|those)\s+(have|were|are|do|want|know|seem|need)\b/gi,
     group: 1,
     message: '“Neither”, “either” and “each” are singular, however many people they are talking about.',
     suggest: (m) => [{
       have: 'has', were: 'was', are: 'is', do: 'does',
       want: 'wants', know: 'knows', seem: 'seems', need: 'needs',
     }[m[1].toLowerCase()]],
+    exclude: (m, doc) => {
+      const before = (doc.normalized || doc.text).slice(Math.max(0, m.index - 40), m.index);
+      // "Does either of you know", "Will each of them have", "I let each of
+      // them have one": after an auxiliary, or a verb such as let, make or
+      // see, the plain form of the verb is the right one.
+      if (/\b(?:do|does|did|can|could|will|would|shall|should|may|might|must|let|lets|make|makes|made|help|helps|helped|see|sees|saw|watch|watches|watched|hear|hears|heard|have|has|had)(?:n['’]t)?\s+(?:not\s+)?$/i.test(before)) return true;
+      // "I suggest that each of you have a look" - after a verb of asking or
+      // insisting, "have" is the subjunctive and is correct.
+      return /\b(?:suggest|recommend|insist|demand|request|propose|require|ask|urge|prefer|important|essential|vital|necessary|crucial|imperative)\w*\s+(?:that\s+)?$/i.test(before);
+    },
   },
   {
     // "Me and the principal has been" - the verb is wrong, and so is "Me".
@@ -484,12 +579,12 @@ const RULES = [
     group: 1,
     message: 'When they are the ones doing the action, it is “… and I”.',
     suggest: () => ['I'],
-    exclude: (m, doc) => {
-      // "she told me and the principal about it" - there "me" is correct,
-      // because it is receiving the action rather than doing it.
-      const before = (doc.normalized || doc.text).slice(Math.max(0, m.index - 18), m.index);
-      return /\b(?:told|gave|showed|sent|asked|gives|tells|between|for|with|to|at|saw|joined|emailed|called)\s*$/i.test(before);
-    },
+    // "Me" is only wrong when it is doing the action, and then it opens the
+    // clause. Everywhere else it is receiving the action and is correct: "she
+    // told me and the principal", "a photo of me and my dad fishing", "he
+    // watched me and my brother playing". Listing the verbs that can come
+    // before it was tried first and cannot work - any verb can.
+    exclude: (m, doc) => !atClauseStart(doc, m.index, { comma: false }),
   },
   {
     // "Me and him went" -> "He and I went". Only when a verb follows, so
@@ -506,6 +601,8 @@ const RULES = [
       return [`${who[0].toUpperCase()}${who.slice(1)} and I`];
     },
     rawCase: true,
+    // Same reasoning as the rule above: "he saw me and him talking" is right.
+    exclude: (m, doc) => !atClauseStart(doc, m.index, { comma: false }),
   },
   {
     id: 'were-where',
@@ -719,10 +816,12 @@ const RULES = [
     id: 'he-dont',
     category: 'grammar',
     short: 'Agreement',
-    re: /\b(he|she|it|this|that|everyone|everybody|nobody|somebody|someone)\s+(don't|do\s+not)\b/gi,
+    // Not "that": in "things that don't work" it is standing in for "things".
+    re: /\b(he|she|it|this|everyone|everybody|nobody|somebody|someone)\s+(don['’]t|do\s+not)\b/gi,
     group: 2,
     message: '“$1” takes “doesn’t”.',
     suggest: (m) => [/\s/.test(m[2]) ? 'does not' : "doesn't"],
+    exclude: (m, doc) => !isTheSubject(doc, m.index, m[1], m[2]),
   },
   {
     id: 'they-is',
@@ -732,15 +831,18 @@ const RULES = [
     group: 2,
     message: '“$1” takes a plural verb.',
     suggest: (m) => [m[2].toLowerCase() === 'is' ? 'are' : 'were'],
+    exclude: (m, doc) => !isTheSubject(doc, m.index, m[1], m[2]),
   },
   {
     id: 'he-are',
     category: 'grammar',
     short: 'Agreement',
-    re: /\b(he|she|it|this|that|there\s+(?:is|was))\s+(are|were)\b/gi,
+    // Not "that": "the things that are left" is a relative clause.
+    re: /\b(he|she|it|this|there\s+(?:is|was))\s+(are|were)\b/gi,
     group: 2,
     message: '“$1” takes a singular verb.',
     suggest: (m) => [m[2].toLowerCase() === 'are' ? 'is' : 'was'],
+    exclude: (m, doc) => !/^there\s/i.test(m[1]) && !isTheSubject(doc, m.index, m[1], m[2]),
   },
   {
     id: 'i-is',
@@ -755,10 +857,12 @@ const RULES = [
     id: 'he-have',
     category: 'grammar',
     short: 'Agreement',
-    re: /\b(he|she|it|this|that|everyone|everybody|nobody|somebody|someone)\s+(have)\b/gi,
+    // Not "that": "the people that have signed up" is a relative clause.
+    re: /\b(he|she|it|this|everyone|everybody|nobody|somebody|someone)\s+(have)\b/gi,
     group: 2,
     message: '“$1” takes “has”.',
     suggest: () => ['has'],
+    exclude: (m, doc) => !isTheSubject(doc, m.index, m[1], m[2]),
   },
   {
     id: 'they-has',
@@ -768,6 +872,7 @@ const RULES = [
     group: 2,
     message: '“$1” takes “have”.',
     suggest: () => ['have'],
+    exclude: (m, doc) => !isTheSubject(doc, m.index, m[1], m[2]),
   },
   {
     id: 'dont-has',
@@ -1020,11 +1125,15 @@ const RULES = [
     },
   },
   {
+    // Extra picky only. These are how people actually write to each other,
+    // and underlining "ok" in every chat message by default is a nag. A
+    // capital "OK" is simply correct and is never mentioned.
     id: 'informal',
-    category: 'style',
+    category: 'advanced',
     short: 'Informal',
     re: /\b(alright|ain't|y'all|ok)\b/gi,
     group: 1,
+    exclude: (m) => m[1] === 'OK',
     message: '“$1” is informal.',
     suggest: (m) => {
       const fixes = { alright: 'all right', "ain't": 'is not', "y'all": 'you all', ok: 'OK' };
@@ -1113,10 +1222,15 @@ const FUNCTION_RULES = [
           // to also be names, so the sentence has to say outright that it means
           // the name. Anything less and "this is good" becomes Mr Good.
           const before = haystack.slice(Math.max(0, token.start - 28), token.start);
-          const after = haystack.slice(token.end, token.end + 4);
-          const introduced = NAME_INTRODUCTION.test(before);
+          const after = haystack.slice(token.end, token.end + 12);
+          const stated = NAME_STATED.test(before);
+          const titled = NAME_TITLE.test(before);
           const addressed = NAME_GREETING.test(before) && NAME_ADDRESSED.test(after);
-          if (!introduced && !addressed) continue;
+          if (!stated && !titled && !addressed) continue;
+          // "The Dr. will see you now", "your Rep. may vote against it": after
+          // a title, "will" and "may" followed by another word are the verbs,
+          // not Will and May.
+          if (titled && !stated && /^(?:will|may)$/.test(token.lower) && /^\s+[a-z]/.test(after)) continue;
         }
         issues.push({
           id: 'proper-noun-capital',

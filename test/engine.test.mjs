@@ -402,3 +402,71 @@ test('"me and the principal" is only wrong when it is the subject', () => {
     assert.deepEqual(idsFor(fine).filter((id) => id === 'me-and-someone'), [], fine);
   }
 });
+
+// --------------------------------- is the word next to the verb its subject?
+//
+// The agreement rules are "word next to verb" patterns, and a word next to a
+// verb is often not its subject: these were all underlined before 1.6.2, some
+// of them since 1.0.
+
+const RELEASE_CORRECT = [
+  // relative clauses: "that" stands for the noun before it
+  "There are things that don't work.", "These are the ones that don't fit.",
+  "I like shoes that don't pinch.", 'The things that are left go here.',
+  'Those that were late can stay.', 'Things that have changed are listed.',
+  'The people that have signed up can come.',
+  // object pronouns
+  "People who try it don't regret it.", 'Thank you is not enough.',
+  // "of" phrases
+  'One of the teachers was absent today.', 'Each of the parents was told.',
+  'Which of these is yours?', 'None of those was mine.',
+  'None of them were ready.', 'None of the students were late.',
+  // questions and plain-verb positions
+  'Does he have time?', 'Did she have fun?', 'Will it have finished by then?',
+  'Let it have a rest.', 'Does either of you know the way?',
+  'Will either of you have time tomorrow?', 'I let each of them have one.',
+  // the subjunctive
+  'If he were here, he would help.', 'I wish it were Friday.',
+  'It looks as though she were asleep.', 'I suggest that he have a look.',
+  'I suggest that each of you have a look.',
+  // "you where" as an indirect question
+  "I'll show you where it is.", "We'll tell you where to park.",
+  'I told you where the office was.',
+  // "me" on the receiving end
+  'This photo shows me and my dad fishing.', 'She watched me and my brother playing outside.',
+  'He saw me and him talking.', 'There is a video of me and her dancing.',
+  // little words that are also titles
+  'My sales rep will call you tomorrow.', 'My prof will email us the notes.',
+  'The gov will decide next week.', 'Our street, Main St. will be closed.',
+  'It takes 500 ms may be less.',
+];
+
+test('correct sentences the agreement rules used to underline', () => {
+  for (const sentence of RELEASE_CORRECT) {
+    assert.deepEqual(issuesFor(sentence).map((i) => `${i.id}:${sentence.slice(i.start, i.end)}`), [], sentence);
+  }
+});
+
+test('the real agreement mistakes are all still caught', () => {
+  for (const sentence of [
+    "He don't know.", "She don't care about it.", "It don't matter.", 'They is coming.',
+    'We was late.', 'You was right.', 'He are tall.', 'It were broken.', 'She have a car.',
+    'He have gone home.', 'They has left.', 'The kids is outside.', 'Those is mine.',
+    "And he don't care.", '"It don\'t matter," she said.', "I think he don't know.",
+    "I know it don't matter.", 'I hope she have time.', 'When he have time, call me.',
+    'Because they is late, we left.', 'My kids is late again.', 'Our parents was told nothing.',
+    'The teachers was happy.', 'She said it were broken.', "Honestly, he don't care.",
+    'Well, they was wrong.', 'He dont know.', 'Mom said the kids was asleep.',
+    'If they was here, they would know.', 'Neither of us have had much luck.',
+    'Me and the principal has been trying.', 'Me and him went together.',
+    'They where at the store.', 'Hello, my name is good.', 'Mr. good signed it.',
+  ]) {
+    assert.ok(issuesFor(sentence).length > 0, `missed: ${sentence}`);
+  }
+});
+
+test('a capitalised OK is correct, and lowercase ok is only mentioned when extra picky', () => {
+  assert.deepEqual(idsFor('OK, that works for me.'), []);
+  assert.deepEqual(idsFor('ok that works for me'), []);
+  assert.ok(idsFor('ok that works for me', { categories: { advanced: true } }).includes('informal'));
+});
