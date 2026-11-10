@@ -99,3 +99,49 @@ export function parseCorrections(raw) {
   }
   return null;
 }
+
+// How many "leave this alone" items to send. Long enough to cover the words a
+// person actually keeps rejecting, short enough that the note stays a footnote
+// rather than becoming most of the prompt.
+export const MAX_LEAVE_ALONE = 60;
+
+/**
+ * The note that tells the model what this writer has already said no to.
+ *
+ * Caret filters these out locally anyway, so the model's suggestion would be
+ * thrown away either way. The point is that it stops spending one of its few
+ * suggestions re-proposing something that has been rejected before, and stops
+ * the writer being nagged about the way they write.
+ *
+ * Everything in here was chosen deliberately by the writer - a word they added
+ * to their dictionary, or a correction they pressed Ignore on. None of it is
+ * guessed from their writing.
+ *
+ * @param {string[]} items  words and phrases to leave alone
+ * @returns {string} '' when there is nothing to say
+ */
+export function leaveAloneNote(items) {
+  const clean = [];
+  const seen = new Set();
+  for (const item of items || []) {
+    const word = String(item || '').trim();
+    // One word or a short phrase. Anything longer is not a word they rejected,
+    // it is a sentence, and it does not belong in the prompt.
+    if (!word || word.length > 40 || seen.has(word.toLowerCase())) continue;
+    seen.add(word.toLowerCase());
+    clean.push(word);
+    if (clean.length >= MAX_LEAVE_ALONE) break;
+  }
+  if (!clean.length) return '';
+
+  return [
+    '',
+    'This writer has already told the checker to leave the following words and',
+    'phrases alone - either by adding them to their dictionary or by dismissing',
+    'a correction to them. This is how they write on purpose.',
+    '',
+    'NEVER propose a change to any of them, in any sentence, for any reason,',
+    'including spelling, capitalization and punctuation inside them:',
+    clean.map((w) => `  ${w}`).join('\n'),
+  ].join('\n');
+}

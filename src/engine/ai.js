@@ -11,7 +11,9 @@
 // from any web page's JavaScript, and cross-origin requests from a content
 // script would be attributed to the page's own origin.
 
-import { SYSTEM_PROMPT, SCHEMA, userPrompt, parseCorrections } from '../shared/proofread.js';
+import {
+  SYSTEM_PROMPT, SCHEMA, userPrompt, parseCorrections, leaveAloneNote,
+} from '../shared/proofread.js';
 import { CARET_ENDPOINT } from '../shared/apikey.js';
 
 const ANTHROPIC_ENDPOINT = 'https://api.anthropic.com/v1/messages';
@@ -153,7 +155,7 @@ export function toIssues(text, corrections) {
  * @throws {Error} with .status set for HTTP failures
  */
 /** Ask OpenAI. Returns the raw JSON string the model produced. */
-async function callOpenAi(text, { apiKey, model, fetchImpl, signal }) {
+async function callOpenAi(text, { apiKey, model, system, fetchImpl, signal }) {
   const response = await fetchImpl(OPENAI_ENDPOINT, {
     method: 'POST',
     headers: { 'content-type': 'application/json', authorization: `Bearer ${apiKey}` },
@@ -162,7 +164,7 @@ async function callOpenAi(text, { apiKey, model, fetchImpl, signal }) {
       // Proofreading is not a reasoning task; keep it cheap and literal.
       temperature: 0,
       messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
+        { role: 'system', content: system },
         { role: 'user', content: userPrompt(text) },
       ],
       response_format: {
@@ -200,7 +202,7 @@ async function callOpenAi(text, { apiKey, model, fetchImpl, signal }) {
 }
 
 /** Ask Anthropic. Returns the raw JSON string the model produced. */
-async function callAnthropic(text, { apiKey, model, effort, fetchImpl, signal }) {
+async function callAnthropic(text, { apiKey, model, effort, system, fetchImpl, signal }) {
   const supportsEffort = !NO_EFFORT_MODELS.has(model);
   const response = await fetchImpl(ANTHROPIC_ENDPOINT, {
     method: 'POST',
@@ -215,7 +217,7 @@ async function callAnthropic(text, { apiKey, model, effort, fetchImpl, signal })
     body: JSON.stringify({
       model,
       max_tokens: supportsEffort ? 6000 : 2000,
-      system: SYSTEM_PROMPT,
+      system,
       output_config: {
         ...(supportsEffort ? { effort } : {}),
         format: { type: 'json_schema', schema: SCHEMA },
@@ -260,7 +262,7 @@ async function callAnthropic(text, { apiKey, model, effort, fetchImpl, signal })
  * The allowance behind it is small and shared, so a refusal here is normal and
  * has to read like an ordinary pause rather than a fault.
  */
-async function callCaret(text, { apiKey, fetchImpl, signal }) {
+async function callCaret(text, { apiKey, leaveAlone, fetchImpl, signal }) {
   if (!CARET_ENDPOINT) {
     throw Object.assign(
       new Error('This build has no Caret server set, so a caret_ key has nothing to talk to.'),
@@ -270,7 +272,7 @@ async function callCaret(text, { apiKey, fetchImpl, signal }) {
   const response = await fetchImpl(`${CARET_ENDPOINT.replace(/\/$/, '')}/check`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-caret-key': apiKey },
-    body: JSON.stringify({ text }),
+    body: JSON.stringify(leaveAlone && leaveAlone.length ? { text, leaveAlone } : { text }),
     signal,
   });
 
@@ -297,13 +299,13 @@ async function callCaret(text, { apiKey, fetchImpl, signal }) {
 }
 
 /** Ask Google. Returns the raw JSON string the model produced. */
-async function callGemini(text, { apiKey, model, fetchImpl, signal }) {
+async function callGemini(text, { apiKey, model, system, fetchImpl, signal }) {
   // The key goes in a header, not the query string: a URL can end up in logs.
   const response = await fetchImpl(`${GEMINI_ENDPOINT}/${encodeURIComponent(model)}:generateContent`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-goog-api-key': apiKey },
     body: JSON.stringify({
-      systemInstruction: { parts: [{ text: SYSTEM_PROMPT }] },
+      systemInstruction: { parts: [{ text: system }] },
       contents: [{ role: 'user', parts: [{ text: userPrompt(text) }] }],
       generationConfig: {
         temperature: 0,
@@ -354,6 +356,9 @@ export async function checkWithAi(text, {
   provider,
   model,
   effort = 'low',
+  // Words this writer has already said to leave alone: their own dictionary,
+  // and the corrections they have dismissed.
+  leaveAlone = [],
   fetchImpl = fetch,
   signal,
 } = {}) {
@@ -370,7 +375,13 @@ export async function checkWithAi(text, {
     caret: callCaret, openai: callOpenAi, gemini: callGemini, anthropic: callAnthropic,
   }[provider];
   const result = await call(body, {
-    apiKey, model: model || DEFAULT_MODEL[provider], effort, fetchImpl, signal,
+    apiKey,
+    model: model || DEFAULT_MODEL[provider],
+    effort,
+    system: SYSTEM_PROMPT + leaveAloneNote(leaveAlone),
+    leaveAlone,
+    fetchImpl,
+    signal,
   });
 
   // The schema is meant to guarantee valid JSON, but never trust a remote

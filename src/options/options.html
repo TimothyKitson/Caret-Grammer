@@ -115,6 +115,14 @@
         key are never sent.
       </p>
       <p class="note">
+        <b>It learns what to leave alone.</b> Every word you add to your
+        dictionary, and every suggestion you dismiss with <b>Ignore</b>, is sent
+        with the request as a list of things not to touch. So the AI stops
+        re-proposing a change you have already turned down, and stops correcting
+        the way you write on purpose. Nothing is guessed from your writing — only
+        the choices you made yourself.
+      </p>
+      <p class="note">
         <b>You do not need this.</b> The built-in checks handle spelling,
         confused words, apostrophes, agreement and capitals on their own, for
         free, with no account. This is for the sentence-level things a rule
@@ -210,7 +218,7 @@
       <div class="rule"></div>
 
       <div class="row" data-search="ignored suggestions clear">
-        <span class="text"><b>Ignored suggestions <span class="count" id="ignored-count"></span></b><i>Every time you press <b>Ignore</b> on a card, that exact suggestion for that exact word stops appearing.</i></span>
+        <span class="text"><b>Ignored suggestions <span class="count" id="ignored-count"></span></b><i>Every time you press <b>Ignore</b> on a card, that exact suggestion for that exact word stops appearing — and the AI pass, if you use it, is told to leave that word alone too.</i></span>
         <button type="button" id="clear-ignored">Clear</button>
       </div>
     </section>

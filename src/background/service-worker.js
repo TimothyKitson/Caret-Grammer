@@ -145,6 +145,28 @@ async function spendBudget(settings) {
   await patchSettings({ aiUsage: { day: today(), count: used + 1 } });
 }
 
+/**
+ * The words this writer has already said to leave alone.
+ *
+ * Two deliberate signals, never a guess: words they added to their dictionary,
+ * and the exact text of corrections they pressed Ignore on. The ignore list is
+ * stored as "rule-id:text", so the text is everything after the first colon.
+ *
+ * Newest first, because the thing they dismissed this morning matters more
+ * than one from six months ago if the list has to be cut short.
+ */
+function leaveAloneList(settings) {
+  const out = [];
+  for (const entry of [...(settings.ignored || [])].reverse()) {
+    const text = String(entry).slice(String(entry).indexOf(':') + 1).trim();
+    if (text) out.push(text);
+  }
+  for (const word of [...(settings.customWords || [])].reverse()) {
+    if (word) out.push(String(word));
+  }
+  return out;
+}
+
 /** @returns {{issues: object[], ran: boolean}} ran=false means try again later. */
 async function aiIssuesFor(text, settings) {
   if (aiCache.has(text)) return { issues: aiCache.get(text), ran: true };
@@ -168,6 +190,7 @@ async function aiIssuesFor(text, settings) {
       provider,
       model,
       effort: settings.aiEffort,
+      leaveAlone: leaveAloneList(settings),
     });
     if (aiCache.size >= AI_CACHE_MAX) aiCache.clear();
     aiCache.set(text, result.issues);
@@ -404,7 +427,7 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
           const { key, provider, model } = aiCredentials(settings);
           const result = await checkWithAi(
             'Their is to many mistake in this sentance, and i has not fixed it yet.',
-            { apiKey: key, provider, model, effort: settings.aiEffort },
+            { apiKey: key, provider, model, effort: settings.aiEffort, leaveAlone: leaveAloneList(settings) },
           );
           await patchSettings({ lastAiError: '' });
           respond({ ok: true, found: result.issues.length, model: result.model });

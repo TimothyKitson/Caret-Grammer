@@ -191,3 +191,35 @@ test('anything else is a 404', async () => {
   const res = await worker.fetch(new Request('https://w.example/'), fakeEnv());
   assert.equal(res.status, 404);
 });
+
+// ------------------------------------------------- what not to correct
+
+test('the Worker puts the writer\'s rejected words into its prompt', async () => {
+  const env = fakeEnv();
+  await worker.fetch(post({ text: 'Kitson signed it', leaveAlone: ['Kitson'] }, KEY), env);
+  assert.match(env.calls[0].body.messages[0].content, /NEVER propose a change/);
+  assert.match(env.calls[0].body.messages[0].content, /Kitson/);
+});
+
+test('a client cannot use leaveAlone to write the prompt', async () => {
+  const env = fakeEnv();
+  await worker.fetch(post({
+    text: 'hello',
+    leaveAlone: [
+      'x'.repeat(500),                       // too long to be a word
+      ...Array.from({ length: 300 }, (_, i) => `w${i}`),  // too many
+      12345, null, { bad: true },            // not strings
+    ],
+  }, KEY), env);
+  const system = env.calls[0].body.messages[0].content;
+  assert.ok(!system.includes('x'.repeat(100)), 'a long string got through');
+  assert.ok(!system.includes('12345'));
+  assert.ok(system.length < 6000, `prompt ballooned to ${system.length}`);
+});
+
+test('no list means the prompt is the plain one', async () => {
+  const env = fakeEnv();
+  await worker.fetch(post({ text: 'hello' }, KEY), env);
+  const { SYSTEM_PROMPT } = await import('../src/shared/proofread.js');
+  assert.equal(env.calls[0].body.messages[0].content, SYSTEM_PROMPT);
+});

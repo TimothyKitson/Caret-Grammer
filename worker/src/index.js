@@ -14,7 +14,9 @@
 // What it never does: store the text it is sent, or log it. The only things
 // written down are counters.
 
-import { SYSTEM_PROMPT, SCHEMA, userPrompt, parseCorrections } from '../../src/shared/proofread.js';
+import {
+  SYSTEM_PROMPT, SCHEMA, userPrompt, parseCorrections, leaveAloneNote,
+} from '../../src/shared/proofread.js';
 
 // Workers AI's documented JSON-mode list does NOT include every model, so this
 // is configurable rather than hardcoded - set MODEL in wrangler.toml and
@@ -98,6 +100,13 @@ export default {
     const text = typeof body.text === 'string' ? body.text.slice(0, MAX_CHARS) : '';
     if (!text.trim()) return json({ corrections: [] });
 
+    // Words the writer has told their own copy of Caret to leave alone. Taken
+    // as untrusted input: strings only, short ones, and a bounded number of
+    // them, so a bad client cannot use this to write the prompt.
+    const leaveAlone = Array.isArray(body.leaveAlone)
+      ? body.leaveAlone.filter((w) => typeof w === 'string' && w.length <= 40).slice(0, 80)
+      : [];
+
     const gate = await spendKey(env, request.headers.get('x-caret-key') || body.key);
     if (!gate.ok) return json({ error: gate.error }, gate.status);
 
@@ -106,7 +115,7 @@ export default {
     try {
       reply = await env.AI.run(model, {
         messages: [
-          { role: 'system', content: SYSTEM_PROMPT },
+          { role: 'system', content: SYSTEM_PROMPT + leaveAloneNote(leaveAlone) },
           { role: 'user', content: userPrompt(text) },
         ],
         // Asked for, not relied on: Workers AI says it cannot guarantee the

@@ -116,6 +116,52 @@ function parseCorrections(raw) {
   return null;
 }
 
+// How many "leave this alone" items to send. Long enough to cover the words a
+// person actually keeps rejecting, short enough that the note stays a footnote
+// rather than becoming most of the prompt.
+const MAX_LEAVE_ALONE = 60;
+
+/**
+ * The note that tells the model what this writer has already said no to.
+ *
+ * Caret filters these out locally anyway, so the model's suggestion would be
+ * thrown away either way. The point is that it stops spending one of its few
+ * suggestions re-proposing something that has been rejected before, and stops
+ * the writer being nagged about the way they write.
+ *
+ * Everything in here was chosen deliberately by the writer - a word they added
+ * to their dictionary, or a correction they pressed Ignore on. None of it is
+ * guessed from their writing.
+ *
+ * @param {string[]} items  words and phrases to leave alone
+ * @returns {string} '' when there is nothing to say
+ */
+function leaveAloneNote(items) {
+  const clean = [];
+  const seen = new Set();
+  for (const item of items || []) {
+    const word = String(item || '').trim();
+    // One word or a short phrase. Anything longer is not a word they rejected,
+    // it is a sentence, and it does not belong in the prompt.
+    if (!word || word.length > 40 || seen.has(word.toLowerCase())) continue;
+    seen.add(word.toLowerCase());
+    clean.push(word);
+    if (clean.length >= MAX_LEAVE_ALONE) break;
+  }
+  if (!clean.length) return '';
+
+  return [
+    '',
+    'This writer has already told the checker to leave the following words and',
+    'phrases alone - either by adding them to their dictionary or by dismissing',
+    'a correction to them. This is how they write on purpose.',
+    '',
+    'NEVER propose a change to any of them, in any sentence, for any reason,',
+    'including spelling, capitalization and punctuation inside them:',
+    clean.map((w) => `  ${w}`).join('\n'),
+  ].join('\n');
+}
+
 // The Caret Worker: a free AI proofreading pass for a handful of people.
 //
 // Why it exists. The extension can already call Google, OpenAI or Anthropic
@@ -215,6 +261,13 @@ export default {
     const text = typeof body.text === 'string' ? body.text.slice(0, MAX_CHARS) : '';
     if (!text.trim()) return json({ corrections: [] });
 
+    // Words the writer has told their own copy of Caret to leave alone. Taken
+    // as untrusted input: strings only, short ones, and a bounded number of
+    // them, so a bad client cannot use this to write the prompt.
+    const leaveAlone = Array.isArray(body.leaveAlone)
+      ? body.leaveAlone.filter((w) => typeof w === 'string' && w.length <= 40).slice(0, 80)
+      : [];
+
     const gate = await spendKey(env, request.headers.get('x-caret-key') || body.key);
     if (!gate.ok) return json({ error: gate.error }, gate.status);
 
@@ -223,7 +276,7 @@ export default {
     try {
       reply = await env.AI.run(model, {
         messages: [
-          { role: 'system', content: SYSTEM_PROMPT },
+          { role: 'system', content: SYSTEM_PROMPT + leaveAloneNote(leaveAlone) },
           { role: 'user', content: userPrompt(text) },
         ],
         // Asked for, not relied on: Workers AI says it cannot guarantee the

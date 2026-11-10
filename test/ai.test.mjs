@@ -310,3 +310,73 @@ test('a model that wraps its JSON in chatter is still understood', async () => {
   assert.equal(parseCorrections('I could not do that.'), null);
   assert.equal(parseCorrections(''), null);
 });
+
+// ------------------------------------------------- what not to correct
+
+test('words the writer rejected are named in the prompt', async () => {
+  const capture = {};
+  await checkWithAi('Kitson signed it.', {
+    provider: 'openai',
+    apiKey: 'sk-test',
+    leaveAlone: ['Kitson', "ya'll", 'good'],
+    fetchImpl: stub({ payload: { choices: [{ message: { content: '{"corrections":[]}' } }] } }, capture),
+  });
+  const system = capture.body.messages[0].content;
+  // The original instructions are still there, with the list appended.
+  assert.match(system, /meticulous copy editor/);
+  assert.match(system, /NEVER propose a change to any of them/);
+  for (const word of ['Kitson', "ya'll", 'good']) assert.ok(system.includes(word), word);
+});
+
+test('no rejections means no note at all', async () => {
+  const capture = {};
+  await checkWithAi('hello', {
+    provider: 'openai',
+    apiKey: 'sk-test',
+    fetchImpl: stub({ payload: { choices: [{ message: { content: '{"corrections":[]}' } }] } }, capture),
+  });
+  const { SYSTEM_PROMPT } = await import('../src/shared/proofread.js');
+  assert.equal(capture.body.messages[0].content, SYSTEM_PROMPT, 'the prompt should be untouched');
+});
+
+test('the list reaches every provider', async () => {
+  const cases = [
+    ['anthropic', 'sk-ant-x', { payload: CORRECTIONS }, (b) => b.system],
+    ['gemini', 'AIzaSyTest', {
+      payload: { candidates: [{ content: { parts: [{ text: '{"corrections":[]}' }] } }] },
+    }, (b) => b.systemInstruction.parts[0].text],
+  ];
+  for (const [provider, apiKey, response, read] of cases) {
+    const capture = {};
+    await checkWithAi('hello', {
+      provider, apiKey, leaveAlone: ['Kitson'], fetchImpl: stub(response, capture),
+    });
+    assert.match(read(capture.body), /Kitson/, provider);
+  }
+});
+
+test('the Worker is sent the list, not a pre-built prompt', async () => {
+  // The Worker owns the prompt - that is the point of it - so the extension
+  // hands over the words and lets the server put them in.
+  const capture = {};
+  await checkWithAi('hello', {
+    provider: 'caret',
+    apiKey: 'caret_a1b2c3d4e5f6',
+    leaveAlone: ['Kitson'],
+    fetchImpl: stub({ payload: { corrections: [] } }, capture),
+  });
+  assert.deepEqual(capture.body.leaveAlone, ['Kitson']);
+  assert.ok(!JSON.stringify(capture.body).includes('copy editor'), 'the prompt must not be sent');
+});
+
+test('the note cannot grow without limit', async () => {
+  const { leaveAloneNote, MAX_LEAVE_ALONE } = await import('../src/shared/proofread.js');
+  const many = Array.from({ length: 500 }, (_, i) => `word${i}`);
+  const note = leaveAloneNote(many);
+  assert.equal(note.split('\n').filter((l) => l.startsWith('  word')).length, MAX_LEAVE_ALONE);
+  // A whole sentence is not a word someone rejected.
+  assert.equal(leaveAloneNote(['x'.repeat(100)]), '');
+  assert.equal(leaveAloneNote([]), '');
+  // Duplicates collapse, whatever their case.
+  assert.equal(leaveAloneNote(['Tim', 'tim', 'TIM']).split('\n').filter((l) => l.startsWith('  ')).length, 1);
+});
