@@ -28,11 +28,17 @@ function toast(text = 'Saved') {
 }
 
 async function save(patch) {
+  // Paint the change straight away, then reconcile. The service worker shuts
+  // down when idle, and waking it means loading a four megabyte word list
+  // first - so waiting for it before anything moves on screen makes a toggle
+  // look broken for as long as that takes.
+  settings = { ...settings, ...patch };
+  paint();
+
   // Send only what changed. The worker merges it into whatever is stored now,
   // so this page cannot undo a word added from a card in another tab.
   const response = await ask({ type: 'patch-settings', patch });
   if (response && response.settings) settings = response.settings;
-  else settings = { ...settings, ...patch };
   await readAiStatus();
   toast();
   paint();
@@ -258,10 +264,17 @@ function renderPreview(issues) {
   }
 }
 
+let previewReady = false;
+
 function schedulePreview() {
   clearTimeout(previewTimer);
+  if (!previewReady) {
+    const host = $('preview');
+    if (!host.textContent.trim()) host.textContent = 'Checking…';
+  }
   previewTimer = setTimeout(async () => {
     const response = await ask({ type: 'preview', text: PREVIEW_TEXT });
+    previewReady = true;
     renderPreview((response && response.issues) || []);
   }, 60);
 }
