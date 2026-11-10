@@ -128,12 +128,16 @@
       </label>
 
       <div id="ai-body" class="sub-rows">
-        <div class="row stack" id="ai-key-row" data-search="api key google gemini free openai chatgpt anthropic claude sk- aiza">
+        <div class="row stack" id="ai-key-row" data-search="api key caret_ google gemini free openai chatgpt anthropic claude sk- aiza">
           <span class="text">
             <b>API key</b>
-            <i>Paste any one of three. Caret works out which from the key itself and sends it nowhere else.</i>
+            <i>Paste any one of these. Caret works out which from the key itself and sends it nowhere else.</i>
           </span>
           <ul class="providers">
+            <li>
+              <b>A Caret key</b> <span class="free">nothing to sign up for</span>
+              <i>If someone gave you a key starting <code>caret_</code>, paste that and you are done — no account anywhere, nothing to pay. It runs on a small shared allowance, so it goes quiet for the rest of the day if that runs out.</i>
+            </li>
             <li>
               <b>Google Gemini</b> <span class="free">free tier</span>
               <i>A key from <code>aistudio.google.com/apikey</code> needs no card and no credits. There is a cap per minute and per day, which proofreading one field at a time does not come near. Starts <code>AIza</code>.</i>
@@ -153,7 +157,7 @@
           </div>
         </div>
 
-        <div class="row stack" data-search="model gpt claude haiku cost">
+        <div class="row stack" id="model-row" data-search="model gpt claude haiku cost">
           <span class="text"><b>Model</b><i id="model-hint">The cheapest one is plenty for proofreading.</i></span>
           <select id="aiModel"></select>
         </div>

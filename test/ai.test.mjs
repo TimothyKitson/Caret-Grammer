@@ -251,19 +251,44 @@ test('a caret_ key is recognised as its own provider', async () => {
   assert.equal(providerFor('caret'), null);
 });
 
-test('the Worker is not called when the build has no endpoint set', async () => {
-  // CARET_ENDPOINT ships empty, so a caret_ key in the published build has
-  // nothing to talk to and must say so rather than fetch some default host.
-  let called = false;
+test('a caret_ key posts to the configured Worker with the key in a header', async () => {
+  const { CARET_ENDPOINT } = await import('../src/shared/apikey.js');
+  const capture = {};
+  const payload = { corrections: [{
+    before: 'I ', original: 'teh', replacement: 'the', kind: 'spelling', explanation: 'A typo.',
+  }], model: '@cf/meta/llama-3.1-8b-instruct', left: 118 };
+
+  const result = await checkWithAi('I teh cat', {
+    provider: 'caret',
+    apiKey: 'caret_a1b2c3d4e5f6',
+    fetchImpl: stub({ payload }, capture),
+  });
+
+  assert.ok(CARET_ENDPOINT.startsWith('https://'), 'the endpoint must be https');
+  assert.equal(capture.url, `${CARET_ENDPOINT}/check`);
+  assert.equal(capture.init.headers['x-caret-key'], 'caret_a1b2c3d4e5f6');
+  // The key goes in a header, never the URL, which ends up in logs.
+  assert.ok(!capture.url.includes('caret_a1b2'));
+  // Only the text is sent - no settings, no site, nothing else about the user.
+  assert.deepEqual(Object.keys(capture.body), ['text']);
+  assert.equal(capture.body.text, 'I teh cat');
+  assert.equal(result.issues.length, 1);
+  assert.equal(result.issues[0].replacements[0], 'the');
+});
+
+test('the Worker running out of allowance is a quiet skip, not an error', async () => {
   await assert.rejects(
-    () => checkWithAi('x y z', {
+    () => checkWithAi('I teh cat', {
       provider: 'caret',
       apiKey: 'caret_a1b2c3d4e5f6',
-      fetchImpl: async () => { called = true; },
+      fetchImpl: stub({
+        status: 429,
+        payload: { error: 'The shared daily allowance is used up.', spent: true },
+      }),
     }),
-    /no Caret server/,
+    // code 'quiet' is what stops the worker writing it to the error line.
+    (error) => error.status === 429 && error.code === 'quiet',
   );
-  assert.equal(called, false);
 });
 
 test('the proofreading contract is one copy, shared with the Worker', async () => {

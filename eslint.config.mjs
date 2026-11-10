@@ -11,6 +11,8 @@ const browser = {
   HTMLInputElement: 'readonly',
   HTMLTextAreaElement: 'readonly', confirm: 'readonly', self: 'readonly',
   process: 'readonly', performance: 'readonly',
+  // the Worker and its tests run on web-standard globals under Node
+  Buffer: 'readonly', Request: 'readonly',
 };
 
 export default [

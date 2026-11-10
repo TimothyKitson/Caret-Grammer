@@ -403,7 +403,7 @@ await step('the AI section asks for a key and offers the free provider', async (
   assert.equal(triggers, 3, `expected 3 trigger choices, saw ${triggers}`);
   assert.equal(intervalHiddenAtFirst, true);
   assert.equal(minutes, '1');
-  assert.equal(providers.length, 3, 'expected all three providers listed');
+  assert.equal(providers.length, 4, 'expected every provider listed');
   assert.ok(providers.some((p) => /free tier/i.test(p)), 'the free one is not marked free');
 });
 

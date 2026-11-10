@@ -264,12 +264,15 @@ function paint() {
   }
   $('ai-key-row').hidden = aiInfo.baked;
   $('effort-row').hidden = aiInfo.provider !== null && aiInfo.provider !== 'anthropic';
+  $('model-row').hidden = aiInfo.provider === 'caret';
   $('interval-row').hidden = settings.aiTrigger !== 'interval';
 
-  const PROVIDER_NAME = { gemini: 'Google', openai: 'OpenAI', anthropic: 'Anthropic' };
-  $('ai-host').textContent = aiInfo.provider
-    ? `the ${PROVIDER_NAME[aiInfo.provider]} API`
-    : 'an AI provider';
+  const PROVIDER_NAME = {
+    caret: 'Caret', gemini: 'Google', openai: 'OpenAI', anthropic: 'Anthropic',
+  };
+  $('ai-host').textContent = aiInfo.provider === 'caret'
+    ? 'the shared Caret server'
+    : aiInfo.provider ? `the ${PROVIDER_NAME[aiInfo.provider]} API` : 'an AI provider';
 
   $('ai-state').textContent = aiInfo.baked
     ? 'Key is built into this copy — nothing to paste.'

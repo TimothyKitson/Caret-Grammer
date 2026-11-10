@@ -29,7 +29,7 @@ export const BUILT_IN_KEY = '';
 // The Caret Worker this build talks to, if there is one. Not a secret: it is
 // the per-person caret_ key that decides who may use it, and that is why the
 // Worker checks one on every request.
-export const CARET_ENDPOINT = '';
+export const CARET_ENDPOINT = 'https://summer-scene-fd09.timoth-5db.workers.dev';
 
 /** 'caret' | 'gemini' | 'openai' | 'anthropic' | null - from the key itself. */
 export function providerFor(key) {
