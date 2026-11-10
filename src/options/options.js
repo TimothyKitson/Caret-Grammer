@@ -243,6 +243,7 @@ function paint() {
 
   $('autocorrectEnabled').checked = !!(settings.autocorrect && settings.autocorrect.enabled);
   $('checkNames').checked = !!settings.checkNames;
+  $('quietOthers').checked = settings.quietOthers !== false;
   $('showBadge').checked = settings.showBadge !== false;
   $('aiEnabled').checked = !!settings.aiEnabled;
   $('aiKey').value = settings.aiKey || '';
@@ -318,6 +319,7 @@ $('autocorrectEnabled').addEventListener('change', (e) => {
   save({ autocorrect: { ...settings.autocorrect, enabled: e.target.checked } });
 });
 $('checkNames').addEventListener('change', (e) => save({ checkNames: e.target.checked }));
+$('quietOthers').addEventListener('change', (e) => save({ quietOthers: e.target.checked }));
 $('showBadge').addEventListener('change', (e) => save({ showBadge: e.target.checked }));
 $('aiEnabled').addEventListener('change', (e) => save({ aiEnabled: e.target.checked }));
 $('aiModel').addEventListener('change', (e) => save({ aiModel: e.target.value }));

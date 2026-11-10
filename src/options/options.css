@@ -1,9 +1,24 @@
 /* Caret settings.
-   Same palette as caretgrammar.com: iris for anything you can act on, mint for
-   anything that worked. Everything scales from one type size and one radius. */
+   Shipped with the extension, not fetched: this page has to look right on a
+   plane. Inter for text, Space Grotesk for anything that should feel spoken.
+   Both SIL OFL, latin subset, variable weight - 72KB for the pair. */
+
+@font-face {
+  font-family: "Caret Sans";
+  src: url("fonts/inter.woff2") format("woff2");
+  font-weight: 100 900;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Caret Display";
+  src: url("fonts/grotesk.woff2") format("woff2");
+  font-weight: 400 700;
+  font-display: swap;
+}
 
 :root {
-  --bg: #f7f7fb;
+  --bg: #f4f4f9;
   --card: #ffffff;
   --fg: #16161d;
   --muted: #5d5d6e;
@@ -15,7 +30,8 @@
   --mint: #00a177;
   --bad: #c62f20;
   --chip: #eeeef6;
-  --r: 10px;
+  --r: 11px;
+  --lift: 0 1px 2px rgba(22, 22, 29, .04), 0 10px 26px -14px rgba(22, 22, 29, .18);
 }
 
 @media (prefers-color-scheme: dark) {
@@ -32,6 +48,7 @@
     --mint: #3ddba6;
     --bad: #ff8b7d;
     --chip: #262633;
+    --lift: 0 1px 2px rgba(0, 0, 0, .3), 0 12px 30px -16px rgba(0, 0, 0, .75);
   }
 }
 
@@ -41,8 +58,9 @@ body {
   margin: 0;
   background: var(--bg);
   color: var(--fg);
-  font: 14px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  font: 14px/1.6 "Caret Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
   -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
 
 .shell {
@@ -58,8 +76,16 @@ body {
 
 .side { position: sticky; top: 32px; align-self: start; }
 
-.brand { display: flex; gap: 11px; align-items: center; margin-bottom: 18px; }
-.brand strong { display: block; font-size: 16px; letter-spacing: -.01em; }
+.brand { display: flex; gap: 11px; align-items: center; margin-bottom: 20px; }
+.brand img {
+  border-radius: 9px;
+  box-shadow: 0 4px 14px -4px color-mix(in srgb, var(--iris) 55%, transparent);
+}
+.brand strong {
+  display: block;
+  font: 600 17px/1.2 "Caret Display", sans-serif;
+  letter-spacing: -.015em;
+}
 .brand span { display: block; font-size: 11.5px; color: var(--faint); }
 
 .search { margin-bottom: 14px; }
@@ -85,7 +111,17 @@ nav a {
   transition: background .12s, color .12s;
 }
 nav a:hover { background: var(--chip); color: var(--fg); }
+nav a { position: relative; }
 nav a.here { background: var(--iris-soft); color: var(--iris); font-weight: 600; }
+nav a.here::before {
+  content: "";
+  position: absolute;
+  left: 0; top: 50%;
+  width: 3px; height: 14px;
+  margin-top: -7px;
+  border-radius: 0 3px 3px 0;
+  background: var(--iris);
+}
 
 .side-foot {
   margin: 20px 0 0;
@@ -105,23 +141,32 @@ nav a.here { background: var(--iris-soft); color: var(--iris); font-weight: 600;
 section {
   background: var(--card);
   border: 1px solid var(--line);
-  border-radius: 14px;
-  padding: 20px 22px;
+  border-radius: 16px;
+  padding: 22px 24px;
   margin: 0 0 16px;
   scroll-margin-top: 24px;
+  box-shadow: var(--lift);
 }
 section[hidden] { display: none; }
 
 h2 {
-  font-size: 13px;
-  font-weight: 700;
-  letter-spacing: .06em;
-  text-transform: uppercase;
-  color: var(--faint);
-  margin: 0 0 14px;
+  font: 600 19px/1.25 "Caret Display", sans-serif;
+  letter-spacing: -.02em;
+  color: var(--fg);
+  margin: 0 0 15px;
   display: flex;
   align-items: center;
-  gap: 8px;
+  gap: 9px;
+  text-transform: none;
+}
+/* A short accent rule, so a heading reads as the start of something. */
+h2::before {
+  content: "";
+  width: 3px;
+  height: 17px;
+  border-radius: 3px;
+  background: linear-gradient(var(--iris), var(--mint));
+  flex: none;
 }
 
 .tag, .count {
@@ -153,11 +198,21 @@ h2 {
 .row:first-of-type, .row.lead { border-top: none; }
 .row[hidden] { display: none; }
 .row.stack { flex-direction: column; align-items: stretch; gap: 9px; }
-label.row { cursor: pointer; }
+label.row { cursor: pointer; border-radius: 9px; }
+/* Bleed into the section padding so the hover reads as a full-width band. */
+label.row { margin: 0 -10px; padding-left: 10px; padding-right: 10px; }
+label.row:hover { background: color-mix(in srgb, var(--iris) 4%, transparent); }
+label.row:hover .track { background: color-mix(in srgb, var(--iris) 38%, var(--line-strong)); }
+label.row:hover input.sw:checked + .track {
+  background: linear-gradient(135deg, var(--iris), color-mix(in srgb, var(--iris) 70%, var(--mint)));
+}
 
 .text { flex: 1 1 auto; min-width: 0; }
-.text b { display: block; font-weight: 600; }
-.text i { display: block; font-style: normal; font-size: 12.5px; color: var(--muted); margin-top: 1px; }
+/* Direct children only. A <b> inside the hint is emphasis mid-sentence, and
+   making every descendant a block broke those lines in three. */
+.text > b { display: block; font-weight: 600; }
+.text > i { display: block; font-style: normal; font-size: 12.5px; color: var(--muted); margin-top: 1px; }
+.text i b { font-weight: 600; color: var(--fg); }
 .text code {
   font-size: 11.5px;
   background: var(--chip);
@@ -192,10 +247,12 @@ input.sw { position: absolute; opacity: 0; width: 0; height: 0; }
   width: 16px; height: 16px;
   border-radius: 50%;
   background: #fff;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, .25);
-  transition: transform .16s;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, .3);
+  transition: transform .22s cubic-bezier(.3, 1.5, .5, 1);
 }
-input.sw:checked + .track { background: var(--iris); }
+input.sw:checked + .track {
+  background: linear-gradient(135deg, var(--iris), color-mix(in srgb, var(--iris) 70%, var(--mint)));
+}
 input.sw:checked + .track::after { transform: translateX(16px); }
 input.sw:disabled + .track { opacity: .5; }
 input.sw:focus-visible + .track { outline: 2px solid var(--iris); outline-offset: 2px; }
@@ -226,8 +283,14 @@ button {
   white-space: nowrap;
   transition: border-color .12s, background .12s, color .12s;
 }
-button:hover { border-color: var(--iris); color: var(--iris); }
-button.primary { background: var(--iris); border-color: var(--iris); color: #fff; }
+button:hover { border-color: var(--iris); color: var(--iris); transform: translateY(-1px); }
+button:active { transform: none; }
+button.primary {
+  background: var(--iris);
+  border-color: var(--iris);
+  color: #fff;
+  box-shadow: 0 6px 16px -8px var(--iris);
+}
 button.primary:hover { filter: brightness(1.08); color: #fff; }
 button.danger:hover { border-color: var(--bad); color: var(--bad); }
 button:disabled { opacity: .55; cursor: default; }
@@ -261,19 +324,42 @@ button:focus-visible { outline: 2px solid var(--iris); outline-offset: 2px; }
 .choices label:hover { border-color: var(--iris); }
 .choices label.on { border-color: var(--iris); background: var(--iris-soft); }
 .choices input { margin: 2px 0 0; accent-color: var(--iris); flex: none; }
-.choices b { display: block; font-weight: 600; font-size: 13px; }
-.choices i { display: block; font-style: normal; font-size: 12px; color: var(--muted); margin-top: 1px; }
+.choices span > b { display: block; font-weight: 600; font-size: 13px; }
+.choices span > i { display: block; font-style: normal; font-size: 12px; color: var(--muted); margin-top: 1px; }
 
 /* --------------------------------------------------------------- preview */
 
 .preview {
   border: 1px solid var(--line-strong);
-  border-radius: var(--r);
+  border-radius: 12px;
+  background: var(--card);
+  padding: 34px 16px 16px;
+  position: relative;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .5);
+}
+/* The little window bar, so it reads as a text box and not a quotation. */
+.preview::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 24px;
+  border-radius: 11px 11px 0 0;
   background: var(--bg);
-  padding: 14px 16px;
+  border-bottom: 1px solid var(--line);
+}
+.preview::after {
+  content: "";
+  position: absolute;
+  left: 12px; top: 9px;
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: var(--line-strong);
+  box-shadow: 11px 0 var(--line-strong), 22px 0 var(--line-strong);
+}
+.preview {
   font-size: 15px;
   line-height: 2;
-  min-height: 70px;
+  min-height: 94px;
   white-space: pre-wrap;
   word-break: break-word;
 }
@@ -367,8 +453,22 @@ footer { color: var(--faint); font-size: 12px; text-align: center; padding: 4px 
   .side-foot { display: none; }
 }
 
+/* Sections ease in on load, slightly staggered. Cheap, and it stops the page
+   landing as one grey slab. */
+@keyframes arrive {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: none; }
+}
+main > section { animation: arrive .45s cubic-bezier(.2, .7, .3, 1) backwards; }
+main > section:nth-of-type(1) { animation-delay: .02s; }
+main > section:nth-of-type(2) { animation-delay: .06s; }
+main > section:nth-of-type(3) { animation-delay: .1s; }
+main > section:nth-of-type(4) { animation-delay: .14s; }
+main > section:nth-of-type(n+5) { animation-delay: .18s; }
+.side { animation: arrive .4s cubic-bezier(.2, .7, .3, 1) backwards; }
+
 @media (prefers-reduced-motion: reduce) {
-  *, *::after { transition: none !important; }
+  *, *::after { transition: none !important; animation: none !important; }
 }
 
 /* The three-provider list in the key row. */
@@ -380,7 +480,7 @@ footer { color: var(--faint); font-size: 12px; text-align: center; padding: 4px 
   background: var(--bg);
 }
 .providers b { font-weight: 600; font-size: 13px; }
-.providers i { display: block; font-style: normal; font-size: 12px; color: var(--muted); margin-top: 2px; }
+.providers > li > i { display: block; font-style: normal; font-size: 12px; color: var(--muted); margin-top: 2px; }
 .providers code { font-size: 11.5px; background: var(--chip); padding: 1px 4px; border-radius: 4px; }
 .free {
   font-size: 10.5px;

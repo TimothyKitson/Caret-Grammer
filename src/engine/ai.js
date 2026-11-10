@@ -108,15 +108,33 @@ function locate(text, correction, taken) {
   return null;
 }
 
+// Words that carry the meaning of a sentence rather than decorate it. Losing
+// one of these does not correct a sentence, it contradicts it.
+const NEGATIONS = /\b(?:not|never|no|none|nothing|nobody|nowhere|neither|nor|cannot|can't|cant|won't|wont|don't|dont|doesn't|doesnt|didn't|didnt|isn't|isnt|aren't|arent|wasn't|wasnt|weren't|werent|haven't|havent|hasn't|hasnt|hadn't|hadnt|shouldn't|shouldnt|wouldn't|wouldnt|couldn't|couldnt|ain't|aint)\b|n['’]t\b/gi;
+
+const countNegations = (text) => (String(text).match(NEGATIONS) || []).length;
+const wordCount = (text) => String(text).trim().split(/\s+/).filter(Boolean).length;
+
 /** Reject anything that is a rewrite rather than a word swap. */
 function isWordSwap(original, replacement) {
   if (typeof original !== 'string' || typeof replacement !== 'string') return false;
   if (!original.trim()) return false;
   if (original.length > MAX_ORIGINAL_CHARS) return false;
-  if (original.trim().split(/\s+/).length > MAX_ORIGINAL_WORDS) return false;
+  if (wordCount(original) > MAX_ORIGINAL_WORDS) return false;
   if (/\n/.test(original) || /\n/.test(replacement)) return false;
   // A "fix" several times longer than what it replaces is new prose.
   if (replacement.length > original.length * 2 + 12) return false;
+
+  // Losing a "didn't" turns "I didn't get one" into "I got one". That is not a
+  // correction at any confidence, so it is refused here rather than trusted to
+  // the model's instructions. Gaining one can be right - "could care less"
+  // really does want "couldn't" - so only losing is refused.
+  if (countNegations(replacement) < countNegations(original)) return false;
+
+  // Dropping one word is a real fix: "the the" -> "the". Dropping two or more
+  // is a sentence being rewritten, whatever it claims to be.
+  if (wordCount(original) - wordCount(replacement) >= 2) return false;
+
   return true;
 }
 

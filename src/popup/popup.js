@@ -49,7 +49,7 @@ async function load() {
       : 'Watching. Click into a text box and start typing.';
   }
 
-  // The button is the third way to ask for an AI pass, next to Alt+Shift+G and
+  // The button is the third way to ask for an AI pass, next to the shortcut and
   // the right-click menu. It only appears when there is something to ask.
   const canAi = !!settings.aiEnabled && settings.enabled && state.siteEnabled && !!host;
   $('check-ai').hidden = !canAi;
@@ -58,7 +58,7 @@ async function load() {
       ? 'also runs on its own after each pause'
       : settings.aiTrigger === 'interval'
         ? `also runs every ${settings.aiIntervalMinutes || 1} min while you type`
-        : 'or press Alt+Shift+G';
+        : 'or right-click the field and choose Proofread with AI';
   }
   if (settings.lastAiError) text += `\nAI: ${settings.lastAiError}`;
   $('status').textContent = text;

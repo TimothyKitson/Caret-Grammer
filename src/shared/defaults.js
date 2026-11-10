@@ -20,6 +20,9 @@ export const DEFAULT_SETTINGS = {
     apostrophes: true,
     commonTypos: true,
   },
+  // Turn the browser's own red squiggles off in fields Caret is checking, so
+  // there are not two sets of underlines disagreeing with each other.
+  quietOthers: true,
   checkNames: false,     // flag capitalized words we do not recognize
   showBadge: true,       // the little count in the corner of the field
   underlineStyle: 'straight',   // or 'wavy'
@@ -56,7 +59,7 @@ export const AI_TRIGGER_INFO = [
   {
     value: 'manual',
     label: 'Only when I ask',
-    hint: 'Press Alt+Shift+G, or open the Caret button and choose “Check with AI”. Nothing is sent until you do.',
+    hint: 'Right-click and choose “Proofread with AI”, press Ctrl+Shift+. , or use the Caret button. Nothing is sent until you do.',
   },
   {
     value: 'interval',

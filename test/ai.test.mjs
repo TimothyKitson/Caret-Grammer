@@ -3,7 +3,7 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { checkWithAi, AI_MODELS, DEFAULT_MODEL } from '../src/engine/ai.js';
+import { checkWithAi, toIssues, AI_MODELS, DEFAULT_MODEL } from '../src/engine/ai.js';
 
 function stub(response, capture = {}) {
   return async (url, init) => {
@@ -379,4 +379,62 @@ test('the note cannot grow without limit', async () => {
   assert.equal(leaveAloneNote([]), '');
   // Duplicates collapse, whatever their case.
   assert.equal(leaveAloneNote(['Tim', 'tim', 'TIM']).split('\n').filter((l) => l.startsWith('  ')).length, 1);
+});
+
+// -------------------------------------------- a fix must not change meaning
+
+/** Run one model correction through the filter and see if it survives. */
+const survives = (text, original, replacement) => toIssues(text, [{
+  before: '', original, replacement, kind: 'grammar', explanation: 'x',
+}]).length === 1;
+
+test('a correction may never drop a negative', () => {
+  // The reported bug: "i didnt end up getting one" came back as "end up
+  // getting one", which says the opposite thing.
+  const text = 'i was going to get a dog but i didnt end up getting one.';
+  assert.equal(survives(text, 'didnt end up getting', 'end up getting'), false);
+  assert.equal(survives(text, 'i didnt', 'I'), false);
+
+  for (const [original, replacement] of [
+    ["couldn't go", 'could go'],
+    ['never went', 'went'],
+    ['is not ready', 'is ready'],
+    ['cannot be done', 'can be done'],
+    ["wasn't there", 'was there'],
+    ['no one came', 'one came'],
+  ]) {
+    assert.equal(survives(`she ${original} today`, original, replacement), false, original);
+  }
+});
+
+test('gaining a negative is still allowed, because some idioms need it', () => {
+  const text = 'I could care less about it.';
+  assert.equal(survives(text, 'could care less', "couldn't care less"), true);
+});
+
+test('fixing a word inside a negative keeps working', () => {
+  const text = 'i didnt go to the shop';
+  assert.equal(survives(text, 'didnt', "didn't"), true);
+  assert.equal(survives(text, 'i didnt go', "I didn't go"), true);
+});
+
+test('dropping one word is a fix, dropping two is a rewrite', () => {
+  assert.equal(survives('the the report is ready', 'the the', 'the'), true);
+  assert.equal(survives('it was very very good', 'very very', 'very'), true);
+  assert.equal(
+    survives('we should probably maybe just go', 'should probably maybe just go', 'should go'),
+    false,
+  );
+});
+
+test('ordinary word swaps are untouched by any of this', () => {
+  assert.equal(survives('I recieved it', 'recieved', 'received'), true);
+  assert.equal(survives('we should of gone', 'should of', 'should have'), true);
+  assert.equal(survives('Me and him went', 'Me and him', 'He and I'), true);
+});
+
+test('the prompt says it too, not just the filter', async () => {
+  const { SYSTEM_PROMPT } = await import('../src/shared/proofread.js');
+  assert.match(SYSTEM_PROMPT, /NEVER drop a negative/);
+  assert.match(SYSTEM_PROMPT, /NEVER change what a sentence means/);
 });

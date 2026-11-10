@@ -61,7 +61,10 @@
   }
 
   function teardown() {
-    if (active) active.adapter.dispose();
+    if (active) {
+      restoreNative(active.adapter.element);
+      active.adapter.dispose();
+    }
     overlay.clearUnderlines();
     overlay.hideCard();
     overlay.hideBadge();
@@ -117,7 +120,7 @@
     localTimer = setTimeout(runCheck, immediate ? 0 : LOCAL_DELAY);
     clearTimeout(aiTimer);
     // An AI pass costs money every time, so when it happens is the user's call.
-    //   manual    only when asked - Alt+Shift+G, the toolbar button, or the
+    //   manual    only when asked - the right-click menu, Ctrl+Shift+. , or the
     //             right-click menu. Arrives here as ai: true.
     //   interval  at most once every aiIntervalMinutes in this field.
     //   auto      after every pause in typing.
@@ -415,6 +418,40 @@
 
   // ------------------------------------------------------------------- events
 
+  // ------------------------------------------------- the browser's own checker
+  //
+  // Most sites do not ship a spell checker: the red squiggles are the browser's
+  // own, and two sets of underlines disagreeing with each other is worse than
+  // either alone. Switching spellcheck off on a field we are checking leaves
+  // one opinion on screen.
+  //
+  // Every field we touch is put back exactly as it was - the attribute absent
+  // if it was absent - because a page that keeps its own state can notice.
+  const quieted = new WeakMap();
+
+  function quietNative(el) {
+    if (!el || quieted.has(el)) return;
+    if (!settings || settings.quietOthers === false) return;
+    quieted.set(el, el.hasAttribute('spellcheck') ? el.getAttribute('spellcheck') : null);
+    el.setAttribute('spellcheck', 'false');
+    // Chrome only re-reads spellcheck when the field is next focused, so a
+    // field already focused keeps its squiggles until nudged.
+    if (document.activeElement === el) {
+      try {
+        el.blur();
+        el.focus({ preventScroll: true });
+      } catch (_) { /* some editors refuse to be blurred */ }
+    }
+  }
+
+  function restoreNative(el) {
+    if (!el || !quieted.has(el)) return;
+    const was = quieted.get(el);
+    quieted.delete(el);
+    if (was === null) el.removeAttribute('spellcheck');
+    else el.setAttribute('spellcheck', was);
+  }
+
   function activate(el) {
     if (!enabled()) return;
     const adapter = adapterFor(el);
@@ -424,6 +461,7 @@
     // are leaving; looking for it in the next one would read as an undo.
     lastFix = null;
     if (active && active.adapter !== adapter) {
+      restoreNative(active.adapter.element);
       overlay.clearUnderlines();
       overlay.hideCard();
       overlay.hidePanel();
@@ -432,6 +470,7 @@
       active.adapter.dispose();
     }
     active = { adapter, issues: [], text: '', entries: [], userEdited: false };
+    quietNative(adapter.element);
     lastAiText = null;
     observeEditable(adapter);
     scheduleCheck({ immediate: true });
@@ -555,6 +594,10 @@
     if (message.type === 'settings-changed') {
       loadSettings().then(() => {
         if (!enabled()) { teardown(); return; }
+        if (active) {
+          if (settings.quietOthers === false) restoreNative(active.adapter.element);
+          else quietNative(active.adapter.element);
+        }
         lastAiText = null;
         if (active) scheduleCheck({ immediate: true });
         else {

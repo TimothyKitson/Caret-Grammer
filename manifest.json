@@ -2,7 +2,7 @@
   "manifest_version": 3,
   "name": "Caret",
   "short_name": "Caret",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "description": "Underlines spelling and grammar mistakes as you type, anywhere in Edge. Fix from a hover card, autocorrect, or ask an AI.",
   "homepage_url": "https://caretgrammar.com",
   "minimum_chrome_version": "116",
@@ -62,15 +62,15 @@
   "commands": {
     "show-suggestions": {
       "suggested_key": {
-        "default": "Alt+G"
+        "default": "Ctrl+Shift+Space"
       },
       "description": "Show suggestions for the word at the cursor"
     },
     "check-now": {
       "suggested_key": {
-        "default": "Alt+Shift+G"
+        "default": "Ctrl+Shift+Period"
       },
-      "description": "Re-check this field now (including the AI pass)"
+      "description": "Proofread this field with AI"
     },
     "toggle-enabled": {
       "description": "Turn Caret on or off"

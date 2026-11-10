@@ -281,6 +281,7 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
             enabled: settings.enabled,
             categories: settings.categories,
             checkNames: settings.checkNames,
+            quietOthers: settings.quietOthers,
             showBadge: settings.showBadge,
             underlineStyle: settings.underlineStyle,
             autocorrect: settings.autocorrect,
@@ -456,6 +457,9 @@ chrome.storage.onChanged.addListener((changes, area) => {
 // ------------------------------------------------------------- menus and keys
 
 const MENUS = [
+  // Named for what it does rather than what it is, because this is the one
+  // people reach for when they do not want to learn a shortcut.
+  { id: 'gc-proofread-ai', title: 'Proofread with AI', contexts: ['editable'] },
   { id: 'gc-check-now', title: 'Check this field now', contexts: ['editable'] },
   { id: 'gc-toggle-site', title: 'Turn checking on or off for this site', contexts: ['editable', 'page'] },
   { id: 'gc-options', title: 'Caret settings…', contexts: ['editable', 'page', 'action'] },
@@ -490,6 +494,17 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
     return;
   }
   if (!tab || !tab.id) return;
+  if (info.menuItemId === 'gc-proofread-ai') {
+    const settings = await getSettings();
+    // Asking for the AI pass with no AI set up should say so, not look broken.
+    if (!settings.aiEnabled || !aiCredentials(settings).key) {
+      await chrome.runtime.openOptionsPage();
+      return;
+    }
+    chrome.tabs.sendMessage(tab.id, { type: 'command', name: 'check-now' }, { frameId: info.frameId })
+      .catch(() => {});
+    return;
+  }
   if (info.menuItemId === 'gc-check-now') {
     chrome.tabs.sendMessage(tab.id, { type: 'command', name: 'check-now' }, { frameId: info.frameId })
       .catch(() => {});

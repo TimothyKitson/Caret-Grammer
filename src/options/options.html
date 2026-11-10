@@ -68,6 +68,12 @@
         <span class="track" aria-hidden="true"></span>
       </label>
 
+      <label class="row" data-search="spellcheck browser squiggles red underline other site duplicate">
+        <span class="text"><b>Turn off the browser's own spell check</b><i>Edge underlines in red too, and two sets of underlines disagreeing with each other is worse than either alone. This silences Edge in the fields Caret is checking, and puts it back when you move on. A site that ships its own checker — Google Docs, say — cannot be switched off from here.</i></span>
+        <input type="checkbox" id="quietOthers" class="sw">
+        <span class="track" aria-hidden="true"></span>
+      </label>
+
       <label class="row" data-search="badge count corner list fix all">
         <span class="text"><b>Show the count badge in the corner of the field</b><i>Click it for a list of everything found, with a “fix all” button.</i></span>
         <input type="checkbox" id="showBadge" class="sw">
@@ -227,16 +233,18 @@
     <section id="sec-keys">
       <h2>Keyboard and buttons</h2>
       <dl class="keys">
-        <dt><kbd>Alt</kbd><kbd>G</kbd></dt>
+        <dt><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>Space</kbd></dt>
         <dd>Suggestions for the word the cursor is in</dd>
-        <dt><kbd>Alt</kbd><kbd>Shift</kbd><kbd>G</kbd></dt>
-        <dd>Re-check this field now, including the AI pass</dd>
+        <dt><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>.</kbd></dt>
+        <dd>Proofread this field with AI</dd>
         <dt><kbd>Esc</kbd></dt>
         <dd>Close the suggestion card</dd>
         <dt>Toolbar</dt>
         <dd>The Caret button has a <b>Check with AI</b> button in it</dd>
         <dt>Right-click</dt>
-        <dd>Check this field now, add a word, or turn Caret off on this site</dd>
+        <dd><b>Proofread with AI</b>, right there in the menu — no shortcut to remember</dd>
+        <dt>Right-click</dt>
+        <dd>Also: add a word to your dictionary, or turn Caret off on this site</dd>
       </dl>
       <button type="button" id="shortcuts">Change the shortcuts</button>
     </section>
