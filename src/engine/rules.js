@@ -460,6 +460,38 @@ const RULES = [
     suggest: () => ["doesn't"],
   },
   {
+    // "neither of us have" -> has. Neither is singular, however many people it
+    // is talking about. Same for either, each and none in this shape.
+    id: 'neither-of-us-have',
+    category: 'grammar',
+    short: 'Agreement',
+    re: /\b(?:neither|either|each|none)\s+of\s+(?:us|them|you|the\s+\w+|my\s+\w+|our\s+\w+|these|those)\s+(have|were|are|do|want|know|seem|need)\b/gi,
+    group: 1,
+    message: '“Neither”, “either” and “each” are singular, however many people they are talking about.',
+    suggest: (m) => [{
+      have: 'has', were: 'was', are: 'is', do: 'does',
+      want: 'wants', know: 'knows', seem: 'seems', need: 'needs',
+    }[m[1].toLowerCase()]],
+  },
+  {
+    // "Me and the principal has been" - the verb is wrong, and so is "Me".
+    // The pronoun rule below only handles "me and him", so this catches the
+    // far more common "me and <somebody named>".
+    id: 'me-and-someone',
+    category: 'grammar',
+    short: 'Pronouns',
+    re: /\b(me)\s+and\s+(?:the|my|our|his|her|their)\s+\w+\s+(?=\w*(?:ed|ing)\b|(?:has|have|was|were|is|are|will|would|can|could|should|did|do|went|got|saw|took|made|said)\b)/gi,
+    group: 1,
+    message: 'When they are the ones doing the action, it is “… and I”.',
+    suggest: () => ['I'],
+    exclude: (m, doc) => {
+      // "she told me and the principal about it" - there "me" is correct,
+      // because it is receiving the action rather than doing it.
+      const before = (doc.normalized || doc.text).slice(Math.max(0, m.index - 18), m.index);
+      return /\b(?:told|gave|showed|sent|asked|gives|tells|between|for|with|to|at|saw|joined|emailed|called)\s*$/i.test(before);
+    },
+  },
+  {
     // "Me and him went" -> "He and I went". Only when a verb follows, so
     // "she told me and him" is left alone.
     id: 'me-and-subject',

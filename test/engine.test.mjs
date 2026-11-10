@@ -368,3 +368,37 @@ test('modern everyday words are in the dictionary', () => {
     assert.deepEqual(idsFor(sentence).filter((id) => id === 'spelling-unknown'), [], sentence);
   }
 });
+
+// ------------------------------------------------- what the AI pass missed
+
+test('neither, either and each take a singular verb', () => {
+  for (const [sentence, word, fix] of [
+    ['Neither of us have had much luck.', 'have', 'has'],
+    ['Neither of them were ready.', 'were', 'was'],
+    ['Either of those are fine.', 'are', 'is'],
+    ['Each of the parents want a copy.', 'want', 'wants'],
+  ]) {
+    const found = findAt(sentence, word);
+    assert.ok(found, sentence);
+    assert.deepEqual(found.replacements, [fix]);
+  }
+  // Already right, so nothing to say.
+  assert.deepEqual(idsFor('Neither of us has had much luck.'), []);
+  assert.deepEqual(idsFor('Neither of them was ready.'), []);
+});
+
+test('"me and the principal" is only wrong when it is the subject', () => {
+  const found = findAt('Me and the principal has been trying.', 'Me');
+  assert.ok(found);
+  assert.deepEqual(found.replacements, ['I']);
+
+  // "me" is right when it is on the receiving end.
+  for (const fine of [
+    'She told me and the principal about it.',
+    'Give it to me and the teacher.',
+    'He sent me and my sister a letter.',
+    'It is between me and the office.',
+  ]) {
+    assert.deepEqual(idsFor(fine).filter((id) => id === 'me-and-someone'), [], fine);
+  }
+});
