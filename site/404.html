@@ -3,6 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0b12">
 <title>Not found — Caret</title>
 <meta name="description" content="That page is not here.">
 <meta name="robots" content="noindex">
@@ -10,47 +12,55 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/assets/app.css">
+<link rel="stylesheet" href="/assets/app.css?v=3">
 </head>
 <body>
+<a class="skip" href="#main">Skip to the content</a>
 
-<header class="top">
-  <div class="wrap">
+<header class="nav">
+  <div class="wrap nav-in">
     <a class="brand" href="/"><img src="/assets/icon.png" alt="" width="28" height="28">Caret</a>
-    <nav class="links">
-      <a href="/setup" class="hide-sm">Setup</a>
-      <a href="/#what" class="hide-sm">What it does</a>
-      <a class="btn small" href="https://microsoftedge.microsoft.com/addons/detail/caret/ejkpanfkmjkkolgdpampfljaangollpm" id="get-top">Get Caret</a>
+    <nav class="nav-links" aria-label="Main">
+      <a class="nav-link hide-sm" href="/#what">What it does</a>
+      <a class="nav-link" href="/setup">Setup</a>
+      <a class="btn sm" href="https://microsoftedge.microsoft.com/addons/detail/caret/ejkpanfkmjkkolgdpampfljaangollpm" id="get-top">Get Caret</a>
     </nav>
   </div>
 </header>
 
-<main>
+<main id="main">
 
-<section class="hero">
+<section class="solo">
+  <div class="hero-pattern" aria-hidden="true"></div>
+  <div class="aurora" aria-hidden="true"><i></i><i></i><i></i></div>
   <div class="wrap narrow">
-    <p class="kicker">404</p>
-    <h1 style="font-size:clamp(30px,4.2vw,44px)">That page is not here.</h1>
-    <p class="lede">Which is embarrassing for a site about catching mistakes.</p>
-    <div class="cta">
-      <a class="btn" href="/">Back to the start</a>
-      <a class="btn ghost" href="/setup">Setup guide</a>
+    <p class="lost-word arrive" aria-hidden="true"><span class="u sp" id="lost-word">404</span><span class="caret"></span></p>
+    <div class="lost-card arrive d2">
+      <span class="chip sp">404</span>
+      <h1>That page is not here.</h1>
+      <p class="lede">Which is embarrassing for a site about catching mistakes.</p>
+      <div class="cta">
+        <a class="btn" href="/">Back to the start</a>
+        <a class="btn ghost" href="/setup">Setup guide</a>
+      </div>
     </div>
   </div>
 </section>
 
 </main>
 
-<footer class="end">
-  <div class="wrap">
-    <span>Caret</span>
-    <span class="right">
+<footer class="foot">
+  <div class="wrap foot-in">
+    <a class="brand" href="/"><img src="/assets/icon.png" alt="" width="24" height="24">Caret</a>
+    <p class="foot-tag">Writing that catches itself.</p>
+    <nav aria-label="Footer">
       <a href="/setup">Setup</a>
       <a href="/report">Report a problem</a>
       <a href="/privacy">Privacy</a>
-    </span>
+    </nav>
   </div>
 </footer>
-<script src="/assets/app.js"></script>
+
+<script src="/assets/app.js?v=3"></script>
 </body>
 </html>

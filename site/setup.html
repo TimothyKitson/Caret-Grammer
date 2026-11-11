@@ -3,179 +3,285 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0b12">
 <title>Setting up Caret</title>
 <meta name="description" content="How to install and configure Caret, the grammar checker for Microsoft Edge.">
 <link rel="icon" href="/assets/icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/assets/app.css">
+<link rel="stylesheet" href="/assets/app.css?v=3">
 </head>
 <body>
+<a class="skip" href="#main">Skip to the content</a>
 
-<header class="top">
-  <div class="wrap">
+<header class="nav">
+  <div class="wrap nav-in">
     <a class="brand" href="/"><img src="/assets/icon.png" alt="" width="28" height="28">Caret</a>
-    <nav class="links">
-      <a href="/setup" class="hide-sm">Setup</a>
-      <a href="/#what" class="hide-sm">What it does</a>
-      <a class="btn small" href="https://microsoftedge.microsoft.com/addons/detail/caret/ejkpanfkmjkkolgdpampfljaangollpm" id="get-top">Get Caret</a>
+    <nav class="nav-links" aria-label="Main">
+      <a class="nav-link hide-sm" href="/#what">What it does</a>
+      <a class="nav-link" href="/setup" aria-current="page">Setup</a>
+      <a class="btn sm" href="https://microsoftedge.microsoft.com/addons/detail/caret/ejkpanfkmjkkolgdpampfljaangollpm" id="get-top">Get Caret</a>
     </nav>
   </div>
 </header>
 
-<main>
+<main id="main">
 
-<section class="hero" style="padding-bottom:0">
-  <div class="wrap narrow" style="text-align:left">
-    <p class="kicker">Setup</p>
-    <h1 style="font-size:clamp(32px,4.6vw,46px)">Setting up Caret</h1>
-    <p class="lede" style="margin-left:0">
+<section class="page-head">
+  <div class="hero-pattern" aria-hidden="true"></div>
+  <div class="aurora" aria-hidden="true"><i></i><i></i><i></i></div>
+  <div class="wrap">
+    <p class="kicker arrive">Setup</p>
+    <h1 class="arrive d1">Setting up Caret</h1>
+    <p class="lede arrive d2">
       Caret works the moment it is installed. Everything on this page is
       optional — it is here for when you want to change something.
     </p>
+    <ul class="jump arrive d3">
+      <li><a href="#steps">Step by step</a></li>
+      <li><a href="#ai">The AI pass</a></li>
+      <li><a href="#shortcuts">Keyboard shortcuts</a></li>
+    </ul>
   </div>
 </section>
 
-<section>
-  <div class="wrap narrow">
-    <ol class="steps">
-      <li class="rise">
-        <h3>Install it</h3>
-        <p>Open <a href="https://microsoftedge.microsoft.com/addons/detail/caret/ejkpanfkmjkkolgdpampfljaangollpm">the Edge Add-ons listing</a>, press <b>Get</b>, then <b>Add extension</b>. Edge will ask once — that is the permission to read the text boxes it checks.</p>
-        <p><a class="btn small" href="https://microsoftedge.microsoft.com/addons/detail/caret/ejkpanfkmjkkolgdpampfljaangollpm">Get Caret for Edge</a></p>
+<div class="wrap guide">
+
+  <nav class="toc" aria-label="On this page">
+    <p class="toc-title">On this page</p>
+    <ol>
+      <li><a href="#steps">Step by step</a>
+        <ol>
+          <li><a href="#install">Install it</a></li>
+          <li><a href="#pin">Pin it to the toolbar</a></li>
+          <li><a href="#settings">Open the settings</a></li>
+          <li><a href="#underlined">Decide what gets underlined</a></li>
+          <li><a href="#autocorrect">Turn on autocorrect</a></li>
+          <li><a href="#double">Stop the double underlines</a></li>
+          <li><a href="#words">Add your own words</a></li>
+          <li><a href="#off">Switch Caret off on a site</a></li>
+        </ol>
       </li>
-      <li class="rise">
-        <h3>Pin it to the toolbar</h3>
-        <p>Click the puzzle-piece icon beside the address bar, find Caret, and click the pin. The button gives you the on/off switches, a <b>Check with AI</b> button, and a way into the settings.</p>
+      <li><a href="#ai">The AI pass</a>
+        <ol>
+          <li><a href="#which">Which AI</a></li>
+          <li><a href="#key">Paste the key</a></li>
+          <li><a href="#when">Choose when it runs</a></li>
+          <li><a href="#limit">Know what the limit is</a></li>
+        </ol>
       </li>
-      <li class="rise">
-        <h3>Open the settings</h3>
-        <p>Click the Caret button, then <b>Settings</b>. The page has a search box at the top left — type what you are looking for rather than hunting for it.</p>
-        <p>At the very top is a live preview: a sentence run through the real checker. Change anything below and the preview updates, so you can see what a setting does before you commit to it.</p>
-      </li>
-      <li class="rise">
-        <h3>Decide what gets underlined</h3>
-        <p>Five switches under <b>What to check</b>: spelling, grammar, punctuation, clarity, and an <b>extra picky</b> one for passive voice and filler words, which is noisier and off by default.</p>
-        <p>If names keep getting underlined, leave <b>Flag names and unusual words</b> off — that is what it is for.</p>
-      </li>
-      <li class="rise">
-        <h3>Turn on autocorrect, if you want it</h3>
-        <p>Off until you switch it on. It only fixes mistakes with exactly one right answer:</p>
-        <p>
-          <b>Capitalize I</b> — <code>i</code> and <code>ive</code> become <code>I</code> and <code>I've</code>, never <code>ill</code> or <code>id</code>, because those are words.<br>
-          <b>Sentence capitals</b> — after a full stop, a question mark or a new line. Not after <code>Dr.</code> or a trailing-off <code>…</code>.<br>
-          <b>Apostrophes</b> — <code>dont</code> → <code>don't</code>, <code>wouldnt</code> → <code>wouldn't</code>.<br>
-          <b>Known typos</b> — <code>teh</code> → <code>the</code>.
-        </p>
-        <p>Anything with a judgement call in it — their/there, your/you're — is still only underlined. Every correction is an ordinary edit, so <kbd>Ctrl</kbd> <kbd>Z</kbd> undoes it, and a word you undo is left alone from then on.</p>
-      </li>
-      <li class="rise">
-        <h3>Stop the double underlines</h3>
-        <p>Edge underlines in red too, and two sets of underlines disagreeing with each other is worse than either alone. <b>Turn off the browser's own spell check</b> is on by default: Caret silences Edge in the fields it is checking, and puts it back when you move on. A site that ships its own checker — Google Docs, say — cannot be switched off from here.</p>
-      </li>
-      <li class="rise">
-        <h3>Add your own words</h3>
-        <p>Surnames, street names, anything Caret keeps underlining that is not wrong. Either add them under <b>My dictionary</b> in the settings, or right-click the word on the page and choose <b>Add to dictionary</b>.</p>
-      </li>
-      <li class="rise">
-        <h3>Switch Caret off where you do not want it</h3>
-        <p>Right-click any page and choose <b>Turn off on this site</b>. The list lives in the settings under <b>Turned off on</b>, and you can remove one with the × beside it.</p>
-      </li>
+      <li><a href="#shortcuts">Keyboard shortcuts</a></li>
     </ol>
-  </div>
-</section>
+  </nav>
 
-<section class="wash">
-  <div class="wrap narrow">
-    <p class="kicker">Optional</p>
-    <h2>The AI pass</h2>
-    <p>
-      The built-in checks handle spelling, confused words, apostrophes,
-      agreement and capitals on their own, offline and free. The AI pass is for
-      the sentence-level things a rule cannot see — and it is genuinely optional.
-    </p>
-    <p>
-      Pick which one you want in the settings. Caret's own is free; the others
-      use a key of your own, and Caret works out which service a key belongs to
-      from the key itself:
-    </p>
+  <div class="guide-main">
 
-    <div class="grid" style="margin:26px 0 30px">
-      <div class="card rise">
-        <h3>Caret<span class="badge-free">free</span></h3>
-        <p>Nothing to sign up for and nothing to pay. Someone gives you a key starting <code>caret_</code> and you paste it once. It runs on a small shared allowance, so Caret holds you to <b>50 checks a day</b>; when they are gone it goes quiet until midnight UTC and the built-in checks carry on as normal.</p>
-      </div>
-      <div class="card rise d1">
-        <h3>Google Gemini<span class="badge-free">free tier</span></h3>
-        <p>A key from <a href="https://aistudio.google.com/apikey">aistudio.google.com/apikey</a> needs no card and no credits. There is a cap per minute and per day, which proofreading one field at a time does not come near. Keys start <code>AIza</code>.</p>
-      </div>
-      <div class="card rise d2">
-        <h3>OpenAI</h3>
-        <p>Pay as you go — you have to buy credits before the key does anything. There is no free allowance. Keys start <code>sk-</code>.</p>
-      </div>
-      <div class="card rise">
-        <h3>Anthropic</h3>
-        <p>Also pay as you go. Keys start <code>sk-ant-</code>.</p>
-      </div>
-    </div>
+    <section class="part" id="steps">
+      <h2 class="sr-only">Step by step</h2>
+      <ol class="steps">
+        <li id="install" data-reveal>
+          <h3>Install it</h3>
+          <p>Open <a href="https://microsoftedge.microsoft.com/addons/detail/caret/ejkpanfkmjkkolgdpampfljaangollpm">the Edge Add-ons listing</a>, press <b>Get</b>, then <b>Add extension</b>. Edge will ask once — that is the permission to read the text boxes it checks.</p>
+          <p><a class="btn sm" href="https://microsoftedge.microsoft.com/addons/detail/caret/ejkpanfkmjkkolgdpampfljaangollpm">Get Caret for Edge</a></p>
+        </li>
+        <li id="pin" data-reveal>
+          <h3>Pin it to the toolbar</h3>
+          <p>Click the puzzle-piece icon beside the address bar, find Caret, and click the pin. The button gives you the on/off switches, a <b>Check with AI</b> button, and a way into the settings.</p>
+        </li>
+        <li id="settings" data-reveal>
+          <h3>Open the settings</h3>
+          <p>Click the Caret button, then <b>Settings</b>. The page has a search box at the top left — type what you are looking for rather than hunting for it.</p>
+          <p>At the very top is a live preview: a sentence run through the real checker. Change anything below and the preview updates, so you can see what a setting does before you commit to it.</p>
+        </li>
+        <li id="underlined" data-reveal>
+          <h3>Decide what gets underlined</h3>
+          <p>Five switches under <b>What to check</b>: spelling, grammar, punctuation, clarity, and an <b>extra picky</b> one for passive voice and filler words, which is noisier and off by default.</p>
+          <p>If names keep getting underlined, leave <b>Flag names and unusual words</b> off — that is what it is for.</p>
+        </li>
+        <li id="autocorrect" data-reveal>
+          <h3>Turn on autocorrect, if you want it</h3>
+          <p>Off until you switch it on. It only fixes mistakes with exactly one right answer:</p>
+          <dl class="terms">
+            <div>
+              <dt>Capitalize I</dt>
+              <dd><code>i</code> and <code>ive</code> become <code>I</code> and <code>I've</code>, never <code>ill</code> or <code>id</code>, because those are words.</dd>
+            </div>
+            <div>
+              <dt>Sentence capitals</dt>
+              <dd>After a full stop, a question mark or a new line. Not after <code>Dr.</code> or a trailing-off <code>…</code>.</dd>
+            </div>
+            <div>
+              <dt>Apostrophes</dt>
+              <dd><code>dont</code> → <code>don't</code>, <code>wouldnt</code> → <code>wouldn't</code>.</dd>
+            </div>
+            <div>
+              <dt>Known typos</dt>
+              <dd><code>teh</code> → <code>the</code>.</dd>
+            </div>
+          </dl>
+          <p>Anything with a judgement call in it — their/there, your/you're — is still only underlined. Every correction is an ordinary edit, so <kbd>Ctrl</kbd> <kbd>Z</kbd> undoes it, and a word you undo is left alone from then on.</p>
+        </li>
+        <li id="double" data-reveal>
+          <h3>Stop the double underlines</h3>
+          <p>Edge underlines in red too, and two sets of underlines disagreeing with each other is worse than either alone. <b>Turn off the browser's own spell check</b> is on by default: Caret silences Edge in the fields it is checking, and puts it back when you move on. A site that ships its own checker — Google Docs, say — cannot be switched off from here.</p>
+        </li>
+        <li id="words" data-reveal>
+          <h3>Add your own words</h3>
+          <p>Surnames, street names, anything Caret keeps underlining that is not wrong. Either add them under <b>My dictionary</b> in the settings, or right-click the word on the page and choose <b>Add to dictionary</b>.</p>
+        </li>
+        <li id="off" data-reveal>
+          <h3>Switch Caret off where you do not want it</h3>
+          <p>Right-click any page and choose <b>Turn off on this site</b>. The list lives in the settings under <b>Turned off on</b>, and you can remove one with the × beside it.</p>
+        </li>
+      </ol>
+    </section>
 
-    <ol class="steps">
-      <li class="rise">
-        <h3>Pick one, then paste the key</h3>
-        <p>Settings → <b>AI proofreading</b> → switch it on, choose which AI, then paste the key. It is kept in your browser profile and sent only to the service it belongs to. If the key does not match the service you picked, Caret says so rather than letting the API fail at you later.</p>
-      </li>
-      <li class="rise">
-        <h3>Choose when it runs</h3>
-        <p>This is the setting that decides your bill, so it is a real choice:</p>
+    <section class="part" id="ai">
+      <div class="part-head" data-reveal>
+        <p class="kicker">Optional</p>
+        <h2>The AI pass</h2>
+      </div>
+      <div class="prose" data-reveal>
         <p>
-          <b>Only when I ask</b> — right-click the box and choose <b>Proofread with AI</b>, press <kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>.</kbd>, or use the <b>Check with AI</b> button in the toolbar popup. Nothing is sent until you do. This is the default.<br>
-          <b>Every minute while I am typing</b> — one check a minute at most, and only in a field you are actually working in.<br>
-          <b>After every pause</b> — the most thorough and by far the most expensive.
+          The built-in checks handle spelling, confused words, apostrophes,
+          agreement and capitals on their own, offline and free. The AI pass is for
+          the sentence-level things a rule cannot see — and it is genuinely optional.
         </p>
-      </li>
-      <li class="rise">
-        <h3>Know what the limit is</h3>
-        <p>On a free option Caret holds you to <b>50 checks a day</b> on this computer — you can set it lower, not higher, because the allowance behind it belongs to somebody else. On a paid key of your own it does not limit you at all, though you can still set a number so a stuck key cannot quietly run up a bill.</p>
-      </li>
-    </ol>
+        <p id="which">
+          Pick which one you want in the settings. Caret's own is free; the others
+          use a key of your own, and Caret works out which service a key belongs to
+          from the key itself:
+        </p>
+      </div>
 
-    <p style="margin-top:26px">
-      Whatever the model suggests, it may only swap a word or a short phrase —
-      never rewrite a sentence — and it is told to keep your vocabulary plain
-      rather than make it sound more formal. Nothing is applied until you click
-      it.
-    </p>
-  </div>
-</section>
+      <ul class="providers">
+        <li class="provider own ring" data-reveal>
+          <div class="provider-head">
+            <span class="mark own" aria-hidden="true"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 14.5 12 5.5l6.5 9" stroke="#fff" stroke-width="3.1"/><path d="M5 20.4h14" stroke="#5ee6bb" stroke-width="2.7"/></svg></span>
+            <h3>Caret</h3>
+            <span class="tag mint">free</span>
+          </div>
+          <p>Nothing to sign up for and nothing to pay. Someone gives you a key starting <code>caret_</code> and you paste it once. It runs on a small shared allowance, so Caret holds you to <b>50 checks a day</b>; when they are gone it goes quiet until midnight UTC and the built-in checks carry on as normal.</p>
+          <p class="key"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5.2" cy="10.8" r="2.9"/><path d="m7.3 8.7 6-6M11 5l2 2M9.2 6.8l1.6 1.6"/></svg>Keys start <code>caret_</code></p>
+        </li>
+        <li class="provider" data-reveal>
+          <div class="provider-head">
+            <span class="mark" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="5.2" cy="10.8" r="2.9"/><path d="m7.3 8.7 6-6M11 5l2 2M9.2 6.8l1.6 1.6"/></svg></span>
+            <h3>Google Gemini</h3>
+            <span class="tag mint">free tier</span>
+          </div>
+          <p>A key from <a href="https://aistudio.google.com/apikey">aistudio.google.com/apikey</a> needs no card and no credits. There is a cap per minute and per day, which proofreading one field at a time does not come near.</p>
+          <p class="key"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5.2" cy="10.8" r="2.9"/><path d="m7.3 8.7 6-6M11 5l2 2M9.2 6.8l1.6 1.6"/></svg>Keys start <code>AIza</code></p>
+        </li>
+        <li class="provider" data-reveal>
+          <div class="provider-head">
+            <span class="mark" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="5.2" cy="10.8" r="2.9"/><path d="m7.3 8.7 6-6M11 5l2 2M9.2 6.8l1.6 1.6"/></svg></span>
+            <h3>OpenAI</h3>
+            <span class="tag">pay as you go</span>
+          </div>
+          <p>Pay as you go — you have to buy credits before the key does anything. There is no free allowance.</p>
+          <p class="key"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5.2" cy="10.8" r="2.9"/><path d="m7.3 8.7 6-6M11 5l2 2M9.2 6.8l1.6 1.6"/></svg>Keys start <code>sk-</code></p>
+        </li>
+        <li class="provider" data-reveal>
+          <div class="provider-head">
+            <span class="mark" aria-hidden="true"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="5.2" cy="10.8" r="2.9"/><path d="m7.3 8.7 6-6M11 5l2 2M9.2 6.8l1.6 1.6"/></svg></span>
+            <h3>Anthropic</h3>
+            <span class="tag">pay as you go</span>
+          </div>
+          <p>Also pay as you go.</p>
+          <p class="key"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5.2" cy="10.8" r="2.9"/><path d="m7.3 8.7 6-6M11 5l2 2M9.2 6.8l1.6 1.6"/></svg>Keys start <code>sk-ant-</code></p>
+        </li>
+      </ul>
 
-<section>
-  <div class="wrap narrow">
-    <p class="kicker">Reference</p>
-    <h2>Keyboard shortcuts</h2>
-    <div class="grid" style="grid-template-columns:repeat(auto-fit,minmax(220px,1fr))">
-      <div class="card"><h3><kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>Space</kbd></h3><p>Suggestions for the word the cursor is in.</p></div>
-      <div class="card"><h3><kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>.</kbd></h3><p>Proofread this field with AI.</p></div>
-      <div class="card"><h3>Right-click</h3><p><b>Proofread with AI</b>, right there in the menu — no shortcut to remember.</p></div>
-      <div class="card"><h3><kbd>Esc</kbd></h3><p>Close the suggestion card.</p></div>
-    </div>
-    <p style="margin-top:20px">You can change any of these: settings → <b>Keyboard and buttons</b> → <b>Change the shortcuts</b>.</p>
-    <p style="margin-top:34px">Still stuck? <a href="/report">Tell me what happened</a> and I will take a look.</p>
+      <ol class="steps">
+        <li id="key" data-reveal>
+          <h3>Pick one, then paste the key</h3>
+          <p>Settings → <b>AI proofreading</b> → switch it on, choose which AI, then paste the key. It is kept in your browser profile and sent only to the service it belongs to. If the key does not match the service you picked, Caret says so rather than letting the API fail at you later.</p>
+        </li>
+        <li id="when" data-reveal>
+          <h3>Choose when it runs</h3>
+          <p>This is the setting that decides your bill, so it is a real choice:</p>
+          <dl class="terms one">
+            <div>
+              <dt>Only when I ask <span class="tag iris">default</span></dt>
+              <dd>Right-click the box and choose <b>Proofread with AI</b>, press <kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>.</kbd>, or use the <b>Check with AI</b> button in the toolbar popup. Nothing is sent until you do. This is the default.</dd>
+            </div>
+            <div>
+              <dt>Every minute while I am typing</dt>
+              <dd>One check a minute at most, and only in a field you are actually working in.</dd>
+            </div>
+            <div>
+              <dt>After every pause</dt>
+              <dd>The most thorough and by far the most expensive.</dd>
+            </div>
+          </dl>
+        </li>
+        <li id="limit" data-reveal>
+          <h3>Know what the limit is</h3>
+          <p>On a free option Caret holds you to <b>50 checks a day</b> on this computer — you can set it lower, not higher, because the allowance behind it belongs to somebody else. On a paid key of your own it does not limit you at all, though you can still set a number so a stuck key cannot quietly run up a bill.</p>
+        </li>
+      </ol>
+
+      <div class="note" data-reveal>
+        <p>
+          Whatever the model suggests, it may only swap a word or a short phrase —
+          never rewrite a sentence — and it is told to keep your vocabulary plain
+          rather than make it sound more formal. Nothing is applied until you click
+          it.
+        </p>
+      </div>
+    </section>
+
+    <section class="part" id="shortcuts">
+      <div class="part-head" data-reveal>
+        <p class="kicker">Reference</p>
+        <h2>Keyboard shortcuts</h2>
+      </div>
+      <dl class="keys" data-reveal>
+        <div>
+          <dt><kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>Space</kbd></dt>
+          <dd>Suggestions for the word the cursor is in.</dd>
+        </div>
+        <div>
+          <dt><kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>.</kbd></dt>
+          <dd>Proofread this field with AI.</dd>
+        </div>
+        <div>
+          <dt><kbd>Right-click</kbd></dt>
+          <dd><b>Proofread with AI</b>, right there in the menu — no shortcut to remember.</dd>
+        </div>
+        <div>
+          <dt><kbd>Esc</kbd></dt>
+          <dd>Close the suggestion card.</dd>
+        </div>
+      </dl>
+      <div class="prose" style="margin-top:22px" data-reveal>
+        <p>You can change any of these: settings → <b>Keyboard and buttons</b> → <b>Change the shortcuts</b>.</p>
+      </div>
+      <div class="help" data-reveal>
+        <p>Still stuck? <a href="/report">Tell me what happened</a> and I will take a look.</p>
+      </div>
+    </section>
+
   </div>
-</section>
+</div>
 
 </main>
 
-<footer class="end">
-  <div class="wrap">
-    <span>Caret</span>
-    <span class="right">
+<footer class="foot">
+  <div class="wrap foot-in">
+    <a class="brand" href="/"><img src="/assets/icon.png" alt="" width="24" height="24">Caret</a>
+    <p class="foot-tag">Writing that catches itself.</p>
+    <nav aria-label="Footer">
       <a href="/setup">Setup</a>
       <a href="/report">Report a problem</a>
       <a href="/privacy">Privacy</a>
-    </span>
+    </nav>
   </div>
 </footer>
-<script src="/assets/app.js"></script>
+
+<script src="/assets/app.js?v=3"></script>
 </body>
 </html>
