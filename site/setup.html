@@ -70,6 +70,7 @@
           <li><a href="#key">Paste the key</a></li>
           <li><a href="#when">Choose when it runs</a></li>
           <li><a href="#limit">Know what the limit is</a></li>
+          <li><a href="#quick">The quick check</a></li>
         </ol>
       </li>
       <li><a href="#shortcuts">Keyboard shortcuts</a></li>
@@ -163,7 +164,7 @@
             <h3>Caret</h3>
             <span class="tag mint">free</span>
           </div>
-          <p>Nothing to sign up for, nothing to pay and nothing to paste: the copy from the Edge store has it built in. Your text goes to Caret's small server on Cloudflare, which asks Cloudflare's AI and sends the corrections back without keeping a copy. It runs on a small shared allowance, so Caret holds you to <b>50 checks a day</b>; when they are gone it goes quiet until tomorrow and the built-in checks carry on as normal.</p>
+          <p>Nothing to sign up for, nothing to pay and nothing to paste: the copy from the Edge store has it built in. Your text goes to Caret's small server on Cloudflare, which asks Cloudflare's AI and sends the corrections back without keeping a copy. It runs on a small shared allowance, so Caret holds you to <b>20 full checks a day</b>, plus <a href="#quick">the quick check</a> if you turn it on; when they are gone it goes quiet until tomorrow and the built-in checks carry on as normal.</p>
           <p class="key"><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="5.2" cy="10.8" r="2.9"/><path d="m7.3 8.7 6-6M11 5l2 2M9.2 6.8l1.6 1.6"/></svg>Built in — no key needed</p>
         </li>
         <li class="provider" data-reveal>
@@ -202,7 +203,7 @@
         </li>
         <li id="when" data-reveal>
           <h3>Choose when it runs</h3>
-          <p>This is the setting that decides your bill, so it is a real choice:</p>
+          <p>On a paid key this is the setting that decides your bill, and on a free one how long the day's checks last, so it is a real choice:</p>
           <dl class="terms one">
             <div>
               <dt>Only when I ask <span class="tag iris">default</span></dt>
@@ -217,10 +218,35 @@
               <dd>The most thorough and by far the most expensive.</dd>
             </div>
           </dl>
+          <p>On Caret's own, with 20 full checks a day, the two automatic choices use them up quickly. Leave it on <b>Only when I ask</b>, and let <a href="#quick">the quick check</a> do the checking as you type.</p>
         </li>
         <li id="limit" data-reveal>
           <h3>Know what the limit is</h3>
-          <p>On a free option Caret holds you to <b>50 checks a day</b> on this computer — you can set it lower, not higher, because the allowance behind it belongs to somebody else. On a paid key of your own it does not limit you at all, though you can still set a number so a stuck key cannot quietly run up a bill.</p>
+          <p>On a free option Caret holds you to a number of full checks a day on this computer: <b>20 on Caret's own</b>, because its free allowance is shared with everybody who uses it, and <b>50 on Google's free tier</b>. You can set it lower, not higher. On a paid key of your own it does not limit you at all, though you can still set a number so a stuck key cannot quietly run up a bill.</p>
+          <p>The quick check has a number of its own, below, and does not use these up.</p>
+        </li>
+        <li id="quick" data-reveal>
+          <h3>Turn on the quick check, if you want it</h3>
+          <p>A second, much smaller AI that reads one sentence at a time. Once you finish a sentence — a full stop, a question mark or an exclamation mark — and move on, or stop typing for a moment, Caret sends just that sentence and underlines anything that comes back. A paragraph of five sentences is five quick checks.</p>
+          <dl class="terms">
+            <div>
+              <dt>Checked once</dt>
+              <dd>A sentence is not sent again unless you change it and then move on from it.</dd>
+            </div>
+            <div>
+              <dt>Free</dt>
+              <dd>It always runs on Caret's own server, whichever AI you picked for the full check. Nothing to sign up for, nothing to pay.</dd>
+            </div>
+            <div>
+              <dt>30 a day, up to 80</dt>
+              <dd>New installs get 30 quick checks a day. Raise it to as many as 80 under <b>Quick checks a day</b>, or set it lower.</dd>
+            </div>
+            <div>
+              <dt>With or without the full check</dt>
+              <dd>It has its own switch. Have the quick check on, the full check on, or both.</dd>
+            </div>
+          </dl>
+          <p>Settings → <b>AI proofreading</b> → <b>Check each sentence as I finish it</b>. It is off until you switch it on. It shares one free allowance with everybody else, so on a very busy day it can go quiet until midnight UTC; the built-in checks carry on as normal.</p>
         </li>
       </ol>
 

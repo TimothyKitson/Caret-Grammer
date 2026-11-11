@@ -2,24 +2,42 @@
 
 export const STORAGE_KEY = 'settings';
 
-// The free options run on an allowance somebody else is paying for - Caret's
-// own server shares one between everybody, and Google rate limits its free
-// tier - so Caret holds each install to this many checks a day. It is counted
-// here, in the extension, per person: the server is not asked to police it.
+// The free options run on an allowance somebody else is paying for, so Caret
+// holds each install to a number of checks a day. It is counted here, in the
+// extension, per person: the server is not asked to police it.
 //
-// A paid key is the user's own money and their own decision, so it is not
-// capped at all. 0 means no limit.
-export const MAX_FREE_DAILY = 50;
-export const FREE_PROVIDERS = new Set(['caret', 'gemini']);
+// Caret's own server shares one small free allowance between everybody, and
+// its big model is the expensive part of it, so the full check is held to 20
+// a day. Google's free tier belongs to the person's own Google account, so it
+// gets more room. A paid key is the user's own money and their own decision,
+// so it is not capped at all. 0 means no limit.
+export const FREE_CEILINGS = { caret: 20, gemini: 50 };
+export const MAX_FREE_DAILY = Math.max(...Object.values(FREE_CEILINGS));
+export const FREE_PROVIDERS = new Set(Object.keys(FREE_CEILINGS));
 export const PAID_PROVIDERS = new Set(['openai', 'anthropic']);
 
 /**
  * The most checks a day this provider may be set to. 0 means no limit.
  * Only a known paid provider is uncapped; anything else, including "not
- * picked yet", is treated as free.
+ * picked yet", gets the tightest free ceiling.
  */
 export function dailyCeiling(provider) {
-  return PAID_PROVIDERS.has(provider) ? 0 : MAX_FREE_DAILY;
+  if (PAID_PROVIDERS.has(provider)) return 0;
+  return FREE_CEILINGS[provider] ?? FREE_CEILINGS.caret;
+}
+
+// The quick check: Caret's small model looks at each sentence as you finish
+// it. It is cheap enough to allow far more of them than the full check, but it
+// still comes out of the same shared allowance, so it has its own cap. New
+// installs start at 30 a day; people can raise it, never past 80.
+export const QUICK_DEFAULT_DAILY = 30;
+export const QUICK_MAX_DAILY = 80;
+
+/** A quick-check limit someone typed, made safe: a whole number from 1 to 80. */
+export function clampQuickLimit(value) {
+  const n = Math.round(Number(value));
+  if (!Number.isFinite(n) || n < 1) return n === 0 ? 1 : QUICK_DEFAULT_DAILY;
+  return Math.min(QUICK_MAX_DAILY, n);
 }
 
 export const DEFAULT_SETTINGS = {
@@ -66,11 +84,17 @@ export const DEFAULT_SETTINGS = {
   // provider": the free ceiling on a free option, no limit on a paid key.
   aiDailyLimit: 0,
   aiUsage: { day: '', count: 0 },
+  // The quick check after each sentence. Off until someone turns it on: it
+  // sends each finished sentence to Caret's server.
+  quickAiEnabled: false,
+  quickAiDailyLimit: QUICK_DEFAULT_DAILY,
+  quickAiUsage: { day: '', count: 0 },
   disabledSites: [],
   customWords: [],
   ignored: [],
-  stats: { checks: 0, issues: 0, aiCalls: 0, aiErrors: 0 },
+  stats: { checks: 0, issues: 0, aiCalls: 0, aiErrors: 0, quickCalls: 0 },
   lastAiError: '',
+  lastQuickError: '',
 };
 
 export const AUTOCORRECT_INFO = [
@@ -145,6 +169,9 @@ export function mergeSettings(stored) {
   merged.categories = { ...DEFAULT_SETTINGS.categories, ...((stored && stored.categories) || {}) };
   merged.stats = { ...DEFAULT_SETTINGS.stats, ...((stored && stored.stats) || {}) };
   merged.aiUsage = { ...DEFAULT_SETTINGS.aiUsage, ...((stored && stored.aiUsage) || {}) };
+  merged.quickAiUsage = { ...DEFAULT_SETTINGS.quickAiUsage, ...((stored && stored.quickAiUsage) || {}) };
+  merged.quickAiDailyLimit = clampQuickLimit(merged.quickAiDailyLimit);
+  merged.quickAiEnabled = merged.quickAiEnabled === true;
   merged.autocorrect = { ...DEFAULT_SETTINGS.autocorrect, ...((stored && stored.autocorrect) || {}) };
   merged.disabledSites = Array.isArray(merged.disabledSites) ? merged.disabledSites : [];
   merged.customWords = Array.isArray(merged.customWords) ? merged.customWords : [];
@@ -159,4 +186,64 @@ export function siteKey(href) {
   } catch (_) {
     return 'local';
   }
+}
+
+/**
+ * Whatever someone pasted into "Turn Caret off on these sites", as a bare
+ * hostname: a full address, a domain, "www." or "*." in front, a path or a
+ * port after - all of it comes down to "ignitiaschools.com". '' if it is not
+ * something that could be a website.
+ */
+export function normalizeSite(input) {
+  let text = String(input || '').trim().toLowerCase();
+  if (!text) return '';
+  text = text.replace(/^\*\./, '');
+  if (!/^[a-z][a-z0-9+.-]*:\/\//.test(text)) text = `https://${text}`;
+  let host;
+  try {
+    host = new URL(text).hostname;
+  } catch (_) {
+    return '';
+  }
+  host = host.replace(/^www\./, '').replace(/\.$/, '');
+  // A dot and only the characters a hostname can have; or localhost.
+  if (host !== 'localhost' && !/^[a-z0-9-]+(\.[a-z0-9-]+)+$/.test(host)) return '';
+  return host;
+}
+
+/**
+ * Is this address on the list? A site on the list covers every subdomain
+ * under it, so "ignitiaschools.com" also turns Caret off on
+ * "englewoodfl.ignitiaschools.com".
+ */
+export function siteBlocked(list, href) {
+  const host = siteKey(href);
+  return (list || []).some((entry) => entry && (host === entry || host.endsWith(`.${entry}`)));
+}
+
+/** The entries on the list that cover this address. */
+export function blockingEntries(list, href) {
+  const host = siteKey(href);
+  return (list || []).filter((entry) => entry && (host === entry || host.endsWith(`.${entry}`)));
+}
+
+/**
+ * The word list with this word added, keeping the capitals it was typed with.
+ * Words are matched without regard to case, so adding "Ignitia" when
+ * "ignitia" is already there swaps in the capitalized one rather than keeping
+ * both. Returns the same array when nothing changes.
+ */
+export function addCustomWord(list, word) {
+  const form = String(word || '').trim();
+  const current = Array.isArray(list) ? list : [];
+  if (!form || form.length > 60) return current;
+  const lower = form.toLowerCase();
+  const existing = current.find((w) => String(w).toLowerCase() === lower);
+  if (existing === form) return current;
+  // An all-lower-case entry is replaced by one with capitals; one with
+  // capitals is not undone by a lower-case add (that came from a card on a
+  // lower-case use, which is exactly what the capital is there to catch).
+  if (existing && form === lower) return current;
+  return [...current.filter((w) => String(w).toLowerCase() !== lower), form]
+    .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: 'base' }));
 }

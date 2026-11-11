@@ -57,6 +57,33 @@ const SYSTEM_PROMPT = [
   '- A replacement should be as simple as, or simpler than, what it replaces.',
 ].join('\n');
 
+// The quick check's prompt: one finished sentence, sent to a very small model.
+//
+// It goes out with every sentence anybody finishes, and every token of it is
+// paid for every time, out of the same small shared allowance. So it is the
+// rules above cut to the bone, not a different set of rules: only real
+// mistakes, never a rewrite, never a change of meaning, never a fancier word.
+//
+// It spells the JSON out in full because the small models it is written for
+// are not on Workers AI's JSON-mode list. The schema is still asked for, but
+// this is what they actually follow. Same shape as the full check, so the
+// same parseCorrections() and toIssues() handle the answer.
+const QUICK_SYSTEM_PROMPT = [
+  'You proofread ONE sentence. Report only real mistakes: spelling, grammar,',
+  'wrong word (their/there), agreement, tense, punctuation.',
+  '- Never rewrite. Swap one word, or a short phrase at most.',
+  '- Never change the meaning. Never drop a "not", "no", "never" or "n\'t".',
+  '- Never swap a word for a fancier one. Never fix style or taste.',
+  '- Leave names, URLs and code alone.',
+  '- "original": copied exactly from the sentence, as short as possible.',
+  '- "before": the up to 10 characters just before "original", copied exactly.',
+  '- "replacement": the corrected "original" only.',
+  '- "kind": spelling, grammar or punctuation. "explanation": a few plain words.',
+  'Reply with JSON only:',
+  '{"corrections":[{"before":"","original":"","replacement":"","kind":"","explanation":""}]}',
+  'If the sentence is correct: {"corrections":[]}',
+].join('\n');
+
 const SCHEMA = {
   type: 'object',
   properties: {
@@ -80,7 +107,7 @@ const SCHEMA = {
   additionalProperties: false,
 };
 
-export { SYSTEM_PROMPT, SCHEMA };
+export { SYSTEM_PROMPT, QUICK_SYSTEM_PROMPT, SCHEMA };
 
 /** The user turn. Same wording wherever the request is built. */
 export function userPrompt(text) {

@@ -70,6 +70,24 @@ test('words added by the user count as correct', () => {
   assert.equal(local.isKnown('zyzzyva'), true);
 });
 
+test('a word added with capitals keeps them, and asks for them back', () => {
+  dict.setUserWords(['Ignitia', 'McDonald', 'Grace']);
+  try {
+    // Accepted as written.
+    assert.equal(findAt('I finished it on Ignitia today.', 'Ignitia'), undefined);
+    // Written without its capital: suggest the way it was added.
+    const lower = findAt('I finished it on ignitia today.', 'ignitia');
+    assert.ok(lower, 'expected a capital suggestion');
+    assert.equal(lower.id, 'proper-noun-capital');
+    assert.deepEqual(lower.replacements, ['Ignitia']);
+    // An everyday word saved with a capital is a name only where the sentence
+    // clearly means one, so "grace" in ordinary use is left alone.
+    assert.equal(findAt('She moved with grace and speed.', 'grace'), undefined);
+  } finally {
+    dict.setUserWords([]);
+  }
+});
+
 // ----------------------------------------------------------------- spelling
 
 test('suggests the right word for common typos', () => {

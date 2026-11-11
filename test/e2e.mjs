@@ -14,6 +14,11 @@ import os from 'node:os';
 import assert from 'node:assert/strict';
 import { execSync } from 'node:child_process';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+// The limits the settings page has to show come from the same file it reads
+// them from, so retuning a number does not mean editing this test.
+import {
+  FREE_CEILINGS, QUICK_DEFAULT_DAILY, QUICK_MAX_DAILY,
+} from '../src/shared/defaults.js';
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.dirname(HERE);
@@ -434,15 +439,29 @@ await step('the AI section asks for a key and offers the free provider', async (
     model: document.getElementById('model-row').hidden,
     limit: document.getElementById('aiDailyLimit').value,
     budget: document.getElementById('ai-budget').textContent,
+    noteHidden: document.getElementById('trigger-note').hidden,
+    note: document.getElementById('trigger-note').textContent,
   }));
+  // Asking Caret's own for more than its ceiling saves the ceiling...
+  await options.locator('#aiDailyLimit').fill('500');
+  await options.locator('#aiDailyLimit').press('Tab');
+  await options.waitForFunction(
+    (n) => document.getElementById('aiDailyLimit').value === String(n),
+    FREE_CEILINGS.caret,
+  );
 
+  // ...and that ceiling was never the person's own number, so it must not
+  // follow them on to a paid key.
   await options.locator('#aiProvider label:has(input[value="anthropic"])').click();
   await options.waitForFunction(() => document.getElementById('key-label').textContent === 'Anthropic API key');
+  await options.waitForFunction(() => document.getElementById('aiDailyLimit').value === '0', null, { timeout: 5000 })
+    .catch(() => {});
   const paid = await options.evaluate(() => ({
     placeholder: document.getElementById('aiKey').placeholder,
     effort: document.getElementById('effort-row').hidden,
     budget: document.getElementById('ai-budget').textContent,
     limit: document.getElementById('aiDailyLimit').value,
+    noteHidden: document.getElementById('trigger-note').hidden,
   }));
 
   await options.locator('label:has(#aiEnabled)').click();
@@ -456,13 +475,128 @@ await step('the AI section asks for a key and offers the free provider', async (
 
   assert.equal(caret.placeholder, 'caret_…');
   assert.equal(caret.model, true, 'the Caret server picks its own model');
-  assert.equal(caret.limit, '50', 'the free option is capped at 50 a day');
+  assert.equal(caret.limit, String(FREE_CEILINGS.caret), "Caret's own full check has its own, smaller cap");
   assert.match(caret.budget, /Free, with a limit/);
+  assert.ok(caret.budget.includes(`at most ${FREE_CEILINGS.caret} full AI checks a day`), caret.budget);
+  if (FREE_CEILINGS.caret !== FREE_CEILINGS.gemini) {
+    assert.ok(!caret.budget.includes(String(FREE_CEILINGS.gemini)), "Caret's budget must not show Google's number");
+  }
+  assert.equal(caret.noteHidden, false, 'on Caret the automatic triggers get a warning');
+  assert.ok(caret.note.includes(`${FREE_CEILINGS.caret} full checks a day`), caret.note);
 
   assert.equal(paid.placeholder, 'sk-ant-…');
   assert.equal(paid.effort, false, 'effort is an Anthropic setting');
   assert.match(paid.budget, /does not limit it/);
-  assert.equal(paid.limit, '0', 'a paid key must not inherit the free cap of 50');
+  assert.equal(paid.limit, '0', "a paid key must not inherit Caret's free cap");
+  assert.equal(paid.noteHidden, true, "the Caret warning is only for Caret");
+});
+
+await step('the quick check has its own switch, off by default, held to its range', async () => {
+  const options = await context.newPage();
+  const errors = [];
+  options.on('pageerror', (error) => errors.push(error.message));
+  options.on('console', (message) => {
+    if (message.type() === 'error') errors.push(message.text());
+  });
+  const open = async () => {
+    await options.goto(`chrome-extension://${extensionId}/src/options/options.html`);
+    await options.waitForSelector('#quickAiEnabled', { state: 'attached' });
+    // load() fills the number in once it has the settings.
+    await options.waitForFunction(() => document.getElementById('quickAiDailyLimit').value !== '');
+  };
+  const message = (msg) => options.evaluate((m) => new Promise((r) => chrome.runtime.sendMessage(m, r)), msg);
+  const stored = async () => (await message({ type: 'get-settings' })).settings;
+  const storedLimitIs = async (n) => {
+    for (let i = 0; i < 40; i += 1) {
+      if ((await stored()).quickAiDailyLimit === n) return;
+      await new Promise((r) => setTimeout(r, 100));
+    }
+    assert.fail(`quickAiDailyLimit never became ${n}; it is ${(await stored()).quickAiDailyLimit}`);
+  };
+  const look = () => options.evaluate(() => {
+    const $ = (id) => document.getElementById(id);
+    return {
+      checked: $('quickAiEnabled').checked,
+      switchDisabled: $('quickAiEnabled').disabled,
+      limit: $('quickAiDailyLimit').value,
+      limitDisabled: $('quickAiDailyLimit').disabled,
+      type: $('quickAiDailyLimit').type,
+      min: $('quickAiDailyLimit').min,
+      max: $('quickAiDailyLimit').max,
+      step: $('quickAiDailyLimit').step,
+      state: $('quick-state').textContent,
+      leftHidden: $('quick-left').hidden,
+      left: $('quick-left').textContent,
+      errorHidden: $('quick-error').hidden,
+      bigAiOn: $('aiEnabled').checked,
+      // Its own block: the full check's switch must not be able to dim it.
+      separate: !$('ai-body').contains($('quick-block')) && $('sec-ai').contains($('quick-block')),
+    };
+  });
+
+  await open();
+  const first = await look();
+  const answer = await message({ type: 'get-settings' });
+
+  // The copy in the repository has no key baked in. Lend it a made-up Caret
+  // key so the switch can be used; nothing is typed into a page while the
+  // quick check is on, so nothing is ever sent with it. Put back afterwards
+  // whatever happens, or every later step would run with it switched on.
+  let lent; let on; let savedOn; let high; let low; let found;
+  try {
+    await message({ type: 'patch-settings', patch: { aiKey: 'caret_e2eoptions_0000' } });
+    await open();
+    lent = await look();
+    await options.locator('label:has(#quickAiEnabled)').click();
+    await options.waitForFunction(() => !document.getElementById('quickAiDailyLimit').disabled);
+    on = await look();
+    savedOn = (await stored()).quickAiEnabled;
+
+    await options.locator('#quickAiDailyLimit').fill('250');
+    await options.locator('#quickAiDailyLimit').press('Tab');
+    await storedLimitIs(QUICK_MAX_DAILY);
+    high = await look();
+
+    await options.locator('#quickAiDailyLimit').fill('0');
+    await options.locator('#quickAiDailyLimit').press('Tab');
+    await storedLimitIs(1);
+    low = await look();
+
+    // Searching for it by what it does finds it.
+    await options.locator('#search').fill('as you type');
+    found = await options.locator('label:has(#quickAiEnabled)').isVisible();
+    await options.locator('#search').fill('');
+  } finally {
+    await message({
+      type: 'patch-settings',
+      patch: { quickAiEnabled: false, quickAiDailyLimit: QUICK_DEFAULT_DAILY, aiKey: '' },
+    });
+    await options.close();
+  }
+
+  assert.equal(errors.length, 0, `console errors: ${errors.join(' | ')}`);
+  assert.equal(first.separate, true, 'the quick check needs its own block in the AI section');
+  assert.equal(first.checked, false, 'the quick check is off for a new install');
+  assert.equal(first.limit, String(QUICK_DEFAULT_DAILY), 'a new install gets the default number of quick checks');
+  assert.deepEqual([first.type, first.min, first.max, first.step], ['number', '1', String(QUICK_MAX_DAILY), '1']);
+  assert.equal(first.limitDisabled, true, 'the number is dead while the quick check is off');
+  assert.equal(first.leftHidden, true, 'no "left today" while it is off');
+  if (answer && answer.quick && answer.quick.available === false) {
+    assert.equal(first.switchDisabled, true, 'with no Caret key the switch cannot be turned on');
+    assert.match(first.state, /no Caret key/);
+  }
+  assert.equal(lent.switchDisabled, false, 'with a Caret key the switch works');
+  assert.equal(on.checked, true);
+  assert.equal(savedOn, true, 'the switch saves quickAiEnabled');
+  assert.equal(on.bigAiOn, false, 'the quick check works with the full check off');
+  if (typeof answer.quickLeftToday === 'number') {
+    assert.equal(on.leftHidden, false, 'the number left today shows while it is on');
+    assert.match(on.left, /^\d+ left today/);
+  }
+  assert.equal(on.errorHidden, true, 'no error to show');
+  assert.equal(high.limit, String(QUICK_MAX_DAILY), '250 is held to the most there is');
+  assert.equal(low.limit, '1', '0 is held to the least there is, 1');
+  assert.equal(found, true, 'searching "as you type" should find the quick check');
 });
 
 await step('a word added in options stops being flagged', async () => {
@@ -471,6 +605,54 @@ await step('a word added in options stops being flagged', async () => {
   await page.locator('#clean').fill('Kitson signed the form.');
   await new Promise((r) => setTimeout(r, 1200));
   assert.deepEqual(await UNDERLINES(), []);
+});
+
+await step('a word added with capitals keeps them, and lower case gets the capital back', async () => {
+  const options = await context.newPage();
+  await options.goto(`chrome-extension://${extensionId}/src/options/options.html`);
+  await options.locator('#new-word').fill('Ignitia');
+  await options.locator('#add-word').click();
+  await options.waitForFunction(() => /Ignitia/.test(document.getElementById('words').textContent));
+  const stored = await options.evaluate(() => new Promise((r) => chrome.runtime.sendMessage({ type: 'get-settings' }, r)));
+  await options.close();
+  assert.ok(stored.settings.customWords.includes('Ignitia'), JSON.stringify(stored.settings.customWords));
+  assert.ok(!stored.settings.customWords.includes('ignitia'));
+  await page.bringToFront();
+  await page.click('#clean');
+  await page.locator('#clean').fill('I wrote it on Ignitia today.');
+  await new Promise((r) => setTimeout(r, 1200));
+  assert.deepEqual(await UNDERLINES(), [], 'written as added: fine');
+  await page.locator('#clean').fill('I wrote it on ignitia today.');
+  await waitFor(UNDERLINES, 'a capital suggestion for ignitia');
+});
+
+await step('a site pasted into settings turns Caret off there, subdomains included', async () => {
+  const options = await context.newPage();
+  await options.goto(`chrome-extension://${extensionId}/src/options/options.html`);
+  // Junk is refused with a message, not saved.
+  await options.locator('#new-site').fill('not a website');
+  await options.locator('#add-site').click();
+  await options.waitForFunction(() => !document.getElementById('site-msg').hidden);
+  const refused = await options.locator('#site-msg').innerText();
+  // A full address from the bar is cut down to its site.
+  await options.locator('#new-site').fill('https://www.example-school.test/assignment/index?eh=5');
+  await options.locator('#new-site').press('Enter');
+  await options.waitForFunction(() => /example-school\.test/.test(document.getElementById('sites').textContent));
+  const ask = (m) => options.evaluate((msg) => new Promise((r) => chrome.runtime.sendMessage(msg, r)), m);
+  const sub = await ask({ type: 'get-state', hrefs: ['https://englewoodfl.example-school.test/x'] });
+  const other = await ask({ type: 'get-state', hrefs: ['https://example-school.test.evil.test/'] });
+  const stored = await ask({ type: 'get-settings' });
+  // Pasting a subdomain of a site already on the list says so instead of adding it.
+  await options.locator('#new-site').fill('englewoodfl.example-school.test');
+  await options.locator('#add-site').click();
+  await options.waitForFunction(() => /already covered/.test(document.getElementById('site-msg').textContent));
+  // Put it back for the steps after this one.
+  await ask({ type: 'patch-settings', patch: { disabledSites: stored.settings.disabledSites.filter((s) => s !== 'example-school.test') } });
+  await options.close();
+  assert.match(refused, /does not look like a web address/);
+  assert.ok(stored.settings.disabledSites.includes('example-school.test'), JSON.stringify(stored.settings.disabledSites));
+  assert.equal(sub.siteEnabled, false, 'a subdomain is covered');
+  assert.equal(other.siteEnabled, true, 'a lookalike domain is not');
 });
 
 // ------------------------------------------------------------- autocorrect
@@ -553,14 +735,49 @@ await step('the popup loads and shows the switches', async () => {
   popup.on('console', (message) => {
     if (message.type() === 'error') errors.push(message.text());
   });
-  await popup.goto(`chrome-extension://${extensionId}/src/popup/popup.html`);
+  const url = `chrome-extension://${extensionId}/src/popup/popup.html`;
+  await popup.goto(url);
   await popup.waitForFunction(() => document.getElementById('status').textContent !== 'Loading…');
   const status = await popup.locator('#status').innerText();
   const enabled = await popup.locator('#enabled').isChecked();
-  await popup.close();
+  const quickHiddenWhenOff = await popup.locator('#quick-meta').isHidden();
+
+  // With the quick check on, the popup says so on a line of its own. A made-up
+  // Caret key, as in the options test; nothing is typed, so nothing is sent.
+  const message = (msg) => popup.evaluate((m) => new Promise((r) => chrome.runtime.sendMessage(m, r)), msg);
+  let quickLine = null;
+  let answer = {};
+  try {
+    await message({ type: 'patch-settings', patch: { quickAiEnabled: true, aiKey: 'caret_e2epopup_00000' } });
+    await popup.goto(url);
+    await popup.waitForFunction(() => document.getElementById('status').textContent !== 'Loading…');
+    if (await popup.locator('#quick-meta').isVisible()) quickLine = await popup.locator('#quick-meta').textContent();
+    answer = await message({ type: 'get-settings' });
+  } finally {
+    await message({ type: 'patch-settings', patch: { quickAiEnabled: false, aiKey: '' } });
+    await popup.close();
+  }
+
   assert.equal(errors.length, 0, `console errors: ${errors.join(' | ')}`);
   assert.equal(enabled, true);
   assert.ok(status.length > 4, 'popup status is empty');
+  assert.equal(quickHiddenWhenOff, true, 'no quick check line while it is off');
+  assert.ok(quickLine, 'the quick check line should show while it is on');
+  assert.match(quickLine, /Quick check\s*on/);
+  if (typeof answer.quickLeftToday === 'number') assert.match(quickLine, /\d+ left today/);
+});
+
+await step('the website states the same limits the extension enforces', async () => {
+  // The site cannot import defaults.js, so its numbers are written out by
+  // hand. This is what notices when one of them is retuned and the other not.
+  const setup = fs.readFileSync(path.join(ROOT, 'site/setup.html'), 'utf8').replace(/\s+/g, ' ');
+  const says = (text) => assert.ok(setup.includes(text), `site/setup.html should say "${text}"`);
+  says(`<b>${FREE_CEILINGS.caret} full checks a day</b>`);
+  says(`<b>${FREE_CEILINGS.caret} on Caret's own</b>`);
+  says(`<b>${FREE_CEILINGS.gemini} on Google's free tier</b>`);
+  says(`${QUICK_DEFAULT_DAILY} a day, up to ${QUICK_MAX_DAILY}`);
+  says(`get ${QUICK_DEFAULT_DAILY} quick checks a day`);
+  says(`as many as ${QUICK_MAX_DAILY}`);
 });
 
 await context.close();

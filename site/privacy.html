@@ -83,17 +83,28 @@
     <h2>The optional AI pass</h2>
     <div>
       <p>
-        Off until you switch it on. When it is on, the text of the field you are
-        working in is sent to the AI you picked in the settings — by default only
-        when you ask for it, or on the schedule you chose instead.
+        Off until you switch it on. When the full check is on, the text of the
+        field you are working in is sent to the AI you picked in the settings —
+        by default only when you ask for it, or on the schedule you chose
+        instead.
       </p>
       <p>
         <b>Caret (the free, built-in option):</b> the text goes to a small server
         I run on Cloudflare, which passes it to Cloudflare Workers AI and sends
         the suggested corrections back. My server does not store or log your
-        text. The only thing it keeps is one number per day — how many checks the
-        shared key has made — with no record of who made them. Cloudflare handles
-        the request under its own terms.
+        text. The only things it keeps are two numbers per day — how many full
+        checks and how many quick checks the key has made — with no record of
+        who made them. Cloudflare handles the request under its own terms.
+      </p>
+      <p>
+        <b>The quick check</b> is separate, and also off until you switch it on.
+        When it is on, each sentence you finish is sent on its own to that same
+        Caret server on Cloudflare, which passes it to a small model on
+        Cloudflare Workers AI and sends any corrections back. It goes there
+        whichever AI you picked for the full check. It is not stored or logged
+        either, and card numbers, passwords and anything that looks like a key
+        are blanked out before it leaves your computer, exactly as for the full
+        check.
       </p>
       <p>
         <b>Google Gemini, OpenAI or Anthropic:</b> the text goes straight from
@@ -106,7 +117,9 @@
         words in your dictionary, and the ones you have pressed <b>Ignore</b> on.
         That is what stops the AI correcting the way you write on purpose. It is
         a list of your own choices, not anything inferred from your writing, and
-        it goes to the same place the text does and nowhere else.
+        it goes to the same place the text does and nowhere else. With the quick
+        check, the list is cut down to the words that appear in that one
+        sentence.
       </p>
     </div>
   </section>

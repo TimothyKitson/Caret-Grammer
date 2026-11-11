@@ -16,6 +16,7 @@
   const HIDE_GRACE = 220;
   const MAX_CHARS = 30000;
   const MIN_AI_CHARS = 12;
+  const QUICK_IDLE = 2000;      // a pause this long after a full stop finishes a sentence
 
   // Never send anything that looks like a card number or a national ID to an
   // API, whatever the field says it is.
@@ -41,6 +42,9 @@
   let lastAiText = null;
   let dead = false;
   let pointer = { x: -1, y: -1 };
+  let quickIdleTimer = null;
+  let quickBlockedUntil = 0;
+  let quickSuppress = 0;        // > 0 while Caret itself is editing the field
 
   // ---------------------------------------------------------------- plumbing
 
@@ -157,6 +161,7 @@
       hrefs: frameHrefs(),
       wantAi,
       kind: adapter.kind,
+      quickIssues: quickIssuesIn(adapter, text),
     });
     if (!response || mine !== version || !active || active.adapter !== adapter) return;
     if (response.error) {
@@ -281,7 +286,9 @@
 
   // What autocorrect needs to know about a field, worked out once per field.
   const fieldFacts = new WeakMap();
-  const CODE_FONT = /mono|courier|consolas|menlo|monaco|source code|fira code|jetbrains|hack\b/i;
+  // Named code fonts. Not the bare word "monospace": that is what Chrome gives
+  // every <textarea> nobody styled, and most of those are ordinary boxes.
+  const CODE_FONT = /\b(?:courier|consolas|menlo|monaco|source code|fira (?:code|mono)|jetbrains|sf mono|ubuntu mono|roboto mono|dejavu sans mono|liberation mono|cascadia|hack|inconsolata|andale mono|lucida console)\b/i;
   const CODE_EDITOR = '.CodeMirror, .cm-editor, .monaco-editor, .ace_editor, pre, code, [data-language]';
 
   function factsFor(adapter) {
@@ -292,7 +299,12 @@
     const capHolder = el.closest('[autocapitalize]') || (el.form && el.form.hasAttribute('autocapitalize') ? el.form : null);
     let code = !!el.closest(CODE_EDITOR);
     if (!code) {
-      try { code = CODE_FONT.test(getComputedStyle(el).fontFamily || ''); } catch (_) { /* detached */ }
+      try {
+        const family = getComputedStyle(el).fontFamily || '';
+        // A box a site deliberately set in a plain "monospace" is a code box;
+        // a textarea in it is just unstyled.
+        code = CODE_FONT.test(family) || (el.tagName !== 'TEXTAREA' && /^\s*monospace\s*$/i.test(family));
+      } catch (_) { /* detached */ }
     }
     facts = {
       kind: adapter.kind,
@@ -307,8 +319,18 @@
 
   function applyFixAt(adapter, start, end, fixed, caret) {
     const shift = fixed.length - (end - start);
-    const ok = adapter.replaceRange(start, end, fixed, caret + shift);
+    const before = adapter.getText();
+    // Caret's own edit, not the person's: the quick check is told about it
+    // directly rather than seeing it as typing.
+    quickSuppress += 1;
+    let ok;
+    try {
+      ok = adapter.replaceRange(start, end, fixed, caret + shift);
+    } finally {
+      quickSuppress -= 1;
+    }
     if (!ok) return false;
+    quickAfterFix(adapter, before, { start, end }, fixed);
     if (adapter.invalidate) adapter.invalidate();
     return true;
   }
@@ -369,6 +391,155 @@
     });
   }
 
+  // ------------------------------------------------------------- quick check
+  //
+  // Caret's small AI, one sentence at a time. A sentence is sent once it is
+  // finished - it has its full stop, question mark or exclamation mark - and
+  // you have moved on from it. It is sent again only if you change it and move
+  // on again. The decision about which sentence is due lives in sentences.js;
+  // this part only listens, queues and places the answers.
+
+  const quickState = new WeakMap();   // adapter -> {tracker, results, queue, busy}
+  const QUICK_RESULTS_MAX = 300;
+
+  function quickOn() {
+    return !!(settings && settings.quickAiEnabled && NS.sentences && enabled());
+  }
+
+  function isInActive(el) {
+    if (!active || !el) return false;
+    const field = active.adapter.element;
+    return el === field || (typeof field.contains === 'function' && field.contains(el));
+  }
+
+  /** Fields where a sentence check makes no sense: code, addresses, numbers. */
+  function quickSkipsField(adapter) {
+    const facts = factsFor(adapter);
+    return facts.code || /^(email|url|tel)$/.test(facts.type);
+  }
+
+  function quickFor(adapter) {
+    let state = quickState.get(adapter);
+    if (!state) {
+      // Whatever is already in the field is the starting point: it was not
+      // typed just now, so it is not checked unless it is changed.
+      state = {
+        tracker: NS.sentences.createTracker(adapter.getText().slice(0, MAX_CHARS)),
+        results: new Map(),
+        queue: [],
+        busy: false,
+      };
+      quickState.set(adapter, state);
+    }
+    return state;
+  }
+
+  function quickNote(kind, inputType = '') {
+    if (!quickOn() || !active) return;
+    const adapter = active.adapter;
+    if (quickSkipsField(adapter)) return;
+    const state = quickFor(adapter);
+    const text = adapter.getText().slice(0, MAX_CHARS);
+    let due;
+    if (kind === 'leave') {
+      due = state.tracker.leave(text);
+    } else {
+      const caret = adapter.caret();
+      if (caret === null || caret === undefined) return;
+      if (kind === 'input') due = state.tracker.input(text, caret, inputType);
+      else if (kind === 'idle') due = state.tracker.idle(text, caret);
+      else due = state.tracker.caret(text, caret);
+    }
+    for (const sentence of due || []) enqueueQuick(adapter, state, sentence);
+  }
+
+  function enqueueQuick(adapter, state, sentence) {
+    // A card number or a password is not sent anywhere, blanked or not.
+    if (SENSITIVE.some((re) => re.test(sentence))) return;
+    if (state.queue.includes(sentence) || state.results.has(sentence)) return;
+    state.queue.push(sentence);
+    pumpQuick(adapter, state);
+  }
+
+  async function pumpQuick(adapter, state) {
+    if (state.busy) return;
+    state.busy = true;
+    try {
+      while (state.queue.length) {
+        if (!quickOn() || Date.now() < quickBlockedUntil) { state.queue.length = 0; break; }
+        const sentence = state.queue.shift();
+        // Rewritten or deleted while it waited: nothing left to check.
+        if (!adapter.getText().includes(sentence)) continue;
+        const reply = await send({ type: 'quick-check', sentence });
+        if (!reply) break;
+        if (reply.capped || reply.paused) {
+          // Today's checks are used up, or the shared allowance is: stop
+          // asking for a while instead of asking for every sentence.
+          quickBlockedUntil = Date.now() + (reply.capped ? 30 : 10) * 60000;
+          state.queue.length = 0;
+          break;
+        }
+        if (!Array.isArray(reply.issues)) continue;
+        if (state.results.size >= QUICK_RESULTS_MAX) {
+          state.results.delete(state.results.keys().next().value);
+        }
+        state.results.set(sentence, reply.issues);
+        if (reply.issues.length && active && active.adapter === adapter) {
+          scheduleCheck({ immediate: true });
+        }
+      }
+    } finally {
+      state.busy = false;
+    }
+  }
+
+  /** Every quick-check finding, placed wherever its sentence is right now. */
+  function quickIssuesIn(adapter, text) {
+    if (!quickOn()) return [];
+    const state = quickState.get(adapter);
+    if (!state || !state.results.size) return [];
+    const out = [];
+    for (const segment of NS.sentences.segments(text)) {
+      const found = state.results.get(segment.text);
+      if (!found || !found.length) continue;
+      for (const issue of found) {
+        out.push({ ...issue, start: issue.start + segment.start, end: issue.end + segment.start });
+      }
+    }
+    return out;
+  }
+
+  /**
+   * After a suggestion is applied, the sentence it was in has new text. If the
+   * old text had already been checked, the new one counts as checked too, with
+   * whatever else was found in it carried over - accepting a fix is not a
+   * reason to spend another check on the same sentence.
+   */
+  function quickAfterFix(adapter, before, issue, replacement) {
+    const state = quickState.get(adapter);
+    if (!state) return;
+    const delta = replacement.length - (issue.end - issue.start);
+    state.tracker.shift(issue.start, delta);
+    const old = NS.sentences.segmentAt(before, issue.start);
+    if (!old || issue.end > old.end) return;
+    const after = adapter.getText();
+    const next = NS.sentences.segmentAt(after, old.start);
+    if (!next || next.text === old.text) return;
+    const relStart = issue.start - old.start;
+    const relEnd = issue.end - old.start;
+    const previous = state.results.get(old.text);
+    if (previous) {
+      const carried = previous
+        .filter((other) => other.end <= relStart || other.start >= relEnd)
+        .map((other) => (other.start >= relEnd
+          ? { ...other, start: other.start + delta, end: other.end + delta }
+          : other))
+        .filter((other) => next.text.slice(other.start, other.end) === other.text);
+      state.results.set(next.text, carried);
+    }
+    if (previous || state.tracker.isSettled(old.text)) state.tracker.settle(next.text);
+  }
+
   // ------------------------------------------------------------------ actions
 
   function applyFix(issue, replacement) {
@@ -381,9 +552,17 @@
       scheduleCheck({ immediate: true });
       return;
     }
-    const ok = adapter.replaceRange(issue.start, issue.end, replacement);
+    const before = adapter.getText();
+    quickSuppress += 1;
+    let ok;
+    try {
+      ok = adapter.replaceRange(issue.start, issue.end, replacement);
+    } finally {
+      quickSuppress -= 1;
+    }
     overlay.hideCard();
     if (!ok) return;
+    quickAfterFix(adapter, before, issue, replacement);
     const shift = replacement.length - (issue.end - issue.start);
     active.issues = (active.issues || [])
       .filter((other) => other !== issue)
@@ -402,10 +581,18 @@
       .filter((issue) => issue.source !== 'ai')
       .filter((issue) => issue.replacements && issue.replacements.length && issue.confidence !== 'low')
       .sort((a, b) => b.start - a.start);   // back to front keeps offsets valid
-    for (const issue of fixable) {
-      const current = active.adapter.getText().slice(issue.start, issue.end);
-      if (current !== issue.text) continue;
-      active.adapter.replaceRange(issue.start, issue.end, issue.replacements[0]);
+    const state = quickState.get(active.adapter);
+    quickSuppress += 1;
+    try {
+      for (const issue of fixable) {
+        const current = active.adapter.getText().slice(issue.start, issue.end);
+        if (current !== issue.text) continue;
+        if (active.adapter.replaceRange(issue.start, issue.end, issue.replacements[0]) && state) {
+          state.tracker.shift(issue.start, issue.replacements[0].length - (issue.end - issue.start));
+        }
+      }
+    } finally {
+      quickSuppress -= 1;
     }
     overlay.hidePanel();
     scheduleCheck({ immediate: true });
@@ -428,6 +615,14 @@
     onSettings: () => send({ type: 'open-options' }),
   };
 
+  /** The AI pass, because someone asked for it. */
+  function runAiNow() {
+    if (!active) return;
+    lastAiText = null;
+    active.userEdited = true;      // asking for it is intent enough
+    scheduleCheck({ immediate: true, ai: true });
+  }
+
   function openPanel(keepPosition = false) {
     if (!active) return;
     const el = active.adapter.element;
@@ -439,9 +634,14 @@
       rect,
       fixableCount: issues.filter((i) => i.source !== 'ai'
         && i.replacements && i.replacements.length && i.confidence !== 'low').length,
+      aiCheck: settings.aiEnabled ? { keys: 'Ctrl+Shift+.' } : null,
       handlers: {
         onApply: (issue, replacement) => { overlay.hidePanel(); applyFix(issue, replacement); },
         onFixAll: fixAll,
+        onAiCheck: () => {
+          overlay.hidePanel();
+          runAiNow();
+        },
       },
     });
     if (keepPosition) return;
@@ -497,6 +697,9 @@
       active.adapter.dispose();
     }
     active = { adapter, issues: [], text: '', entries: [], userEdited: false };
+    // Start the quick check's record of this field now, before any typing, so
+    // the first thing typed counts as typed.
+    if (quickOn() && !quickSkipsField(adapter)) quickFor(adapter);
     quietNative(adapter.element);
     lastAiText = null;
     observeEditable(adapter);
@@ -525,7 +728,52 @@
     }
   }
 
-  document.addEventListener('focusin', (event) => {
+  // Every listener on the page goes through on(), so they can all be put back.
+  //
+  // Some editors rebuild themselves by rewriting their whole document with
+  // document.open() - Ignitia's Writer does it when you press its check
+  // button. The browser wipes every event listener in that document when it
+  // does, ours included, and Caret would sit there dead until a reload. The
+  // Document object itself survives, so adding the same listeners again brings
+  // everything back. addEventListener ignores an exact duplicate, so putting
+  // one back that was never lost is harmless.
+  const listeners = [];
+  function on(target, type, fn, options) {
+    listeners.push([target, type, fn, options]);
+    target.addEventListener(type, fn, options);
+  }
+  function relisten() {
+    for (const [target, type, fn, options] of listeners) target.addEventListener(type, fn, options);
+  }
+
+  /** The focused element, looking inside shadow roots. */
+  function focusedElement() {
+    let el = document.activeElement;
+    while (el && el.shadowRoot && el.shadowRoot.activeElement) el = el.shadowRoot.activeElement;
+    return el;
+  }
+
+  // A rewritten document has a new <html> element. Watch for that directly,
+  // and check again on the timer below in case the observer missed it.
+  let knownRoot = document.documentElement;
+  function heal() {
+    if (dead || document.documentElement === knownRoot) return;
+    knownRoot = document.documentElement;
+    relisten();
+    // The field we were watching went with the old document.
+    if (active && !active.adapter.element.isConnected) teardown();
+    // The person is usually already back in the new editor: pick it up now
+    // rather than waiting for a focus event that has already happened.
+    setTimeout(() => {
+      const el = focusedElement();
+      if (!active && el && NS.isEditable(el) && !NS.isOptedOut(el)) activate(el);
+    }, 0);
+  }
+  try {
+    new MutationObserver(heal).observe(document, { childList: true });
+  } catch (_) { /* no document to watch */ }
+
+  on(document, 'focusin', (event) => {
     const el = deepTarget(event);
     // Do this before anything else: a field that is a password now must stay
     // excluded even if the site turns it into a text field later.
@@ -533,7 +781,7 @@
     if (NS.isEditable(el) && !NS.isOptedOut(el)) activate(el);
   }, true);
 
-  document.addEventListener('input', (event) => {
+  on(document, 'input', (event) => {
     const el = deepTarget(event);
     if (!active) {
       if (NS.isEditable(el) && !NS.isOptedOut(el)) activate(el);
@@ -545,11 +793,39 @@
       if (event.isTrusted) active.userEdited = true;
       overlay.hidePanel();
       autocorrect(event);
+      if (event.isTrusted && !event.isComposing && !quickSuppress) {
+        quickNote('input', event.inputType);
+        clearTimeout(quickIdleTimer);
+        quickIdleTimer = setTimeout(() => quickNote('idle'), QUICK_IDLE);
+      }
       scheduleCheck();
     }
   }, true);
 
-  document.addEventListener('mousemove', (event) => {
+  // Moving the caret without typing - arrow keys, a click - can be leaving the
+  // sentence you just changed, which is when that sentence gets its check.
+  const CARET_KEYS = new Set([
+    'ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'Home', 'End', 'PageUp', 'PageDown',
+  ]);
+  on(document, 'keyup', (event) => {
+    if (!active || !CARET_KEYS.has(event.key)) return;
+    if (isInActive(deepTarget(event))) quickNote('caret');
+  }, true);
+  on(document, 'mouseup', (event) => {
+    if (!active) return;
+    // After the browser has placed the caret.
+    if (isInActive(deepTarget(event))) setTimeout(() => quickNote('caret'), 0);
+  }, true);
+  on(document, 'compositionend', (event) => {
+    if (active && isInActive(deepTarget(event))) quickNote('input', 'insertCompositionText');
+  }, true);
+  on(document, 'focusout', (event) => {
+    if (!active || deepTarget(event) !== active.adapter.element) return;
+    clearTimeout(quickIdleTimer);
+    quickNote('leave');
+  }, true);
+
+  on(document, 'mousemove', (event) => {
     if (!active || !enabled()) return;
     pointer = { x: event.clientX, y: event.clientY };
     const hit = overlay.hitTest(pointer.x, pointer.y, 2);
@@ -575,7 +851,7 @@
     }, HIDE_GRACE);
   }, { passive: true, capture: true });
 
-  document.addEventListener('mousedown', (event) => {
+  on(document, 'mousedown', (event) => {
     if (!active || !enabled()) return;
     const hit = overlay.hitTest(event.clientX, event.clientY, 2);
     if (hit) {
@@ -592,7 +868,7 @@
     if (overlay.isPanelOpen() && !overlay.panelContains(deepTarget(event))) overlay.hidePanel();
   }, true);
 
-  document.addEventListener('keydown', (event) => {
+  on(document, 'keydown', (event) => {
     if (event.key === 'Escape') {
       if (overlay.isCardOpen() || overlay.isPanelOpen()) {
         overlay.hideCard();
@@ -604,15 +880,23 @@
   // A site can rewrite a field's value without an input event - a draft
   // restored, a template inserted. Nothing tells us, so look now and then.
   setInterval(() => {
-    if (!active || !enabled()) return;
+    heal();
+    if (!enabled()) return;
+    if (!active) {
+      // Focus can land in an editor without a focus event reaching us - a
+      // site moving it there by script while it rebuilt the page.
+      const el = focusedElement();
+      if (el && NS.isEditable(el) && !NS.isOptedOut(el)) activate(el);
+      return;
+    }
     const adapter = active.adapter;
     if (!adapter.element.isConnected) { teardown(); return; }
     const now = adapter.getText().slice(0, MAX_CHARS);
     if (now !== active.text) scheduleCheck();
   }, 2000);
 
-  window.addEventListener('scroll', reposition, { passive: true, capture: true });
-  window.addEventListener('resize', reposition, { passive: true });
+  on(window, 'scroll', reposition, { passive: true, capture: true });
+  on(window, 'resize', reposition, { passive: true });
   if (document.fonts && document.fonts.addEventListener) {
     document.fonts.addEventListener('loadingdone', reposition);
   }
@@ -626,6 +910,7 @@
           else quietNative(active.adapter.element);
         }
         lastAiText = null;
+        if (active && quickOn() && !quickSkipsField(active.adapter)) quickFor(active.adapter);
         if (active) scheduleCheck({ immediate: true });
         else {
           const el = document.activeElement;
@@ -650,9 +935,7 @@
           openPanel();
         }
       } else if (message.name === 'check-now') {
-        lastAiText = null;
-        active.userEdited = true;      // asking for it is intent enough
-        scheduleCheck({ immediate: true, ai: true });
+        runAiNow();
       }
     } else if (message.type === 'ping') {
       respond({ ok: true, active: !!active, issues: active ? (active.issues || []).length : 0 });

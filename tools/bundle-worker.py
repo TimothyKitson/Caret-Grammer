@@ -38,10 +38,12 @@ banner = """// Caret Worker - SINGLE FILE BUILD. Do not edit this one.
 //   Workers AI  ->  variable name  AI
 //   KV namespace ->  variable name  KEYS
 //
-// and, optionally, two plain text variables:
+// and, optionally, plain text variables (all can be left unset):
 //
-//   MODEL           @cf/meta/llama-3.1-8b-instruct
-//   PER_KEY_DAILY   120
+//   MODEL           force a model to the front of the full-check list
+//   QUICK_MODEL     force a model to the front of the quick-check list
+//   PER_KEY_DAILY   full checks a day per key when a key has no "daily"
+//   QUICK_DAILY     quick checks a day per key when a key has no "quickDaily"
 
 """
 

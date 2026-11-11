@@ -43,12 +43,28 @@ export function createDictionary({
 
   // Words the user added from the popup, plus words they told us to ignore.
   let userWords = new Set();
+  // The ones they wrote with a capital - "Ignitia", "McDonald", "NASA" - and
+  // the way they wrote it, so a lower-case "ignitia" can be given its capital.
+  let userForms = new Map();
 
   const api = {
     size: words.size,
 
     setUserWords(list) {
-      userWords = new Set((list || []).map((w) => w.toLowerCase()));
+      userWords = new Set();
+      userForms = new Map();
+      for (const entry of list || []) {
+        const form = String(entry || '').trim();
+        if (!form) continue;
+        const lower = form.toLowerCase();
+        userWords.add(lower);
+        if (form !== lower) {
+          // A capital on an everyday word ("Will", "Grace") is a name only
+          // some of the time, so it is treated like the built-in ambiguous
+          // names: capitalized only where the sentence clearly means the name.
+          userForms.set(lower, { form, ambiguous: words.has(lower) || rank.has(lower) });
+        }
+      }
     },
 
     /** Is this exactly a known word? (lower-cased input) */
@@ -98,7 +114,7 @@ export function createDictionary({
      * @returns {{form: string, ambiguous: boolean}|null}
      */
     properForm(word) {
-      return proper.get(word) || null;
+      return userForms.get(word) || proper.get(word) || null;
     },
 
     properCount: proper.size,

@@ -6,11 +6,14 @@
 // rebuilt on demand, which takes about half a second once per wake-up.
 
 import {
-  DEFAULT_SETTINGS, STORAGE_KEY, mergeSettings, siteKey, dailyCeiling,
+  DEFAULT_SETTINGS, STORAGE_KEY, mergeSettings, siteKey, dailyCeiling, clampQuickLimit,
+  siteBlocked, blockingEntries, addCustomWord,
 } from '../shared/defaults.js';
 import { createDictionary } from '../engine/dictionary.js';
 import { check } from '../engine/engine.js';
-import { checkWithAi, DEFAULT_MODEL } from '../engine/ai.js';
+import {
+  checkWithAi, checkQuick, DEFAULT_MODEL, QUICK_MAX_SENTENCE,
+} from '../engine/ai.js';
 import { BUILT_IN_KEY, providerFor } from '../shared/apikey.js';
 
 const DATA = {
@@ -95,7 +98,7 @@ function bumpStats(patch) {
 /** hrefs is [this frame, the page embedding it]; either one can turn it off. */
 function siteEnabled(settings, hrefs) {
   const list = Array.isArray(hrefs) ? hrefs : [hrefs || ''];
-  return !list.some((href) => href && settings.disabledSites.includes(siteKey(href)));
+  return !list.some((href) => href && siteBlocked(settings.disabledSites, href));
 }
 
 async function broadcast(message) {
@@ -184,6 +187,131 @@ async function spendBudget(settings) {
   const usage = settings.aiUsage || {};
   const used = usage.day === today() ? (usage.count || 0) : 0;
   await patchSettings({ aiUsage: { day: today(), count: used + 1 } });
+}
+
+// ------------------------------------------------------------- quick check
+
+// The quick check runs on Caret's own server whatever AI is picked for the
+// full check, so it needs a Caret key of its own: the one baked into this copy,
+// or a caret_ key pasted into the settings.
+function caretKey(settings) {
+  if (providerFor(BUILT_IN_KEY) === 'caret') return BUILT_IN_KEY;
+  const typed = (settings.aiKey || '').trim();
+  return providerFor(typed) === 'caret' ? typed : '';
+}
+
+/** Quick checks left today, never more than the person's own limit (1-80). */
+function quickLeft(settings) {
+  const limit = clampQuickLimit(settings.quickAiDailyLimit);
+  const usage = settings.quickAiUsage || {};
+  const used = usage.day === today() ? (usage.count || 0) : 0;
+  return Math.max(0, limit - used);
+}
+
+const quickCache = new Map();        // sentence -> issues relative to it
+const QUICK_CACHE_MAX = 400;
+const QUICK_MIN_GAP_MS = 300;
+const QUICK_MAX_PER_MINUTE = 30;     // a burst guard; the daily limit is the real cap
+const QUICK_OLD_SERVER_WAIT = 6 * 60 * 60 * 1000;
+let quickRecent = [];
+let quickChain = Promise.resolve();  // one quick check at a time, in order
+
+/**
+ * Check one sentence with the quick model. Requests are run one after another
+ * so two finished sentences cannot both read the same "left today" and both
+ * spend the last check.
+ */
+function quickCheck(sentence) {
+  const run = quickChain.then(() => runQuickCheck(sentence));
+  quickChain = run.catch(() => {});
+  return run;
+}
+
+async function runQuickCheck(sentence) {
+  const settings = await getSettings();
+  if (!settings.enabled || !settings.quickAiEnabled) return { skipped: true };
+  const text = typeof sentence === 'string' ? sentence : '';
+  if (!text.trim() || text.length > QUICK_MAX_SENTENCE) return { skipped: true };
+  if (quickCache.has(text)) return { issues: quickCache.get(text), cached: true };
+  const key = caretKey(settings);
+  if (!key) return { error: 'This copy has no Caret key, so the quick check cannot run.' };
+  if (quickLeft(settings) <= 0) return { capped: true };
+  // The server answered a quick check with the big model recently: it has not
+  // been updated. Every further try would spend the expensive allowance, so
+  // wait a few hours before asking again.
+  if (Date.now() - (Number(settings.quickServerOldAt) || 0) < QUICK_OLD_SERVER_WAIT) return { paused: true };
+
+  const since = Date.now() - QUICK_MIN_GAP_MS;
+  const last = quickRecent[quickRecent.length - 1] || 0;
+  if (last > since) await new Promise((r) => setTimeout(r, last - since));
+  // More than a person could type in a minute: wait for the window to clear
+  // rather than drop the sentence, which would never be asked about again.
+  quickRecent = quickRecent.filter((t) => Date.now() - t < 60000);
+  if (quickRecent.length >= QUICK_MAX_PER_MINUTE) {
+    await new Promise((r) => setTimeout(r, 60000 - (Date.now() - quickRecent[0]) + 10));
+    quickRecent = quickRecent.filter((t) => Date.now() - t < 60000);
+  }
+  quickRecent.push(Date.now());
+
+  try {
+    const result = await checkQuick(text, { apiKey: key, leaveAlone: leaveAloneList(settings) });
+    if (quickCache.size >= QUICK_CACHE_MAX) quickCache.delete(quickCache.keys().next().value);
+    quickCache.set(text, result.issues);
+    const usage = settings.quickAiUsage || {};
+    const used = usage.day === today() ? (usage.count || 0) : 0;
+    await patchSettings({
+      quickAiUsage: { day: today(), count: used + 1 },
+      ...(settings.lastQuickError ? { lastQuickError: '' } : {}),
+    });
+    bumpStats({ quickCalls: 1 });
+    return { issues: result.issues };
+  } catch (error) {
+    // Out of the shared allowance, or this key's quick checks for today: an
+    // ordinary pause, not a fault. It does not count against the person.
+    if (error.code === 'quiet') return { paused: true };
+    if (error.code === 'old-server') {
+      await patchSettings({ quickServerOldAt: Date.now(), lastQuickError: error.message });
+      return { paused: true };
+    }
+    await patchSettings({
+      lastQuickError: `${new Date().toISOString().slice(0, 16).replace('T', ' ')} — ${error.message}`,
+    });
+    return { error: error.message };
+  }
+}
+
+/**
+ * Quick-check issues the page sent along with a check, made safe: each one
+ * must sit inside the text and match it, and words the person has since added
+ * to their dictionary are dropped.
+ */
+function quickIssuesFor(text, list, settings) {
+  if (!settings.quickAiEnabled || !Array.isArray(list)) return [];
+  const mine = new Set((settings.customWords || []).map((w) => String(w).toLowerCase()));
+  const out = [];
+  for (const issue of list.slice(0, 200)) {
+    if (!issue || typeof issue !== 'object') continue;
+    const { start, end } = issue;
+    if (!Number.isInteger(start) || !Number.isInteger(end) || start < 0 || end <= start || end > text.length) continue;
+    if (text.slice(start, end) !== issue.text) continue;
+    if (mine.has(String(issue.text).toLowerCase())) continue;
+    const replacements = Array.isArray(issue.replacements)
+      ? issue.replacements.filter((r) => typeof r === 'string').slice(0, 3)
+      : [];
+    out.push({
+      id: typeof issue.id === 'string' ? issue.id : 'ai-grammar',
+      category: ['spelling', 'grammar', 'punctuation', 'style'].includes(issue.category) ? issue.category : 'grammar',
+      short: 'AI',
+      start,
+      end,
+      text: issue.text,
+      message: String(issue.message || 'Suggested correction.').slice(0, 300),
+      replacements,
+      confidence: 'high',
+      source: 'ai',
+    });
+  }
+  return out;
 }
 
 /**
@@ -303,6 +431,7 @@ async function handleCheck(message, sender) {
   } else if (settings.aiEnabled && aiCredentials(settings).key && aiCache.has(text)) {
     extra = aiCache.get(text);
   }
+  extra = extra.concat(quickIssuesFor(text, message.quickIssues, settings));
 
   const result = check(text, { dict: dictionary }, {
     categories: settings.categories,
@@ -335,6 +464,9 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
             aiEnabled: !!(settings.aiEnabled && aiCredentials(settings).key),
             aiTrigger: settings.aiTrigger,
             aiIntervalMinutes: settings.aiIntervalMinutes,
+            // Only true when it can actually run: switched on and a Caret key
+            // to run it with.
+            quickAiEnabled: !!(settings.quickAiEnabled && caretKey(settings)),
           },
           siteEnabled: siteEnabled(settings, message.hrefs || message.href || ''),
           site: siteKey((message.hrefs && message.hrefs[0]) || message.href || ''),
@@ -352,7 +484,7 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
         const lower = word.toLowerCase();
         if (!settings.autocorrect || !settings.autocorrect.enabled
             || settings.autocorrect.commonTypos === false
-            || settings.customWords.includes(lower)
+            || settings.customWords.some((w) => String(w).toLowerCase() === lower)
             || settings.ignored.includes(`spelling-known-typo:${lower}`)) {
           respond({ fix: null });
           return;
@@ -381,12 +513,8 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
       case 'add-word': {
         const settings = await getSettings();
         const word = String(message.word || '').trim();
-        if (word && !settings.customWords.includes(word.toLowerCase())) {
-          await saveSettings({
-            ...settings,
-            customWords: [...settings.customWords, word.toLowerCase()].sort(),
-          });
-        }
+        const next = addCustomWord(settings.customWords, word);
+        if (next !== settings.customWords) await saveSettings({ ...settings, customWords: next });
         aiCache.clear();
         respond({ ok: true });
         return;
@@ -406,6 +534,8 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
         respond({
           settings,
           aiLeftToday: budgetLeft(settings, provider),
+          quickLeftToday: quickLeft(settings),
+          quick: { available: !!caretKey(settings) },
           // Never the key itself - only what the settings page needs to know
           // to decide between a switch and a key box.
           ai: {
@@ -462,16 +592,25 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
       }
       case 'toggle-site': {
         const settings = await getSettings();
-        const key = siteKey((message.hrefs && message.hrefs[0]) || message.href || '');
-        const disabled = settings.disabledSites.includes(key);
+        const href = (message.hrefs && message.hrefs[0]) || message.href || '';
+        const key = siteKey(href);
+        const covering = blockingEntries(settings.disabledSites, href);
+        const disabled = covering.length > 0;
         await saveSettings({
           ...settings,
+          // Turning it back on here lifts whatever entry was covering this
+          // address, the parent domain included - otherwise the switch would
+          // flip and nothing would change.
           disabledSites: disabled
-            ? settings.disabledSites.filter((s) => s !== key)
+            ? settings.disabledSites.filter((s) => !covering.includes(s))
             : [...settings.disabledSites, key],
         });
         await broadcast({ type: 'settings-changed' });
         respond({ siteEnabled: disabled, site: key });
+        return;
+      }
+      case 'quick-check': {
+        respond(await quickCheck(message.sentence));
         return;
       }
       case 'test-ai': {
@@ -565,12 +704,13 @@ chrome.contextMenus.onClicked.addListener(async (info, tab) => {
   }
   if (info.menuItemId === 'gc-toggle-site') {
     const settings = await getSettings();
-    const key = siteKey(info.pageUrl || tab.url || '');
-    const disabled = settings.disabledSites.includes(key);
+    const href = info.pageUrl || tab.url || '';
+    const key = siteKey(href);
+    const covering = blockingEntries(settings.disabledSites, href);
     await saveSettings({
       ...settings,
-      disabledSites: disabled
-        ? settings.disabledSites.filter((s) => s !== key)
+      disabledSites: covering.length
+        ? settings.disabledSites.filter((s) => !covering.includes(s))
         : [...settings.disabledSites, key],
     });
     await broadcast({ type: 'settings-changed' });

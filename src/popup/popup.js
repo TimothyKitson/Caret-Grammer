@@ -75,13 +75,13 @@ async function paintShortcuts() {
 }
 
 /**
- * The status sentence, and any AI error on a line of its own below it.
+ * The status sentence, and each AI error on a line of its own below it.
  *
  * When the count is on show as a figure, the same number at the front of the
  * sentence is kept for screen readers and hidden from the eye, so the two read
  * as one line: "4" then "suggestions in the field you were typing in."
  */
-function paintStatus(text, error, found) {
+function paintStatus(text, errors, found) {
   const line = $('status');
   line.textContent = '';
   const say = document.createElement('span');
@@ -96,7 +96,7 @@ function paintStatus(text, error, found) {
     say.textContent = text;
   }
   line.appendChild(say);
-  if (error) {
+  for (const error of errors.filter(Boolean)) {
     const note = document.createElement('span');
     note.className = 'ai-error';
     note.textContent = error;
@@ -132,6 +132,38 @@ function paintAiMeta(answer, canAi) {
     }
   }
   meta.hidden = !meta.childNodes.length;
+}
+
+/**
+ * The quick check after each sentence, on a line of its own. It has nothing to
+ * do with the AI button above it - it runs on Caret's own server whether the
+ * full check is on or not - so it is shown whenever it is switched on and
+ * Caret is working on this page.
+ */
+function paintQuickMeta(answer, canQuick) {
+  const meta = $('quick-meta');
+  meta.textContent = '';
+  meta.className = 'ai-meta quick-meta';
+  meta.hidden = !canQuick;
+  if (!canQuick) return;
+  const strong = document.createElement('b');
+  strong.textContent = 'Quick check';
+  if (answer.quick && answer.quick.available === false) {
+    meta.classList.add('warn');
+    meta.append(strong, ' is on, but this copy has no Caret key');
+    return;
+  }
+  meta.append(strong, ' on');
+  // No number means an extension that does not say; just show that it is on.
+  if (typeof answer.quickLeftToday === 'number') {
+    const dot = document.createElement('span');
+    dot.className = 'sep';
+    dot.textContent = '·';
+    if (answer.quickLeftToday === 0) meta.classList.add('warn');
+    meta.append(dot, answer.quickLeftToday === 0
+      ? 'none left today'
+      : `${answer.quickLeftToday} left today`);
+  }
 }
 
 // ------------------------------------------------------------------- load
@@ -184,8 +216,13 @@ async function load() {
         ? `also runs every ${settings.aiIntervalMinutes || 1} min while you type`
         : 'or right-click the field and choose Proofread with AI';
   }
-  paintStatus(text, settings.lastAiError ? `AI: ${settings.lastAiError}` : '', found);
+  const canQuick = !!settings.quickAiEnabled && settings.enabled && state.siteEnabled && !!host;
+  paintStatus(text, [
+    settings.lastAiError ? `AI: ${settings.lastAiError}` : '',
+    canQuick && settings.lastQuickError ? `Quick check: ${settings.lastQuickError}` : '',
+  ], found);
   paintAiMeta(answer, canAi);
+  paintQuickMeta(answer, canQuick);
 
   // The count, as a figure, underlined the way this person has Caret underline.
   const figure = $('found');

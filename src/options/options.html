@@ -27,6 +27,7 @@
   <symbol id="i-caret" viewBox="0 0 20 20"><path d="m5 13 5-6 5 6"/></symbol>
   <symbol id="i-ask" viewBox="0 0 20 20"><path d="m5.5 3.8 3.3 11.6 2.1-4.5 4.5-2.1z"/><path d="m11.8 11.8 3.7 3.7"/></symbol>
   <symbol id="i-clock" viewBox="0 0 20 20"><circle cx="10" cy="10" r="7"/><path d="M10 6v4.3l2.8 1.7"/></symbol>
+  <symbol id="i-sentence" viewBox="0 0 20 20"><path d="M3.5 6h13M3.5 10h7.5M3.5 14h4.5"/><path d="M14.6 11.2c.25 1.6.85 2.2 2.4 2.4-1.55.25-2.15.85-2.4 2.4-.25-1.55-.85-2.15-2.4-2.4 1.55-.2 2.15-.8 2.4-2.4z"/></symbol>
 </svg>
 
 <div class="shell">
@@ -211,9 +212,10 @@
           </select>
         </div>
 
-        <div class="row stack" data-search="when to run trigger every minute manual keybind button">
-          <span class="text"><b>When to run it</b><i>Each run costs money, so this is the setting that decides your bill.</i></span>
+        <div class="row stack" data-search="when to run trigger every minute pause manual keybind button">
+          <span class="text"><b>When to run it</b><i id="trigger-hint">Each run costs money, so this is the setting that decides your bill.</i></span>
           <div id="aiTrigger" class="choices" role="radiogroup" aria-label="When to run AI proofreading"></div>
+          <p class="hint" id="trigger-note" hidden></p>
         </div>
 
         <div class="row" id="interval-row" data-search="interval minutes how often">
@@ -221,19 +223,58 @@
           <input type="text" id="aiIntervalMinutes" inputmode="numeric" size="3" class="num" aria-label="Minutes between checks">
         </div>
 
-        <div class="row" data-search="daily limit cap spend budget free rate limit 50">
-          <span class="text"><b id="limit-label">Checks a day</b><i id="ai-budget"></i></span>
+        <div class="row" data-search="daily limit cap spend budget free rate limit full checks a day">
+          <span class="text"><b id="limit-label">Full checks a day</b><i id="ai-budget"></i></span>
           <input type="text" id="aiDailyLimit" inputmode="numeric" size="4" class="num" aria-labelledby="limit-label">
         </div>
 
         <p class="result" id="ai-result"></p>
+      </div>
+
+      <div class="rule"></div>
+
+      <!-- The quick check stands on its own: it has its own switch, its own
+           daily number, and it runs whether the full check above is on or not. -->
+      <div class="quick" id="quick-block">
+        <h3 class="sub-head"><svg class="ico" aria-hidden="true"><use href="#i-sentence"/></svg>Quick check after each sentence <span class="tag free">free</span></h3>
+        <p class="note">
+          Caret's small AI reads each sentence once you finish it and move on,
+          and underlines anything it finds. A sentence is checked once, and only
+          checked again if you change it. This is separate from the full check
+          above: have either one on, or both.
+        </p>
+        <p class="note">
+          <b>Free, with a daily number.</b> New installs get
+          <span id="quick-default">30</span> quick checks a day, and you can raise
+          that to <span id="quick-max">100</span>. Each finished sentence is sent
+          to Caret's server on Cloudflare, which keeps nothing, with card numbers,
+          passwords and anything that looks like a key blanked out first.
+        </p>
+
+        <label class="row lead" data-search="quick check sentence small ai free as you type each sentence finish">
+          <span class="text"><b>Check each sentence as I finish it</b><i id="quick-state"></i></span>
+          <input type="checkbox" id="quickAiEnabled" class="sw">
+          <span class="track" aria-hidden="true"></span>
+        </label>
+
+        <div id="quick-body" class="sub-rows">
+          <div class="row" data-search="quick checks a day daily limit sentence small free">
+            <span class="text">
+              <b id="quick-limit-label">Quick checks a day</b>
+              <i id="quick-hint">Anything from 1 to 100. When they run out, the built-in checks carry on as normal.</i>
+              <i class="left" id="quick-left" hidden></i>
+            </span>
+            <input type="number" id="quickAiDailyLimit" min="1" max="100" step="1" inputmode="numeric" class="num" aria-labelledby="quick-limit-label" aria-describedby="quick-hint">
+          </div>
+          <p class="warn" id="quick-error" hidden></p>
+        </div>
       </div>
     </section>
 
     <!-- ------------------------------------------------------------ words -->
     <section id="sec-words">
       <h2><svg class="ico" aria-hidden="true"><use href="#i-words"/></svg>My dictionary <span class="count" id="words-count"></span></h2>
-      <p class="note">Words Caret should always accept — surnames, street names, anything it keeps underlining that is not wrong.</p>
+      <p class="note">Words Caret should always accept — surnames, street names, anything it keeps underlining that is not wrong. Type a name the way it is spelled, capitals and all (<b>Ignitia</b>, <b>McDonald</b>), and Caret will also point out when it is written without them.</p>
       <div class="inline add" data-search="add word dictionary custom">
         <input type="text" id="new-word" placeholder="Kitson" spellcheck="false" aria-label="A word to add to your dictionary">
         <button type="button" id="add-word" class="primary">Add</button>
@@ -244,8 +285,14 @@
     <!-- ------------------------------------------------------------ sites -->
     <section id="sec-sites">
       <h2><svg class="ico" aria-hidden="true"><use href="#i-sites"/></svg>Turned off on <span class="count" id="sites-count"></span></h2>
+      <p class="note">Paste a web address or a site name and Caret stays off there — on every page of it, and on its subdomains too, so <b>ignitiaschools.com</b> also covers <b>englewoodfl.ignitiaschools.com</b>.</p>
+      <div class="inline add" data-search="sites turn off block disable website paste address url domain">
+        <input type="text" id="new-site" placeholder="Paste an address, like docs.google.com" spellcheck="false" autocomplete="off" aria-label="A website to turn Caret off on" aria-describedby="site-msg">
+        <button type="button" id="add-site" class="primary">Turn off</button>
+      </div>
+      <p class="hint" id="site-msg" role="status" hidden></p>
       <ul class="chips" id="sites"></ul>
-      <p class="hint" id="sites-empty">Right-click any page and choose <b>Turn off on this site</b> to add one.</p>
+      <p class="hint" id="sites-empty">Nothing here yet — or right-click any page and choose <b>Turn off on this site</b>.</p>
 
       <div class="rule"></div>
 

@@ -355,7 +355,7 @@ async function callAnthropic(text, { apiKey, model, effort, system, fetchImpl, s
  * The allowance behind it is small and shared, so a refusal here is normal and
  * has to read like an ordinary pause rather than a fault.
  */
-async function callCaret(text, { apiKey, leaveAlone, fetchImpl, signal }) {
+async function callCaret(text, { apiKey, leaveAlone, mode, fetchImpl, signal }) {
   if (!CARET_ENDPOINT) {
     throw Object.assign(
       new Error('This build has no Caret server set, so a caret_ key has nothing to talk to.'),
@@ -365,7 +365,11 @@ async function callCaret(text, { apiKey, leaveAlone, fetchImpl, signal }) {
   const response = await fetchImpl(`${CARET_ENDPOINT.replace(/\/$/, '')}/check`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-caret-key': apiKey },
-    body: JSON.stringify(leaveAlone && leaveAlone.length ? { text, leaveAlone } : { text }),
+    body: JSON.stringify({
+      text,
+      ...(mode === 'quick' ? { mode } : {}),
+      ...(leaveAlone && leaveAlone.length ? { leaveAlone } : {}),
+    }),
     signal,
   });
 
@@ -388,6 +392,7 @@ async function callCaret(text, { apiKey, leaveAlone, fetchImpl, signal }) {
     json: JSON.stringify({ corrections: (payload && payload.corrections) || [] }),
     usage: payload && typeof payload.left === 'number' ? { left: payload.left } : {},
     model: (payload && payload.model) || 'caret',
+    mode: (payload && payload.mode) || '',
   };
 }
 
@@ -489,5 +494,71 @@ export async function checkWithAi(text, {
     truncated,
     usage: result.usage,
     model: result.model,
+  };
+}
+
+// ------------------------------------------------------------- quick check
+
+// One sentence is all a quick check ever sends. Anything longer than this is
+// not a sentence somebody just typed, it is a run-on or a pasted block, and
+// the full check is the right tool for it.
+export const QUICK_MAX_SENTENCE = 600;
+
+/**
+ * The words from the leave-alone list that actually appear in this sentence.
+ * The quick check runs on every sentence, so sending the whole list each time
+ * would be most of the request; a word that is not in the sentence cannot be
+ * corrected in it anyway.
+ */
+export function leaveAloneFor(sentence, leaveAlone = []) {
+  const lower = sentence.toLowerCase();
+  return leaveAlone.filter((word) => {
+    const w = String(word || '').trim().toLowerCase();
+    return w && lower.includes(w) && !isSecret(w);
+  });
+}
+
+/**
+ * Caret's quick check: one finished sentence, sent to the Caret server's small
+ * model. Issues come back with offsets relative to the sentence, so the caller
+ * can place them wherever that sentence is in the field now.
+ *
+ * @returns {Promise<{issues: object[], model: string, left: number|undefined}>}
+ * @throws {Error} with .code 'quiet' when the shared allowance or this key's
+ *   quick allowance for today is used up
+ */
+export async function checkQuick(sentence, {
+  apiKey,
+  leaveAlone = [],
+  fetchImpl = fetch,
+  signal,
+} = {}) {
+  if (!apiKey) throw Object.assign(new Error('No Caret key.'), { code: 'no-key' });
+  const text = String(sentence || '');
+  if (!text.trim()) return { issues: [] };
+  if (text.length > QUICK_MAX_SENTENCE) {
+    throw Object.assign(new Error('That is too long to be one sentence.'), { code: 'too-long' });
+  }
+  const result = await callCaret(maskSecrets(text), {
+    apiKey,
+    mode: 'quick',
+    leaveAlone: leaveAloneFor(text, leaveAlone),
+    fetchImpl,
+    signal,
+  });
+  // A server from before the quick check ignores "mode" and answers with the
+  // big model, which costs twenty times as much out of the shared allowance.
+  // Say so instead of quietly carrying on like that.
+  if (result.mode !== 'quick') {
+    throw Object.assign(
+      new Error("Caret's server has not been updated for the quick check yet."),
+      { code: 'old-server' },
+    );
+  }
+  const corrections = parseCorrections(result.json);
+  return {
+    issues: corrections ? toIssues(text, corrections) : [],
+    model: result.model,
+    left: result.usage && result.usage.left,
   };
 }

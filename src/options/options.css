@@ -323,6 +323,8 @@ h2 .ico {
 .note b { color: var(--fg); font-weight: 600; }
 .hint { margin: 10px 0 0; font-size: 12.5px; color: var(--faint); }
 .hint[hidden] { display: none; }
+.hint.bad { color: var(--bad, #c62f20); }
+.hint.good { color: var(--mint-text, var(--muted)); }
 .rule { height: 1px; margin: 14px -26px; background: var(--line); }
 .no-results { padding: 10px 2px 18px; color: var(--muted); }
 
@@ -464,6 +466,30 @@ label.row:hover { background: color-mix(in srgb, var(--iris) 5%, transparent); }
 .text > i { display: block; margin-top: 2px; font-style: normal; font-size: 12.5px; color: var(--muted); }
 .text i b { font-weight: 600; color: var(--fg); }
 .text code { font-size: 11.5px; padding: 1px 5px; border-radius: 5px; background: var(--chip); }
+.text > i[hidden] { display: none; }
+
+/* How many are left today, as a line of its own under a hint. Mint while
+   there are some, red once they are gone. */
+.text > i.left {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-top: 6px;
+  color: var(--mint-text);
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+.text > i.left[hidden] { display: none; }
+.text > i.left::before {
+  content: "";
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--mint);
+}
+.text > i.left.out { color: var(--bad); }
+.text > i.left.out::before { background: var(--bad); }
 
 .sub-rows {
   position: relative;
@@ -484,6 +510,27 @@ label.row:hover { background: color-mix(in srgb, var(--iris) 5%, transparent); }
 }
 .sub-rows.dim { opacity: .45; }
 .sub-rows.dim::before { background: var(--line-strong); }
+
+/* A block inside a section that stands on its own, like the quick check:
+   a smaller heading with its own icon, in mint because it is the free one. */
+.sub-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 4px 0 12px;
+  font: 600 16px/1.3 "Caret Display", sans-serif;
+  letter-spacing: -.015em;
+}
+.sub-head .ico {
+  width: 26px;
+  height: 26px;
+  padding: 5px;
+  border-radius: 8px;
+  color: var(--mint-text);
+  background: color-mix(in srgb, var(--mint) 12%, transparent);
+  box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--mint) 26%, transparent);
+}
+.sub-head .tag.free { background: color-mix(in srgb, var(--mint) 15%, transparent); color: var(--mint-text); }
 
 /* -------------------------------------------------------------- switches */
 
@@ -522,7 +569,7 @@ label.row:hover input.sw:not(:checked):not(:disabled) + .track {
 
 /* ---------------------------------------------------------------- inputs */
 
-input[type=text], input[type=password], select {
+input[type=text], input[type=password], input[type=number], select {
   width: 100%;
   padding: 8px 11px;
   border: 1px solid var(--line-strong);
@@ -532,7 +579,7 @@ input[type=text], input[type=password], select {
   font: inherit;
   transition: border-color .15s, box-shadow .15s;
 }
-input[type=text]:focus, input[type=password]:focus, select:focus {
+input[type=text]:focus, input[type=password]:focus, input[type=number]:focus, select:focus {
   outline: none;
   border-color: var(--iris);
   box-shadow: 0 0 0 3px var(--iris-soft);
@@ -612,6 +659,8 @@ button.danger:hover:not(:disabled) { border-color: var(--bad); color: var(--bad)
 
 .warn { margin: 2px 0 0; font-size: 12.5px; color: var(--bad); }
 .warn[hidden] { display: none; }
+.row.stack > .hint { margin: 0; }
+#quick-body > .warn { margin: 4px 0 6px; }
 .result { margin: 12px 0 0; min-height: 1.2em; font-size: 12.5px; }
 .result.ok { color: var(--mint-text); }
 .result.bad { color: var(--bad); }

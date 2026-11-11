@@ -4,7 +4,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  checkWithAi, toIssues, maskSecrets, resolveModel, AI_MODELS, DEFAULT_MODEL,
+  checkWithAi, checkQuick, leaveAloneFor, toIssues, maskSecrets, resolveModel, AI_MODELS, DEFAULT_MODEL,
 } from '../src/engine/ai.js';
 
 function stub(response, capture = {}) {
@@ -524,4 +524,72 @@ test('GPT-6 is asked for no reasoning and sent no temperature', async () => {
   assert.equal(modern.body.reasoning_effort, 'none');
   assert.equal('temperature' in modern.body, false);
   assert.equal('max_tokens' in modern.body, false);
+});
+
+// ------------------------------------------------------------- quick check
+
+test('a quick check sends one sentence, marked quick, with only the words it contains', async () => {
+  const capture = {};
+  const reply = { payload: { corrections: [{
+    before: 'The lake is ', original: 'near', replacement: 'close', kind: 'style', explanation: 'x',
+  }], model: 'small', left: 9, mode: 'quick' } };
+  const result = await checkQuick('The lake is near the Caretville trees.', {
+    apiKey: 'caret_testtesttest',
+    leaveAlone: ['Caretville', 'gonna', 'sk-proj-abcdefghijklmnop1234'],
+    fetchImpl: stub(reply, capture),
+  });
+  assert.match(capture.url, /\/check$/);
+  assert.equal(capture.init.headers['x-caret-key'], 'caret_testtesttest');
+  assert.equal(capture.body.mode, 'quick');
+  assert.equal(capture.body.text, 'The lake is near the Caretville trees.');
+  assert.deepEqual(capture.body.leaveAlone, ['Caretville']);
+  assert.equal(result.issues.length, 1);
+  // Offsets are relative to the sentence, for the page to place.
+  assert.equal(result.issues[0].start, 12);
+  assert.equal(result.issues[0].end, 16);
+  assert.equal(result.issues[0].source, 'ai');
+});
+
+test('a quick check blanks secrets and is refused for a run-on block', async () => {
+  const capture = {};
+  await checkQuick('My card is 4111 1111 1111 1111 and it expires soon.', {
+    apiKey: 'caret_testtesttest', fetchImpl: stub({ payload: { corrections: [], mode: 'quick' } }, capture),
+  });
+  assert.ok(!JSON.stringify(capture.body).includes('4111'));
+  await assert.rejects(
+    () => checkQuick('word '.repeat(200), { apiKey: 'caret_testtesttest', fetchImpl: stub({ payload: {} }) }),
+    /too long/,
+  );
+});
+
+test('a used-up allowance on a quick check is a quiet pause', async () => {
+  await assert.rejects(
+    () => checkQuick('This is a sentence.', {
+      apiKey: 'caret_testtesttest',
+      fetchImpl: stub({ status: 429, payload: { error: 'used up' } }),
+    }),
+    (error) => error.code === 'quiet',
+  );
+});
+
+test('a normal check does not say quick', async () => {
+  const capture = {};
+  await checkWithAi('I has went home.', {
+    provider: 'caret', apiKey: 'caret_testtesttest', fetchImpl: stub({ payload: { corrections: [] } }, capture),
+  });
+  assert.equal('mode' in capture.body, false);
+});
+
+test('leaveAloneFor keeps only words that appear, case-insensitively', () => {
+  assert.deepEqual(leaveAloneFor('We met at CARETVILLE today.', ['caretville', 'gonna', '']), ['caretville']);
+});
+
+test('a server that answers a quick check with the big model is reported, not trusted', async () => {
+  await assert.rejects(
+    () => checkQuick('This is a sentence.', {
+      apiKey: 'caret_testtesttest',
+      fetchImpl: stub({ payload: { corrections: [], model: '@cf/meta/llama-3.3-70b-instruct-fp8-fast' } }),
+    }),
+    (error) => error.code === 'old-server',
+  );
 });

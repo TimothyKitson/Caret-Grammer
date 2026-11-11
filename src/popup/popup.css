@@ -557,6 +557,20 @@ body.ready .spark .star { transition: transform .4s cubic-bezier(.3, 1.35, .5, 1
 .ai-meta .sep { color: var(--faint); }
 .ai-meta.warn { color: var(--bad); }
 
+/* The quick check, on its own line under the AI one: a mint dot while it is
+   running, red when it cannot run or today's checks are gone. */
+.ai-meta:not([hidden]) + .quick-meta { margin-top: 4px; }
+.quick-meta::before {
+  content: "";
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--mint);
+  box-shadow: 0 0 6px color-mix(in srgb, var(--mint) 60%, transparent);
+}
+.quick-meta.warn::before { background: var(--bad); box-shadow: none; }
+
 /* --------------------------------------------------------------- keycaps */
 
 .combo { display: inline-flex; flex: none; gap: 3px; }

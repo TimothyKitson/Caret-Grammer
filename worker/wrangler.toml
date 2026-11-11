@@ -18,10 +18,9 @@ binding = "KEYS"
 id = "REPLACE_WITH_YOUR_KV_NAMESPACE_ID"
 
 [vars]
-# Workers AI's JSON-mode list does not cover every model. These are on it:
-#   @cf/meta/llama-3.1-8b-instruct          small, cheapest in neurons
-#   @cf/meta/llama-3.3-70b-instruct-fp8-fast  much better, costs more per call
-# Compare them with `npm run quality` before settling.
-MODEL = "@cf/meta/llama-3.1-8b-instruct"
-# 0 = no per-key cap. The extension limits each person instead.
+# Leave MODEL and QUICK_MODEL unset to use the lists built into the Worker
+# (full check: Llama 3.3 70B first; quick check: Granite 4.0 Micro first).
+# Set them only to force a particular model to the front, for example
+#   QUICK_MODEL = "@cf/google/gemma-4-26b-a4b-it"   better, ~3x the neurons
+# 0 = no per-key cap on full checks. The extension limits each person instead.
 PER_KEY_DAILY = "0"

@@ -1,6 +1,7 @@
 import {
   CATEGORY_INFO, AUTOCORRECT_INFO, AI_TRIGGER_INFO, AI_PROVIDER_INFO,
   DEFAULT_SETTINGS, MAX_FREE_DAILY, dailyCeiling,
+  QUICK_DEFAULT_DAILY, QUICK_MAX_DAILY, clampQuickLimit, normalizeSite, addCustomWord,
 } from '../shared/defaults.js';
 import { AI_MODELS, resolveModel } from '../engine/ai.js';
 import { providerFor } from '../shared/apikey.js';
@@ -11,6 +12,10 @@ const ask = (message) => new Promise((resolve) => chrome.runtime.sendMessage(mes
 let settings = { ...DEFAULT_SETTINGS };
 let aiLeftToday = 0;
 let aiInfo = { provider: null, baked: false, hasKey: false };
+// The quick check's side of the same answer. null means the extension did not
+// say, and then the "left today" line is simply not shown.
+let quickLeftToday = null;
+let quickInfo = { available: true };
 let toastTimer = null;
 let previewTimer = null;
 
@@ -50,6 +55,20 @@ async function readAiStatus() {
   if (!fresh) return;
   if (typeof fresh.aiLeftToday === 'number') aiLeftToday = fresh.aiLeftToday;
   if (fresh.ai) aiInfo = fresh.ai;
+  quickLeftToday = typeof fresh.quickLeftToday === 'number' ? fresh.quickLeftToday : null;
+  if (fresh.quick) quickInfo = fresh.quick;
+}
+
+/**
+ * True when a daily limit is only a free ceiling, which was never the person's
+ * own choice: carried over to their own paid key it would cap them for no
+ * reason. That is the ceiling of the free option they are leaving, or the
+ * highest free ceiling, which every free option was held to before Caret's own
+ * came down to its smaller number.
+ */
+function isOnlyACeiling(limit, leaving) {
+  const n = Number(limit);
+  return n > 0 && (n === dailyCeiling(leaving) || n === MAX_FREE_DAILY);
 }
 
 // --------------------------------------------------------------- builders
@@ -157,9 +176,8 @@ function paintProviders() {
     input.disabled = !settings.aiEnabled;
     input.addEventListener('change', () => {
       const patch = { aiProvider: option.value };
-      // A limit that is only the free ceiling was never the person's choice;
-      // carried over to their own paid key it would cap them for no reason.
-      if (dailyCeiling(option.value) === 0 && Number(settings.aiDailyLimit) === MAX_FREE_DAILY) {
+      const leaving = settings.aiProvider || aiInfo.provider || '';
+      if (dailyCeiling(option.value) === 0 && isOnlyACeiling(settings.aiDailyLimit, leaving)) {
         patch.aiDailyLimit = 0;
       }
       save(patch);
@@ -229,6 +247,45 @@ function paintModels() {
   }
   select.value = chosen;
   if (!select.value && select.options.length) select.selectedIndex = 0;
+}
+
+/**
+ * The quick check after each sentence. It has nothing to do with the full
+ * check's switch, provider or key box: it always runs on Caret's own server,
+ * so the only thing that can stop it is this copy having no Caret key.
+ */
+function paintQuick() {
+  const on = !!settings.quickAiEnabled;
+  const available = quickInfo.available !== false;
+
+  const box = $('quickAiEnabled');
+  box.checked = on;
+  // Nothing to switch on without a key - but a switch that is already on can
+  // always be turned off.
+  box.disabled = !available && !on;
+  $('quick-state').textContent = available
+    ? 'Works with the full check above on or off. It always uses Caret’s own '
+      + 'server, whichever AI you picked there.'
+    : 'This copy has no Caret key, so the quick check cannot run. If someone '
+      + 'gave you one, switch on AI proofreading above, pick Caret and paste it there.';
+
+  const live = on && available;
+  $('quick-body').classList.toggle('dim', !live);
+  const limit = $('quickAiDailyLimit');
+  limit.disabled = !live;
+  limit.value = String(clampQuickLimit(settings.quickAiDailyLimit));
+
+  // Only when the extension said how many: an older service worker does not.
+  const left = $('quick-left');
+  left.hidden = !live || quickLeftToday === null;
+  left.classList.toggle('out', quickLeftToday === 0);
+  left.textContent = quickLeftToday === 0
+    ? '0 left today. They come back tomorrow.'
+    : `${quickLeftToday} left today`;
+
+  const error = $('quick-error');
+  error.hidden = !live || !settings.lastQuickError;
+  error.textContent = settings.lastQuickError ? `Last problem: ${settings.lastQuickError}` : '';
 }
 
 // --------------------------------------------------------------- preview
@@ -323,7 +380,6 @@ function paint() {
     field.disabled = !on;
   }
   const picked = settings.aiProvider || aiInfo.provider || '';
-  const free = picked === 'caret' || picked === 'gemini';
 
   // Nothing to paste when this copy already carries a Caret key.
   $('ai-key-row').hidden = picked === 'caret' && aiInfo.baked;
@@ -369,13 +425,24 @@ function paint() {
   limitBox.value = ceiling > 0
     ? String(Math.min(Number(settings.aiDailyLimit) || ceiling, ceiling))
     : String(Number(settings.aiDailyLimit) || 0);
-  $('limit-label').textContent = ceiling > 0 ? 'Checks a day' : 'Checks a day (optional)';
+  $('limit-label').textContent = ceiling > 0 ? 'Full checks a day' : 'Full checks a day (optional)';
   $('ai-budget').textContent = ceiling > 0
-    ? `Free, with a limit: at most ${ceiling} AI checks a day on this computer, `
+    ? `Free, with a limit: at most ${ceiling} full AI checks a day on this computer, `
       + `and you can set it lower. ${settings.aiEnabled ? `${aiLeftToday} left today. ` : ''}`
       + 'When it runs out the built-in checks carry on as normal.'
     : 'Your own key, so Caret does not limit it. Set a number to stop a runaway '
       + 'from costing you, or 0 for no limit at all.';
+
+  // On a free option a run costs a check, not money. Caret's own allows so few
+  // full checks a day that the two automatic choices get a warning of their own.
+  $('trigger-hint').textContent = ceiling > 0
+    ? 'Each run uses one of the day’s checks, so this decides how long they last.'
+    : 'Each run costs money, so this is the setting that decides your bill.';
+  $('trigger-note').hidden = picked !== 'caret';
+  $('trigger-note').textContent = `Caret gives you ${dailyCeiling('caret')} full checks a day — `
+    + '“every minute” or “after every pause” will use them up quickly.';
+
+  paintQuick();
 
   $('master-dot').classList.toggle('off', !settings.enabled);
   $('master-text').textContent = settings.enabled ? 'Checking' : 'Switched off';
@@ -400,6 +467,7 @@ function paint() {
     `${(stats.issues || 0).toLocaleString()} things found`,
     `${(stats.aiCalls || 0).toLocaleString()} AI calls`,
     `${(stats.aiErrors || 0).toLocaleString()} AI errors`,
+    `${(stats.quickCalls || 0).toLocaleString()} quick checks`,
   ].join(' · ');
 
   schedulePreview();
@@ -422,7 +490,8 @@ $('aiKey').addEventListener('change', (e) => {
   // Same reasoning as switching provider: a free ceiling left over from
   // before should not cap a paid key that was just pasted.
   const provider = settings.aiProvider || providerFor(aiKey) || '';
-  if (dailyCeiling(provider) === 0 && Number(settings.aiDailyLimit) === MAX_FREE_DAILY) {
+  const leaving = settings.aiProvider || aiInfo.provider || '';
+  if (dailyCeiling(provider) === 0 && isOnlyACeiling(settings.aiDailyLimit, leaving)) {
     patch.aiDailyLimit = 0;
   }
   save(patch);
@@ -450,13 +519,59 @@ $('aiDailyLimit').addEventListener('change', (e) => {
 });
 clampNumber('aiIntervalMinutes', 'aiIntervalMinutes', 1, 120, 1);
 
+$('quickAiEnabled').addEventListener('change', (e) => save({ quickAiEnabled: e.target.checked }));
+$('quickAiDailyLimit').addEventListener('change', (e) => {
+  const typed = e.target.value.trim();
+  // An emptied box, or one the browser could not read as a number, is not a
+  // request for anything: put back what is saved.
+  if (!typed) {
+    e.target.value = String(clampQuickLimit(settings.quickAiDailyLimit));
+    return;
+  }
+  // Below the minimum means the minimum, not the default.
+  save({ quickAiDailyLimit: clampQuickLimit(Math.max(0, Number(typed))) });
+});
+
 async function addWord() {
   const input = $('new-word');
-  const word = input.value.trim().toLowerCase();
-  if (!word || settings.customWords.includes(word)) { input.value = ''; return; }
+  // Kept exactly as typed: "Ignitia" stays "Ignitia".
+  const next = addCustomWord(settings.customWords, input.value);
   input.value = '';
-  await save({ customWords: [...settings.customWords, word] });
+  if (next !== settings.customWords) await save({ customWords: next });
 }
+
+function siteMessage(text, tone) {
+  const el = $('site-msg');
+  el.textContent = text;
+  el.className = `hint ${tone || ''}`.trim();
+  el.hidden = !text;
+}
+
+async function addSite() {
+  const input = $('new-site');
+  const raw = input.value.trim();
+  if (!raw) return;
+  const site = normalizeSite(raw);
+  if (!site) {
+    siteMessage('That does not look like a web address. Try something like example.com.', 'bad');
+    return;
+  }
+  const covering = settings.disabledSites.find((s) => site === s || site.endsWith(`.${s}`));
+  input.value = '';
+  if (covering) {
+    siteMessage(covering === site
+      ? `Caret is already off on ${site}.`
+      : `${site} is already covered by ${covering}.`, '');
+    return;
+  }
+  // A broader entry makes narrower ones underneath it redundant.
+  const kept = settings.disabledSites.filter((s) => !s.endsWith(`.${site}`));
+  await save({ disabledSites: [...kept, site].sort() });
+  siteMessage(`Caret is now off on ${site}.`, 'good');
+}
+$('add-site').addEventListener('click', addSite);
+$('new-site').addEventListener('keydown', (e) => { if (e.key === 'Enter') addSite(); });
+$('new-site').addEventListener('input', () => siteMessage(''));
 $('add-word').addEventListener('click', addWord);
 $('new-word').addEventListener('keydown', (e) => { if (e.key === 'Enter') addWord(); });
 
@@ -576,6 +691,12 @@ async function paintShortcuts() {
 async function load() {
   const manifest = chrome.runtime.getManifest();
   $('version').textContent = `version ${manifest.version}`;
+  // The quick check's numbers come from one place, so the words cannot drift.
+  $('quick-default').textContent = String(QUICK_DEFAULT_DAILY);
+  $('quick-max').textContent = String(QUICK_MAX_DAILY);
+  $('quickAiDailyLimit').max = String(QUICK_MAX_DAILY);
+  $('quick-hint').textContent = `Anything from 1 to ${QUICK_MAX_DAILY}. When they run out, `
+    + 'the built-in checks carry on as normal.';
   const state = await ask({ type: 'get-settings' });
   if (state && state.settings) settings = state.settings;
   await readAiStatus();

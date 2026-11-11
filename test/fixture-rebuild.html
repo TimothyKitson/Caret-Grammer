@@ -1,0 +1,37 @@
+<!doctype html><meta charset="utf-8"><title>rebuild</title>
+<style>body{font:16px/1.5 sans-serif;padding:16px} .ed{width:600px;height:90px;border:1px solid #888;padding:6px;margin:0 0 6px} iframe{width:640px;height:110px;border:1px solid #888}</style>
+<h4>A: iframe editor rebuilt with document.open/write</h4>
+<iframe id="fa" src="about:blank"></iframe><button id="ba">check A</button>
+<h4>B: contenteditable replaced by a new element</h4>
+<div id="wrapB"><div class="ed" id="edB" contenteditable="true"></div></div><button id="bb">check B</button>
+<h4>C: contenteditable innerHTML rewritten with marks</h4>
+<div class="ed" id="edC" contenteditable="true"></div><button id="bc">check C</button>
+<h4>D: iframe replaced by a brand new iframe</h4>
+<div id="wrapD"><iframe id="fd" src="about:blank"></iframe></div><button id="bd">check D</button>
+<script>
+const mark = (t) => t.replace(/\b(there are|can be)\b/g, '<b style="color:blue;text-decoration:underline dotted">$1</b>');
+function initFrame(f, text) {
+  const d = f.contentDocument; d.open();
+  d.write('<!doctype html><body style="font:16px sans-serif;margin:6px"><div id="ed" contenteditable="true" style="min-height:80px;outline:none">' + text + '</div></body>');
+  d.close();
+}
+initFrame(document.getElementById('fa'), '');
+initFrame(document.getElementById('fd'), '');
+document.getElementById('ba').onclick = () => {
+  const f = document.getElementById('fa'); const text = f.contentDocument.getElementById('ed').innerText;
+  initFrame(f, mark(text)); f.contentDocument.getElementById('ed').focus();
+};
+document.getElementById('bb').onclick = () => {
+  const old = document.getElementById('edB'); const text = old.innerText;
+  document.getElementById('wrapB').innerHTML = '<div class="ed" id="edB" contenteditable="true">' + mark(text) + '</div>';
+  document.getElementById('edB').focus();
+};
+document.getElementById('bc').onclick = () => {
+  const ed = document.getElementById('edC'); ed.innerHTML = mark(ed.innerText); ed.focus();
+};
+document.getElementById('bd').onclick = () => {
+  const old = document.getElementById('fd'); const text = old.contentDocument.getElementById('ed').innerText;
+  const f = document.createElement('iframe'); f.id = 'fd'; f.src = 'about:blank';
+  document.getElementById('wrapD').replaceChildren(f); initFrame(f, mark(text)); f.contentDocument.getElementById('ed').focus();
+};
+</script>

@@ -123,6 +123,16 @@
     .row .what b { font-weight: 600; }
     .row button { padding: 3px 9px; font-size: 12px; }
     .empty-state { padding: 10px 8px; color: #5e5e5e; }
+    .panel-ai { border-top: 1px solid rgba(0,0,0,0.07); margin-top: 6px; padding-top: 8px; }
+    button.ai-check {
+      display: flex; align-items: center; gap: 7px; width: 100%;
+      padding: 7px 10px; border-radius: 8px; font-weight: 600; font-size: 12.5px;
+      background: linear-gradient(135deg, #5b4bff, #4a39ea); color: #fff;
+    }
+    button.ai-check:hover { filter: brightness(1.07); }
+    button.ai-check:disabled { cursor: default; opacity: .7; filter: none; }
+    button.ai-check svg { width: 14px; height: 14px; flex: 0 0 auto; fill: currentColor; }
+    button.ai-check .keys { margin-left: auto; font-weight: 500; font-size: 11px; opacity: .85; }
 
     .badge {
       position: absolute; z-index: 1; pointer-events: auto; cursor: pointer;
@@ -149,7 +159,8 @@
       button.link:hover { color: #fff; background: #3a3f47; }
       button.fix.alt { background: #2c3a52; color: #cfe0ff; }
       .row:hover { background: #2c3038; }
-      .foot { border-top-color: rgba(255,255,255,0.1); }
+      .foot, .panel-ai { border-top-color: rgba(255,255,255,0.1); }
+      button.ai-check { background: linear-gradient(135deg, #5b4bff, #4a39ea); color: #fff; }
     }
   `;
 
@@ -391,7 +402,7 @@
         return badge && !badge.hidden ? badge.getBoundingClientRect() : null;
       },
 
-      showPanel({ issues, rect, fixableCount, handlers = {} }) {
+      showPanel({ issues, rect, fixableCount, aiCheck = null, handlers = {} }) {
         attach();
         if (!panel) {
           panel = document.createElement('div');
@@ -443,6 +454,36 @@
           row.addEventListener('mouseenter', () => api.markActive(issue));
           row.addEventListener('mouseleave', () => api.markActive(null));
           panel.appendChild(row);
+        }
+
+        // The AI pass, from inside the page. Some sites replace the browser's
+        // right-click menu with their own, which hides "Proofread with AI";
+        // this is always here.
+        if (aiCheck && handlers.onAiCheck) {
+          const wrap = document.createElement('div');
+          wrap.className = 'panel-ai';
+          const go = document.createElement('button');
+          go.className = 'ai-check';
+          go.disabled = !!aiCheck.busy;
+          const svgNS = 'http://www.w3.org/2000/svg';
+          const icon = document.createElementNS(svgNS, 'svg');
+          icon.setAttribute('viewBox', '0 0 16 16');
+          icon.setAttribute('aria-hidden', 'true');
+          const star = document.createElementNS(svgNS, 'path');
+          star.setAttribute('d', 'M8 0l1.8 5.2L15 7l-5.2 1.8L8 14l-1.8-5.2L1 7l5.2-1.8z');
+          icon.appendChild(star);
+          const label = document.createElement('span');
+          label.textContent = aiCheck.busy ? 'Checking…' : 'Check with AI';
+          go.append(icon, label);
+          if (aiCheck.keys) {
+            const keys = document.createElement('span');
+            keys.className = 'keys';
+            keys.textContent = aiCheck.keys;
+            go.appendChild(keys);
+          }
+          go.addEventListener('click', () => handlers.onAiCheck());
+          wrap.appendChild(go);
+          panel.appendChild(wrap);
         }
         placeFloating(panel, rect, 6);
       },
