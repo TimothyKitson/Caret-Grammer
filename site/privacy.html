@@ -3,6 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0b12">
 <title>Privacy — Caret</title>
 <meta name="description" content="What Caret does, and does not do, with your writing.">
 <meta name="robots" content="noindex">
@@ -10,98 +12,127 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/assets/app.css">
+<link rel="stylesheet" href="/assets/app.css?v=3">
 </head>
 <body>
+<a class="skip" href="#main">Skip to the content</a>
 
-<header class="top">
-  <div class="wrap">
+<header class="nav">
+  <div class="wrap nav-in">
     <a class="brand" href="/"><img src="/assets/icon.png" alt="" width="28" height="28">Caret</a>
-    <nav class="links">
-      <a href="/setup" class="hide-sm">Setup</a>
-      <a href="/#what" class="hide-sm">What it does</a>
-      <a class="btn small" href="https://microsoftedge.microsoft.com/addons/detail/caret/ejkpanfkmjkkolgdpampfljaangollpm" id="get-top">Get Caret</a>
+    <nav class="nav-links" aria-label="Main">
+      <a class="nav-link hide-sm" href="/#what">What it does</a>
+      <a class="nav-link" href="/setup">Setup</a>
+      <a class="btn sm" href="https://microsoftedge.microsoft.com/addons/detail/caret/ejkpanfkmjkkolgdpampfljaangollpm" id="get-top">Get Caret</a>
     </nav>
   </div>
 </header>
 
-<main>
+<main id="main">
 
-<section class="hero" style="padding-bottom:0">
-  <div class="wrap narrow" style="text-align:left">
-    <p class="kicker">Privacy</p>
-    <h1 style="font-size:clamp(30px,4.2vw,42px)">What Caret does with your writing</h1>
-    <p class="lede" style="margin-left:0">Short version: nothing leaves your computer unless you switch on the AI pass and press the button.</p>
+<section class="page-head">
+  <div class="hero-pattern" aria-hidden="true"></div>
+  <div class="aurora" aria-hidden="true"><i></i><i></i><i></i></div>
+  <div class="wrap">
+    <p class="kicker arrive">Privacy</p>
+    <h1 class="arrive d1">What Caret does with your writing</h1>
+    <p class="lede arrive d2">Short version: nothing leaves your computer unless you switch on the AI pass and press the button.</p>
   </div>
 </section>
 
-<section>
-  <div class="wrap narrow">
+<div class="wrap policy">
+
+  <section data-reveal>
     <h2>The checking</h2>
-    <p>
-      The dictionary, the frequency list and every rule ship inside the
-      extension. Checking happens in your own browser. There is no Caret server,
-      no account, and no analytics — I do not know how many people use this or
-      what they type.
-    </p>
+    <div>
+      <p>
+        The dictionary, the frequency list and every rule ship inside the
+        extension. Checking happens in your own browser. There is no Caret server,
+        no account, and no analytics — I do not know how many people use this or
+        what they type.
+      </p>
+    </div>
+  </section>
 
+  <section data-reveal>
     <h2>What is stored</h2>
-    <p>
-      Your settings, the words you add to your dictionary, the sites you turn it
-      off on, the suggestions you have ignored, and a few counters for the
-      Numbers section. All of it lives in your browser profile's extension
-      storage. Removing the extension removes all of it.
-    </p>
+    <div>
+      <p>
+        Your settings, the words you add to your dictionary, the sites you turn it
+        off on, the suggestions you have ignored, and a few counters for the
+        Numbers section. All of it lives in your browser profile's extension
+        storage. Removing the extension removes all of it.
+      </p>
+    </div>
+  </section>
 
+  <section data-reveal>
     <h2>What is never looked at</h2>
-    <p>
-      Password fields are skipped outright. So is any field a site marks as not
-      wanting a checker. Text that looks like a card number, an API key or
-      similar is left alone even when the AI pass is on.
-    </p>
+    <div>
+      <p>
+        Password fields are skipped outright. So is any field a site marks as not
+        wanting a checker. Text that looks like a card number, an API key or
+        similar is left alone even when the AI pass is on.
+      </p>
+    </div>
+  </section>
 
+  <section data-reveal>
     <h2>The optional AI pass</h2>
-    <p>
-      Off unless you turn it on and add your own API key. When you do, the
-      contents of the field you are typing in are sent to the service that key
-      belongs to — Google, OpenAI or Anthropic — and that service's own terms
-      apply to it. The key is kept in your browser profile and sent to nobody
-      else.
-    </p>
-    <p>
-      Sent with it is a list of words you have told Caret to leave alone: the
-      words in your dictionary, and the ones you have pressed <b>Ignore</b> on.
-      That is what stops the AI correcting the way you write on purpose. It is
-      a list of your own choices, not anything inferred from your writing, and
-      it goes to the same place the text does and nowhere else.
-    </p>
-    <p>By default it only runs when you ask for it.</p>
+    <div>
+      <p>
+        Off unless you turn it on and add your own API key. When you do, the
+        contents of the field you are typing in are sent to the service that key
+        belongs to — Google, OpenAI or Anthropic — and that service's own terms
+        apply to it. The key is kept in your browser profile and sent to nobody
+        else.
+      </p>
+      <p>
+        Sent with it is a list of words you have told Caret to leave alone: the
+        words in your dictionary, and the ones you have pressed <b>Ignore</b> on.
+        That is what stops the AI correcting the way you write on purpose. It is
+        a list of your own choices, not anything inferred from your writing, and
+        it goes to the same place the text does and nowhere else.
+      </p>
+      <p>By default it only runs when you ask for it.</p>
+    </div>
+  </section>
 
+  <section data-reveal>
     <h2>This website</h2>
-    <p>
-      Hosted on Netlify, which keeps standard server logs. The only form on the
-      site is <a href="/report">the report form</a>, and what you type into it
-      is emailed to me. Fonts are loaded from Google Fonts. No tracking, no
-      cookies set by me.
-    </p>
+    <div>
+      <p>
+        Hosted on Netlify, which keeps standard server logs. The only form on the
+        site is <a href="/report">the report form</a>, and what you type into it
+        is emailed to me. Fonts are loaded from Google Fonts. No tracking, no
+        cookies set by me.
+      </p>
+    </div>
+  </section>
 
+  <section data-reveal>
     <h2>Getting in touch</h2>
-    <p><a href="/report">The report form</a> reaches me directly.</p>
-  </div>
-</section>
+    <div>
+      <p><a href="/report">The report form</a> reaches me directly.</p>
+    </div>
+  </section>
+
+</div>
 
 </main>
 
-<footer class="end">
-  <div class="wrap">
-    <span>Caret</span>
-    <span class="right">
+<footer class="foot">
+  <div class="wrap foot-in">
+    <a class="brand" href="/"><img src="/assets/icon.png" alt="" width="24" height="24">Caret</a>
+    <p class="foot-tag">Writing that catches itself.</p>
+    <nav aria-label="Footer">
       <a href="/setup">Setup</a>
       <a href="/report">Report a problem</a>
-      <a href="/privacy">Privacy</a>
-    </span>
+      <a href="/privacy" aria-current="page">Privacy</a>
+    </nav>
   </div>
 </footer>
-<script src="/assets/app.js"></script>
+
+<script src="/assets/app.js?v=3"></script>
 </body>
 </html>

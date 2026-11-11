@@ -3,141 +3,264 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0b12">
 <title>Caret — a grammar checker for Edge</title>
 <meta name="description" content="Caret underlines spelling and grammar mistakes as you type, in every text box in Microsoft Edge, and fixes them from a hover card. Free, and it works offline.">
 <link rel="icon" href="assets/icon.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="assets/app.css">
+<link rel="stylesheet" href="assets/app.css?v=3">
 <meta property="og:title" content="Caret — a grammar checker for Edge">
 <meta property="og:description" content="Underlines mistakes as you type, in every text box in Edge. Free, and it works offline.">
 <meta property="og:type" content="website">
 </head>
 <body>
+<a class="skip" href="#main">Skip to the content</a>
 
-<header class="top">
-  <div class="wrap">
+<header class="nav">
+  <div class="wrap nav-in">
     <a class="brand" href="/"><img src="assets/icon.png" alt="" width="28" height="28">Caret</a>
-    <nav class="links">
-      <a href="/setup" class="hide-sm">Setup</a>
-      <a href="#what" class="hide-sm">What it does</a>
-      <a class="btn small" href="https://microsoftedge.microsoft.com/addons/detail/caret/ejkpanfkmjkkolgdpampfljaangollpm" id="get-top">Get Caret</a>
+    <nav class="nav-links" aria-label="Main">
+      <a class="nav-link hide-sm" href="#what">What it does</a>
+      <a class="nav-link" href="/setup">Setup</a>
+      <a class="btn sm" href="https://microsoftedge.microsoft.com/addons/detail/caret/ejkpanfkmjkkolgdpampfljaangollpm" id="get-top">Get Caret</a>
     </nav>
   </div>
 </header>
 
-<main>
+<main id="main">
 
 <section class="hero">
-  <div class="wrap narrow">
-    <span class="pill rise in"><span class="spark"></span>Free · works offline · no account</span>
-    <h1 class="rise in">Writing that<br>catches itself.</h1>
-    <p class="lede rise in d1">
+  <div class="hero-pattern" aria-hidden="true"></div>
+  <div class="wrap">
+    <p class="eyebrow arrive">A grammar checker for Microsoft Edge</p>
+    <h1 class="arrive d1">Writing that<br><span class="grad">catches itself.</span><span class="caret" aria-hidden="true"></span></h1>
+    <p class="lede arrive d2">
       Caret underlines spelling and grammar mistakes as you type — in every text
       box, on every site, in Microsoft Edge. Hover one and it tells you what to
       put instead.
     </p>
-    <div class="cta rise in d2">
-      <a class="btn" href="https://microsoftedge.microsoft.com/addons/detail/caret/ejkpanfkmjkkolgdpampfljaangollpm">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v12"/><path d="m7 12 5 5 5-5"/><path d="M5 21h14"/></svg>
+    <div class="cta arrive d3">
+      <a class="btn lg" href="https://microsoftedge.microsoft.com/addons/detail/caret/ejkpanfkmjkkolgdpampfljaangollpm">
+        <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5.5 14.5 12 5.5l6.5 9" stroke="#fff" stroke-width="3.1"/><path d="M5 20.4h14" stroke="#5ee6bb" stroke-width="2.7"/></svg>
         Get Caret for Edge
       </a>
-      <a class="btn ghost" href="/setup">How to set it up</a>
+      <a class="btn lg ghost" href="/setup">How to set it up</a>
     </div>
-    <p class="undertext rise in d3">One click from the Edge Add-ons store. Nothing to configure to start.</p>
+    <ul class="trust arrive d4">
+      <li><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 8.5 3.2 3.2L13 4.6"/></svg>Free</li>
+      <li><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 8.5 3.2 3.2L13 4.6"/></svg>Works offline</li>
+      <li><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 8.5 3.2 3.2L13 4.6"/></svg>No account</li>
+    </ul>
+
+    <div class="stage arrive d5">
+      <div class="aurora" aria-hidden="true"><i></i><i></i><i></i></div>
+      <figure class="demo ring" id="demo">
+        <div class="demo-bar">
+          <span class="demo-dots" aria-hidden="true"><i></i><i></i><i></i></span>
+          <span class="demo-title">Any text box, anywhere</span>
+          <button class="demo-toggle" id="demo-toggle" type="button" hidden>
+            <svg class="i-pause" width="12" height="12" viewBox="0 0 12 12" fill="currentColor" aria-hidden="true"><rect x="2" y="1.5" width="3" height="9" rx="1"/><rect x="7" y="1.5" width="3" height="9" rx="1"/></svg>
+            <svg class="i-play" width="12" height="12" viewBox="0 0 12 12" fill="currentColor" aria-hidden="true"><path d="M3 1.7v8.6a.6.6 0 0 0 .9.5l7-4.3a.6.6 0 0 0 0-1l-7-4.3a.6.6 0 0 0-.9.5z"/></svg>
+            <span>Pause</span>
+          </button>
+        </div>
+        <div role="img" aria-label="Caret at work in a short message. Four mistakes are underlined, one of each kind: “recieved”, “should of”, “prior to” and “dont”. Each is fixed from its hover card, to “received”, “should have”, “before” and “don't”.">
+          <div class="demo-body" id="demo-body">
+            <p class="demo-text" id="demo-text">Hi Mrs. Ellis, I <span class="u sp is-active" data-chip="Spelling" data-msg="“recieved” is a common misspelling." data-fix="received" data-dict>recieved</span> the permission slip and <span class="u gr" data-chip="Verb form" data-msg="Write “should have”: “of” only sounds like “’ve”." data-fix="should have" data-alt="should've">should of</span> sent it back <span class="u cl" data-chip="Wordy" data-msg="Shorter: “before”." data-fix="before">prior to</span> Friday. I <span class="u pu" data-chip="Apostrophe" data-msg="Did you mean “don't”?" data-fix="don't">dont</span> know how I missed it.</p>
+            <div class="hcard demo-card" id="demo-card">
+              <div class="hcard-head"><span class="chip sp">Spelling</span></div>
+              <p class="hcard-msg">“recieved” is a common misspelling.</p>
+              <div class="hcard-fixes"><span class="fix">received</span></div>
+              <div class="hcard-foot"><span class="add">Add to dictionary</span><span>Ignore</span><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="2.2"/><path d="M8 1.6v1.7M8 12.7v1.7M1.6 8h1.7M12.7 8h1.7M3.5 3.5l1.2 1.2M11.3 11.3l1.2 1.2M12.5 3.5l-1.2 1.2M4.7 11.3l-1.2 1.2"/></svg></div>
+            </div>
+          </div>
+          <div class="demo-foot">
+            <ul class="legend">
+              <li class="sp">Spelling</li>
+              <li class="gr">Grammar</li>
+              <li class="pu">Punctuation</li>
+              <li class="cl">Clarity</li>
+            </ul>
+            <span class="badge" id="demo-badge">4</span>
+          </div>
+        </div>
+      </figure>
+    </div>
   </div>
 
-  <div class="wrap">
-    <div class="demo rise">
-      <div class="bar"><i></i><i></i><i></i><span>Any text box, anywhere</span></div>
-      <div class="field" id="demo-field">Hi Mrs. Ellis, I <span class="u sp">recieved</span> the <span class="u sp">premission</span> slip and will <span class="u sp">defintely</span> <span class="caret-bar"></span></div>
+  <div class="band" id="band" role="group" aria-label="The kind of thing Caret corrects">
+    <div class="band-track">
+      <ul class="band-row">
+        <li><span class="was u sp">recieve</span><span class="sr-only"> becomes </span><svg class="arrow" width="18" height="12" viewBox="0 0 18 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 6h15M11.5 1.5 16 6l-4.5 4.5"/></svg><span class="now">receive</span><svg class="tick" width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 8.5 3.2 3.2L13 4.6"/></svg></li>
+        <li><span class="was u gr">could of</span><span class="sr-only"> becomes </span><svg class="arrow" width="18" height="12" viewBox="0 0 18 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 6h15M11.5 1.5 16 6l-4.5 4.5"/></svg><span class="now">could have</span><svg class="tick" width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 8.5 3.2 3.2L13 4.6"/></svg></li>
+        <li><span class="was u pu">dont</span><span class="sr-only"> becomes </span><svg class="arrow" width="18" height="12" viewBox="0 0 18 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 6h15M11.5 1.5 16 6l-4.5 4.5"/></svg><span class="now">don't</span><svg class="tick" width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 8.5 3.2 3.2L13 4.6"/></svg></li>
+        <li><span class="was u sp">definately</span><span class="sr-only"> becomes </span><svg class="arrow" width="18" height="12" viewBox="0 0 18 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 6h15M11.5 1.5 16 6l-4.5 4.5"/></svg><span class="now">definitely</span><svg class="tick" width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 8.5 3.2 3.2L13 4.6"/></svg></li>
+        <li><span class="was u gr">i</span><span class="sr-only"> becomes </span><svg class="arrow" width="18" height="12" viewBox="0 0 18 12" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M1 6h15M11.5 1.5 16 6l-4.5 4.5"/></svg><span class="now">I</span><svg class="tick" width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m3 8.5 3.2 3.2L13 4.6"/></svg></li>
+      </ul>
     </div>
   </div>
 </section>
 
-<section id="what" class="wash">
+<section class="section" id="what">
   <div class="wrap">
-    <div class="section-head mid">
+    <div class="section-head" data-reveal>
       <p class="kicker">What it does</p>
       <h2>A quiet second pair of eyes</h2>
       <p>No sign-up, no subscription, no sending your writing anywhere. The whole dictionary ships inside the extension.</p>
     </div>
 
-    <div class="grid">
-      <div class="card rise">
-        <div class="icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 7V5h16v2"/><path d="M9 19h6"/><path d="M12 5v14"/></svg></div>
-        <h3>Everywhere you type</h3>
-        <p>Gmail, Outlook, forms, comment boxes, the little search field nobody checks. If you can type in it, Caret watches it.</p>
-      </div>
-      <div class="card rise d1">
-        <div class="icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg></div>
-        <h3>Hover, then decide</h3>
-        <p>A card shows what is wrong and what to put instead. Nothing changes until you click it — Caret never rewrites what you wrote.</p>
-      </div>
-      <div class="card rise d2">
-        <div class="icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2v4"/><path d="m16.2 7.8 2.9-2.9"/><path d="M18 12h4"/><path d="M12 18v4"/><path d="M4.9 19.1 7.8 16.2"/><path d="M2 12h4"/><path d="m4.9 4.9 2.9 2.9"/></svg></div>
-        <h3>Autocorrect, if you want it</h3>
-        <p>Off by default. Switch it on and the mistakes with exactly one right answer fix themselves: <code>i</code> → <code>I</code>, <code>dont</code> → <code>don't</code>, capitals after a full stop. Ctrl+Z undoes any of them.</p>
-      </div>
-      <div class="card rise">
-        <div class="icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg></div>
-        <h3>It stays on your computer</h3>
-        <p>The checking runs inside your browser. Password fields, card numbers and anything that looks like a key are skipped entirely.</p>
-      </div>
-      <div class="card rise d1">
-        <div class="icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3 9.8 8.6 4 9.3l4.3 4-1.2 5.9L12 16.3l4.9 2.9-1.2-5.9 4.3-4-5.8-.7Z"/></svg></div>
-        <h3>An AI pass when you ask<span class="badge-free">optional</span></h3>
-        <p>For the sentence-level things a rule cannot see. Caret's own is free with a daily limit and nothing to sign up for; or bring your own key from Google, OpenAI or Anthropic. It is told to keep your words plain, never to make them sound fancier.</p>
-      </div>
-      <div class="card rise d2">
-        <div class="icon"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12h4l3 8 4-16 3 8h4"/></svg></div>
-        <h3>It knows when to keep quiet</h3>
-        <p>A checker that underlines correct writing is worse than no checker. “This is good” is not a surname, <code>IEP</code> is not a typo, and a word you tell it to leave alone stays left alone — by the AI too.</p>
-      </div>
+    <div class="bento">
+
+      <article class="tile t-hover" data-reveal>
+        <div class="tile-art" aria-hidden="true">
+          <p class="says">We will <span class="anchor"><span class="u sp is-active">definately</span><span class="hcard">
+            <span class="hcard-head"><span class="chip sp">Spelling</span></span>
+            <span class="hcard-msg">“definately” is a common misspelling.</span>
+            <span class="hcard-fixes"><span class="fix">definitely</span></span>
+            <span class="hcard-foot"><span>Add to dictionary</span><span>Ignore</span><svg width="13" height="13" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="8" cy="8" r="2.2"/><path d="M8 1.6v1.7M8 12.7v1.7M1.6 8h1.7M12.7 8h1.7M3.5 3.5l1.2 1.2M11.3 11.3l1.2 1.2M12.5 3.5l-1.2 1.2M4.7 11.3l-1.2 1.2"/></svg></span>
+            <svg class="art-pointer" viewBox="0 0 22 22"><path d="M4 2.5v15.2l4.2-3.7 2.7 6 2.7-1.2-2.7-5.9h5.6L4 2.5z" fill="#fff" stroke="#0b0b12" stroke-width="1.3" stroke-linejoin="round"/></svg>
+          </span></span> be there. Thanks for the invite!</p>
+        </div>
+        <div class="tile-copy">
+          <h3>Hover, then decide</h3>
+          <p>A card shows what is wrong and what to put instead. Nothing changes until you click it — Caret never rewrites what you wrote.</p>
+        </div>
+      </article>
+
+      <article class="tile t-every" data-reveal>
+        <div class="tile-art" aria-hidden="true">
+          <ul class="fields">
+            <li><svg width="15" height="15" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round"><circle cx="7" cy="7" r="4.6"/><path d="m10.6 10.6 3.2 3.2"/></svg><span><span class="u sp">restaraunts</span> near me</span></li>
+            <li><span class="where">Comment</span><span><span class="u pu">Thats</span> a great idea</span></li>
+            <li><span class="where">Subject</span><span>I <span class="u gr">could of</span> called</span></li>
+          </ul>
+        </div>
+        <div class="tile-copy">
+          <h3>Everywhere you type</h3>
+          <p>Gmail, Outlook, forms, comment boxes, the little search field nobody checks. If you can type in it, Caret watches it.</p>
+        </div>
+      </article>
+
+      <article class="tile t-auto" data-reveal>
+        <div class="tile-art" aria-hidden="true">
+          <dl class="swap">
+            <div class="before"><dt>You type</dt><dd><span>i</span> <span>dont</span> think so. <span>m</span>aybe later</dd></div>
+            <div class="after"><dt>It becomes</dt><dd><span>I</span> <span>don't</span> think so. <span>M</span>aybe later</dd></div>
+          </dl>
+        </div>
+        <div class="tile-copy">
+          <h3>Autocorrect, if you want it</h3>
+          <p>Off by default. Switch it on and the mistakes with exactly one right answer fix themselves: <code>i</code> → <code>I</code>, <code>dont</code> → <code>don't</code>, capitals after a full stop. Ctrl+Z undoes any of them.</p>
+        </div>
+      </article>
+
+      <article class="tile t-private" data-reveal>
+        <div class="tile-art" aria-hidden="true">
+          <ul class="skips">
+            <li><span class="what">Password</span><span class="val">••••••••</span><span class="skipped"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 8S4 3.5 8 3.5 14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8z"/><circle cx="8" cy="8" r="1.9"/><path d="m2.5 2.5 11 11"/></svg>Skipped</span></li>
+            <li><span class="what">Card number</span><span class="val">•••• ••••</span><span class="skipped"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 8S4 3.5 8 3.5 14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8z"/><circle cx="8" cy="8" r="1.9"/><path d="m2.5 2.5 11 11"/></svg>Skipped</span></li>
+            <li><span class="what">API key</span><span class="val">sk-•••••</span><span class="skipped"><svg width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M1.5 8S4 3.5 8 3.5 14.5 8 14.5 8 12 12.5 8 12.5 1.5 8 1.5 8z"/><circle cx="8" cy="8" r="1.9"/><path d="m2.5 2.5 11 11"/></svg>Skipped</span></li>
+          </ul>
+        </div>
+        <div class="tile-copy">
+          <h3>It stays on your computer</h3>
+          <p>The checking runs inside your browser. Password fields, card numbers and anything that looks like a key are skipped entirely.</p>
+        </div>
+      </article>
+
+      <article class="tile t-quiet" data-reveal>
+        <div class="tile-art" aria-hidden="true">
+          <div class="quiet">
+            <p>This is good. The IEP meeting is on Friday.</p>
+            <span class="badge clean"><svg width="12" height="12" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="m3 8.5 3.2 3.2L13 4.6"/></svg></span>
+          </div>
+        </div>
+        <div class="tile-copy">
+          <h3>It knows when to keep quiet</h3>
+          <p>A checker that underlines correct writing is worse than no checker. “This is good” is not a surname, <code>IEP</code> is not a typo, and a word you tell it to leave alone stays left alone — by the AI too.</p>
+        </div>
+      </article>
+
+      <article class="tile t-ai" data-reveal>
+        <div class="tile-copy">
+          <h3>An AI pass when you ask <span class="tag iris">optional</span></h3>
+          <p>For the sentence-level things a rule cannot see. Caret's own is free with a daily limit and nothing to sign up for; or bring your own key from Google, OpenAI or Anthropic. It is told to keep your words plain, never to make them sound fancier.</p>
+        </div>
+        <div class="tile-art" aria-hidden="true">
+          <ul class="picks">
+            <li><span class="mark own"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round"><path d="M5.5 14.5 12 5.5l6.5 9" stroke="#fff" stroke-width="3.1"/><path d="M5 20.4h14" stroke="#5ee6bb" stroke-width="2.7"/></svg></span>Caret<span class="tag mint">free</span></li>
+            <li><span class="mark"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="5.2" cy="10.8" r="2.9"/><path d="m7.3 8.7 6-6M11 5l2 2M9.2 6.8l1.6 1.6"/></svg></span>Google Gemini<span class="tag mint">free tier</span></li>
+            <li><span class="mark"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="5.2" cy="10.8" r="2.9"/><path d="m7.3 8.7 6-6M11 5l2 2M9.2 6.8l1.6 1.6"/></svg></span>OpenAI</li>
+            <li><span class="mark"><svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="5.2" cy="10.8" r="2.9"/><path d="m7.3 8.7 6-6M11 5l2 2M9.2 6.8l1.6 1.6"/></svg></span>Anthropic</li>
+          </ul>
+        </div>
+      </article>
+
     </div>
   </div>
 </section>
 
-<section>
-  <div class="wrap narrow">
-    <div class="section-head">
+<section class="section" id="start" style="padding-top:0">
+  <div class="wrap">
+    <div class="section-head" data-reveal>
       <p class="kicker">Getting started</p>
       <h2>Two minutes, start to finish</h2>
     </div>
-    <ol class="steps">
-      <li class="rise">
+    <ol class="timeline" data-reveal>
+      <li>
+        <span class="node" aria-hidden="true">1</span>
         <h3>Install it from the Edge store</h3>
         <p>The button below opens the listing. Press <b>Get</b>, then <b>Add extension</b>.</p>
       </li>
-      <li class="rise d1">
+      <li>
+        <span class="node" aria-hidden="true">2</span>
         <h3>Start typing</h3>
         <p>That is genuinely it. Mistakes get underlined; hover one to fix it, or press <kbd>Ctrl</kbd> <kbd>Shift</kbd> <kbd>Space</kbd> with the cursor in the word.</p>
       </li>
-      <li class="rise d2">
+      <li>
+        <span class="node" aria-hidden="true">3</span>
         <h3>Make it yours, if you like</h3>
         <p>The settings page has autocorrect, what to check, your own dictionary and the optional AI pass. <a href="/setup">The setup guide walks through all of it.</a></p>
       </li>
     </ol>
-    <div class="cta" style="justify-content:flex-start;margin-top:36px">
-      <a class="btn" href="https://microsoftedge.microsoft.com/addons/detail/caret/ejkpanfkmjkkolgdpampfljaangollpm">Get Caret for Edge</a>
+  </div>
+</section>
+
+<section class="closer">
+  <div class="wrap">
+    <div class="closer-card ring" data-reveal>
+      <div class="pattern" aria-hidden="true"></div>
+      <div class="aurora" aria-hidden="true"><i></i><i></i><i></i></div>
+      <img class="closer-icon" src="assets/icon.png" alt="" width="72" height="72">
+      <h2>Writing that <span class="grad">catches itself.</span></h2>
+      <div class="cta">
+        <a class="btn lg" href="https://microsoftedge.microsoft.com/addons/detail/caret/ejkpanfkmjkkolgdpampfljaangollpm">
+          <svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5.5 14.5 12 5.5l6.5 9" stroke="#fff" stroke-width="3.1"/><path d="M5 20.4h14" stroke="#5ee6bb" stroke-width="2.7"/></svg>
+          Get Caret for Edge
+        </a>
+      </div>
+      <p class="undertext">One click from the Edge Add-ons store. Nothing to configure to start.</p>
     </div>
   </div>
 </section>
 
 </main>
 
-<footer class="end">
-  <div class="wrap">
-    <span>Caret</span>
-    <span class="right">
+<footer class="foot">
+  <div class="wrap foot-in">
+    <a class="brand" href="/"><img src="assets/icon.png" alt="" width="24" height="24">Caret</a>
+    <p class="foot-tag">Writing that catches itself.</p>
+    <nav aria-label="Footer">
       <a href="/setup">Setup</a>
       <a href="/report">Report a problem</a>
       <a href="/privacy">Privacy</a>
-    </span>
+    </nav>
   </div>
 </footer>
 
-<script src="assets/app.js"></script>
+<script src="assets/app.js?v=3"></script>
 </body>
 </html>

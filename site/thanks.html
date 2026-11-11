@@ -3,6 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0b0b12">
 <title>Thanks — Caret</title>
 <meta name="description" content="Your report was sent.">
 <meta name="robots" content="noindex">
@@ -10,51 +12,56 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@600;700&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="/assets/app.css">
+<link rel="stylesheet" href="/assets/app.css?v=3">
 </head>
 <body>
+<a class="skip" href="#main">Skip to the content</a>
 
-<header class="top">
-  <div class="wrap">
+<header class="nav">
+  <div class="wrap nav-in">
     <a class="brand" href="/"><img src="/assets/icon.png" alt="" width="28" height="28">Caret</a>
-    <nav class="links">
-      <a href="/setup" class="hide-sm">Setup</a>
-      <a href="/#what" class="hide-sm">What it does</a>
-      <a class="btn small" href="https://microsoftedge.microsoft.com/addons/detail/caret/ejkpanfkmjkkolgdpampfljaangollpm" id="get-top">Get Caret</a>
+    <nav class="nav-links" aria-label="Main">
+      <a class="nav-link hide-sm" href="/#what">What it does</a>
+      <a class="nav-link" href="/setup">Setup</a>
+      <a class="btn sm" href="https://microsoftedge.microsoft.com/addons/detail/caret/ejkpanfkmjkkolgdpampfljaangollpm" id="get-top">Get Caret</a>
     </nav>
   </div>
 </header>
 
-<main>
+<main id="main">
 
-<section class="hero">
+<section class="solo mint">
+  <div class="hero-pattern" aria-hidden="true"></div>
+  <div class="aurora" aria-hidden="true"><i></i><i></i><i></i></div>
   <div class="wrap narrow">
-    <div style="width:60px;height:60px;border-radius:50%;background:color-mix(in srgb,var(--mint) 16%,transparent);color:var(--mint-ink);display:grid;place-items:center;margin:0 auto 22px">
-      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6 9 17l-5-5"/></svg>
+    <div class="done arrive" aria-hidden="true">
+      <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12.5 9.5 17.5 19.5 6.5"/></svg>
     </div>
-    <h1 style="font-size:clamp(30px,4.2vw,44px)">Got it — thank you.</h1>
-    <p class="lede">
+    <h1 class="arrive d1">Got it — thank you.</h1>
+    <p class="lede arrive d2">
       That went straight to my inbox. If you left an email address and it needs
       an answer, you will get one.
     </p>
-    <div class="cta">
-      <a class="btn ghost" href="/">Back to the start</a>
+    <div class="cta arrive d3">
+      <a class="btn lg ghost" href="/">Back to the start</a>
     </div>
   </div>
 </section>
 
 </main>
 
-<footer class="end">
-  <div class="wrap">
-    <span>Caret</span>
-    <span class="right">
+<footer class="foot">
+  <div class="wrap foot-in">
+    <a class="brand" href="/"><img src="/assets/icon.png" alt="" width="24" height="24">Caret</a>
+    <p class="foot-tag">Writing that catches itself.</p>
+    <nav aria-label="Footer">
       <a href="/setup">Setup</a>
       <a href="/report">Report a problem</a>
       <a href="/privacy">Privacy</a>
-    </span>
+    </nav>
   </div>
 </footer>
-<script src="/assets/app.js"></script>
+
+<script src="/assets/app.js?v=3"></script>
 </body>
 </html>
