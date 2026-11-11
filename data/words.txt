@@ -40921,6 +40921,7 @@ brazilwood
 brazing
 brazos
 brazzaville
+brb
 breach
 breached
 breacher
@@ -42722,6 +42723,7 @@ btise
 btl
 btry
 btu
+btw
 bu
 bual
 buat
@@ -127501,6 +127503,7 @@ gif
 gifblaar
 giffgaff
 gifola
+gifs
 gift
 giftbook
 gifted
@@ -133206,6 +133209,7 @@ gtc
 gtd
 gte
 gteau
+gtg
 gthite
 gtt
 gu
@@ -137703,6 +137707,7 @@ hazzans
 hazzanut
 hb
 hbase
+hbu
 hcb
 hcf
 hcl
@@ -149623,6 +149628,7 @@ idist
 idistic
 idite
 iditol
+idk
 idle
 idleby
 idled
@@ -149931,6 +149937,7 @@ ikhwan
 ikon
 ikona
 ikons
+ikr
 ikra
 il
 ila
@@ -150517,6 +150524,7 @@ imelle
 imer
 imerina
 imeritian
+imho
 imhotep
 imi
 imid
@@ -150931,6 +150939,7 @@ immute
 immutilate
 immutual
 immy
+imo
 imodium
 imogen
 imogene
@@ -160583,6 +160592,7 @@ irksome
 irksomely
 irksomeness
 irkutsk
+irl
 irma
 iroha
 irok
@@ -163962,6 +163972,7 @@ jizya
 jizyah
 jizzen
 jj
+jk
 jms
 jnana
 jnanamarga
@@ -176864,6 +176875,7 @@ lloyd
 lludd
 llyn
 lm
+lmao
 ln
 lndg
 lnr
@@ -203666,6 +203678,7 @@ ngai
 ngaio
 ngaliema
 ngapi
+ngl
 ngoko
 ngoma
 nguyen
@@ -214008,6 +214021,7 @@ nuzzles
 nuzzling
 nv
 nvidia
+nvm
 ny
 nyala
 nyalas
@@ -216730,6 +216744,7 @@ omentums
 omentuta
 omer
 omers
+omg
 omicron
 omicrons
 omikron
@@ -244315,6 +244330,7 @@ ployed
 ploying
 ployment
 ploys
+pls
 pltano
 plu
 pluchea
@@ -244723,6 +244739,7 @@ plynlymmon
 plyscore
 plywood
 plywoods
+plz
 pm
 pmk
 pmsg
@@ -279055,6 +279072,7 @@ roer
 roes
 roestone
 roey
+rofl
 rog
 rogan
 rogation
@@ -299428,6 +299446,7 @@ smeuse
 smeuth
 smew
 smews
+smh
 smich
 smicker
 smicket
@@ -323717,6 +323736,7 @@ tazza
 tazzas
 tazze
 tb
+tbh
 tbilisi
 tbs
 tbsp
@@ -329403,6 +329423,7 @@ thwartwise
 thwite
 thwittle
 thworl
+thx
 thy
 thyestean
 thyestes
@@ -338077,6 +338098,7 @@ tsurugi
 tsutsutsi
 tswana
 tty
+ttyl
 ttys
 tu
 tua
@@ -366392,6 +366414,7 @@ vicugnas
 vicuna
 vicunas
 vicus
+vid
 vidal
 vidame
 viddhal
@@ -366436,6 +366459,7 @@ vidkid
 vidkids
 vidonia
 vidry
+vids
 vidua
 viduage
 vidual
@@ -375472,6 +375496,7 @@ wycliffite
 wyclifian
 wyclifism
 wyclifite
+wyd
 wyde
 wye
 wyes

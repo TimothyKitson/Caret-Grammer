@@ -90,6 +90,83 @@ Good morning, and welcome to the first day of the school year.
 It is good practice to proofread anything before you send it.
 We had a good turnout at the open house on Thursday evening.
 The weather is supposed to be good for the game on Saturday.
+Hi Mrs. Patel, just a reminder that picture day is this Thursday.
+Could you send me the permission slip by Friday? Thanks so much!
+We're out of printer paper again, so I ordered two more boxes.
+The bus will be about fifteen minutes late because of the snow.
+Please let me know if Jordan needs to be picked up early.
+I've attached the agenda for Monday's staff meeting.
+Our fundraiser raised $2,340, which is more than last year.
+If it rains, recess will be held in the gym.
+Each student should bring a water bottle and a packed lunch.
+The kids loved the field trip to the science museum.
+She said she'd be here by noon, but her flight was delayed.
+I can't make it tonight; can we reschedule for next week?
+Neither the principal nor the teachers were told about the change.
+Everyone in the class has finished their project.
+The data shows a clear improvement over last semester.
+He doesn't know whether he'll be able to come.
+My mom and I are going to the store later.
+Who's bringing the snacks for the party on Friday?
+Its battery lasts all day, which is great for long trips.
+They're planning to visit their grandparents over the break.
+There's a meeting at 3:30 in Room 204.
+Whose jacket is this? It was left on the playground.
+I would have called, but my phone died.
+Let's meet at the library after school.
+We need to buy milk, eggs, bread, and butter.
+The committee has reached its decision.
+A number of parents have asked about the new schedule.
+The number of students has grown every year.
+None of the cookies were left by the end of the day.
+I'm not sure if that's the right answer, but it's worth a try.
+Lunch will be served at 11:45 sharp.
+You're welcome to stop by any time this week.
+The teacher gave Sam and me extra homework.
+Between you and me, I think the test was too hard.
+Our team won the game 3 to 1 on Saturday.
+Ms. Lopez will be out sick, so a substitute will cover her class.
+Please don't forget to sign and return the report card envelope.
+The new playground equipment arrives in April.
+Can you believe it's already November?
+I really appreciate all the help you gave us this year.
+Grades will be posted online by the end of the week.
+We should've left earlier to avoid the traffic.
+If I were you, I'd talk to the counselor about it.
+Go ahead and take a seat; the nurse will be right with you.
+The office closes at 4 p.m. on Fridays.
+Parent-teacher conferences are scheduled for October 12th and 13th.
+Thank you for your patience while we fix the heating system.
+My brother's friends are coming over for dinner.
+The students' artwork is on display in the hallway.
+I'll email you the link once the form is ready.
+Can't wait for the weekend!
+In 1865, the Civil War ended and the long work of rebuilding began.
+The author uses imagery to show how lonely the main character feels.
+Photosynthesis is the process plants use to turn sunlight into energy.
+In conclusion, both sides of the argument have strong points.
+However, not everyone agrees with this view.
+For example, many cities have banned plastic bags.
+The results suggest that more research is needed.
+Although it was raining, the game went on as planned.
+After the meeting, we went out for pizza.
+I was wondering if you had a chance to look at my essay.
+Let me know what you think when you get a chance.
+Sorry for the late reply, I've been swamped this week.
+Happy birthday! Hope you have an amazing day.
+The Johnsons are hosting Thanksgiving this year.
+We drove from Denver to Salt Lake City in one day.
+I read that book in two days because I couldn't put it down.
+Dr. Kim recommends getting at least eight hours of sleep.
+The meeting has been moved to Wednesday at 10 a.m.
+My favorite subjects are math and art.
+Do you want to grab coffee sometime next week?
+It's been a while since we last talked.
+I'm proud of how much you've grown this year.
+The weather was perfect for a hike, so we went to the mountains.
+Please RSVP by March 3rd so we can get a head count.
+World War I is a big topic in history class.
+You and I are on the same team this time.
 `.trim().split('\n').map((s) => s.trim()).filter(Boolean);
 
 // Real mistakes. Each should be caught, and the right fix offered.
@@ -124,6 +201,9 @@ const MISTAKES = [
   ['She dont know yet.', 'dont', "doesn't"],
   ['Me and him went together.', 'Me and him', 'He and I'],
   ['Their going to be late.', 'Their', "They're"],
+  ['My mom and I is going.', 'is', 'are'],
+  ['I is happy.', 'is', 'am'],
+  ['My dad and I has a plan.', 'has', 'have'],
 ];
 
 // ------------------------------------------------------------------- scoring

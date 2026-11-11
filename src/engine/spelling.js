@@ -211,6 +211,13 @@ export function checkToken(token, dict, options = {}, doc = null) {
   if (token.allCaps && token.text.length > 1 && !options.checkNames) return null;
 
   if (token.capitalized && !options.checkNames) {
+    // A family by name: "the Johnsons", "the Joneses", "the Garcias".
+    if (/s$/.test(lower)) {
+      const stem = lower.endsWith('es') && dict.properForm(lower.slice(0, -2))
+        ? lower.slice(0, -2)
+        : lower.slice(0, -1);
+      if (dict.properForm(stem)) return null;
+    }
     // Only flag a capitalized word when there is a common word right next to
     // it ("Teh" -> "The"). Otherwise it is a name or a piece of jargon.
     const best = replacements.find((r) => !r.includes(' '));

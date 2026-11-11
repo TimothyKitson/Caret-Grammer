@@ -410,6 +410,11 @@ test('"me and the principal" is only wrong when it is the subject', () => {
 // of them since 1.0.
 
 const RELEASE_CORRECT = [
+  // a plural subject that includes "I", Roman numerals, families by name
+  'My mom and I are going to the store later.', 'You and I are on the same team.',
+  'World War I is a big topic in history class.',
+  'The Johnsons are hosting Thanksgiving this year.', 'We saw the Joneses and the Garcias.',
+  'Sorry, idk yet. Ttyl!',
   // "i" that is not the pronoun
   'Bring snacks, i.e. fruit or nuts.', 'Set x = i + 1 in the loop.',
   'The variable i is unused.', 'Dot the i and cross the t.',

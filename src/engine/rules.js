@@ -36,6 +36,9 @@ const CLAUSE_OPENER = new RegExp(
   + '|realise|realised|bet|swear|heard|noticed'
   + ')\\s+)$', 'i',
 );
+// The word before a capital I that makes it a Roman numeral: "World War I",
+// "Part I", "Henry I".
+const ROMAN_I_BEFORE = /\b(?:War|Part|Chapter|Book|Volume|Act|Scene|Phase|Level|Type|Grade|Stage|Class|Title|Section|Unit|Article|Appendix|Figure|Table|Episode|Season|Round|Henry|Elizabeth|Charles|James|George|Edward|William|Mary|Louis|Peter|Catherine|Napoleon|Richard|John|Alexander|Frederick|Nicholas)\s+$/;
 const CLAUSE_OPENER_OR_COMMA = /(?:,\s+)$/;
 
 function atClauseStart(doc, index, { comma = true } = {}) {
@@ -850,8 +853,23 @@ const RULES = [
     short: 'Agreement',
     re: /\bI\s+(is|are|has|does)\b/g,
     group: 1,
-    message: '“I” takes “am”, “have”, or “do”.',
-    suggest: (m) => ({ is: 'am', are: 'am', has: 'have', does: 'do' }[m[1].toLowerCase()] ? [{ is: 'am', are: 'am', has: 'have', does: 'do' }[m[1].toLowerCase()]] : []),
+    message: (m, doc) => (/\b(?:and|nor)\s+$/i.test(doc.text.slice(Math.max(0, m.index - 30), m.index))
+      ? 'Two people together take the plural: “are”, “have”, or “do”.'
+      : '“I” takes “am”, “have”, or “do”.'),
+    exclude: (m, doc) => {
+      const before = doc.text.slice(Math.max(0, m.index - 30), m.index);
+      // "My mom and I are" - a plural subject, and "are" is right.
+      if (/\b(?:and|nor)\s+$/i.test(before) && m[1].toLowerCase() === 'are') return true;
+      // "World War I is", "Henry I has" - a numeral, not the pronoun.
+      return ROMAN_I_BEFORE.test(before);
+    },
+    suggest: (m, doc) => {
+      const verb = m[1].toLowerCase();
+      const before = doc.text.slice(Math.max(0, m.index - 30), m.index);
+      // "Mom and I is" wants the plural, not "am".
+      if (/\b(?:and|nor)\s+$/i.test(before)) return [{ is: 'are', has: 'have', does: 'do' }[verb]].filter(Boolean);
+      return [{ is: 'am', are: 'am', has: 'have', does: 'do' }[verb]];
+    },
   },
   {
     id: 'he-have',
@@ -1451,7 +1469,9 @@ export function runRules(doc, options = {}) {
       const replacements = (raw || [])
         .filter((r) => r !== undefined && r !== null && r !== text)
         .map((r) => (rule.rawCase ? r : matchCase(text, r)));
-      let message = fillTemplate(rule.message, m);
+      let message = typeof rule.message === 'function'
+        ? rule.message(m, doc)
+        : fillTemplate(rule.message, m);
       if (message.includes('$$FIX$$')) {
         message = replacements[0]
           ? message.replace('$$FIX$$', replacements[0])
