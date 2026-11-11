@@ -418,6 +418,7 @@ await step('the AI section asks for a key and offers the free provider', async (
     placeholder: document.getElementById('aiKey').placeholder,
     effort: document.getElementById('effort-row').hidden,
     budget: document.getElementById('ai-budget').textContent,
+    limit: document.getElementById('aiDailyLimit').value,
   }));
 
   await options.locator('label:has(#aiEnabled)').click();
@@ -437,6 +438,7 @@ await step('the AI section asks for a key and offers the free provider', async (
   assert.equal(paid.placeholder, 'sk-ant-…');
   assert.equal(paid.effort, false, 'effort is an Anthropic setting');
   assert.match(paid.budget, /does not limit it/);
+  assert.equal(paid.limit, '0', 'a paid key must not inherit the free cap of 50');
 });
 
 await step('a word added in options stops being flagged', async () => {

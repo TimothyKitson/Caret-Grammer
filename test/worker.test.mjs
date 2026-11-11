@@ -328,3 +328,36 @@ test('an explicit "daily" on a key still caps it', async () => {
   const res = await worker.fetch(post({ text: 'x y' }, KEY), env);
   assert.equal(res.status, 429);
 });
+
+// --------------------------------------------------------- KV having a bad day
+
+test('a counter KV cannot write (over the free quota) still answers the check', async () => {
+  const kv = fakeKv({ 'key:caret_abcdef123456': JSON.stringify({ name: 'Dad', daily: 3 }) });
+  kv.put = async () => { throw new Error('KV put() limit exceeded for the day.'); };
+  const env = fakeEnv({ kv });
+  const response = await worker.fetch(post({ text: 'I saw teh dog.' }, KEY), env);
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.equal(body.corrections.length, 1);
+});
+
+test('a counter KV cannot read still answers the check', async () => {
+  const kv = fakeKv({ 'key:caret_abcdef123456': JSON.stringify({ name: 'Dad', daily: 3 }) });
+  const get = kv.get.bind(kv);
+  kv.get = async (key, options) => {
+    if (key.startsWith('use:')) throw new Error('KV get() limit exceeded');
+    return get(key, options);
+  };
+  const response = await worker.fetch(post({ text: 'I saw teh dog.' }, KEY), fakeEnv({ kv }));
+  assert.equal(response.status, 200);
+});
+
+test('when the key itself cannot be looked up, it says so instead of "not recognised"', async () => {
+  const kv = fakeKv();
+  kv.get = async () => { throw new Error('KV unavailable'); };
+  const env = fakeEnv({ kv });
+  const response = await worker.fetch(post({ text: 'I saw teh dog.' }, KEY), env);
+  assert.equal(response.status, 503);
+  assert.match((await response.json()).error, /cannot check keys right now/);
+  assert.equal(env.calls.length, 0, 'no model call without a checked key');
+});

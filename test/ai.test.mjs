@@ -3,7 +3,7 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { checkWithAi, toIssues, AI_MODELS, DEFAULT_MODEL } from '../src/engine/ai.js';
+import { checkWithAi, toIssues, maskSecrets, AI_MODELS, DEFAULT_MODEL } from '../src/engine/ai.js';
 
 function stub(response, capture = {}) {
   return async (url, init) => {
@@ -459,4 +459,32 @@ test('taking a negative prefix off a word is refused', () => {
   assert.equal(survives('a nonprofit group', 'nonprofit', 'profit'), false);
   assert.equal(survives('that is incorrect', 'incorrect', 'correct'), false);
   assert.equal(survives('it was unnecesary', 'unnecesary', 'unnecessary'), true);
+});
+
+// ----------------------------------------------------- secrets stay at home
+
+test('card numbers, keys and passwords are blanked before anything is sent', async () => {
+  const capture = {};
+  const text = 'I has went home. Card 4111 1111 1111 1111, key sk-proj-abcdefghijklmnop1234, '
+    + 'ssn 123-45-6789, and my password is hunter2.';
+  await checkWithAi(text, {
+    provider: 'caret',
+    apiKey: 'caret_testtesttest',
+    leaveAlone: ['Caret', 'sk-proj-abcdefghijklmnop1234'],
+    fetchImpl: stub({ payload: { corrections: [] } }, capture),
+  });
+  const sent = JSON.stringify(capture.body);
+  for (const secret of ['4111', 'abcdefghijklmnop1234', '123-45-6789', 'hunter2']) {
+    assert.ok(!sent.includes(secret), `sent ${secret}`);
+  }
+  assert.ok(sent.includes('I has went home.'), 'the prose itself still goes');
+  assert.deepEqual(capture.body.leaveAlone, ['Caret']);
+});
+
+test('blanking keeps the length, and leaves ordinary numbers alone', () => {
+  const text = 'Call 555-123-4567 at 10am on 2026-11-11. Order #12345678. PIN: 4821.';
+  const masked = maskSecrets(text);
+  assert.equal(masked.length, text.length);
+  assert.ok(masked.startsWith('Call 555-123-4567 at 10am on 2026-11-11. Order #12345678. PIN: '));
+  assert.ok(masked.endsWith('••••.'));
 });

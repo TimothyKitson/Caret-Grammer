@@ -156,6 +156,36 @@ function isWordSwap(original, replacement) {
   return true;
 }
 
+// Things that must never leave the computer, AI pass or not. Each match is
+// blanked character for character (separators kept) so the text keeps its
+// shape and length; a correction that touches a blank cannot be found in the
+// real text and is dropped.
+const SECRETS = [
+  // card numbers: 13 to 19 digits, spaces or dashes allowed between
+  /\b(?:\d[ -]?){12,18}\d\b/g,
+  // US social security numbers
+  /\b\d{3}-\d{2}-\d{4}\b/g,
+  // API keys and tokens with a known shape
+  new RegExp('(?:\\bsk-(?:ant-|proj-)?[A-Za-z0-9_-]{16,}|\\bAIza[0-9A-Za-z_-]{30,}|\\bcaret_[A-Za-z0-9_-]{8,}'
+    + '|\\bgh[pousr]_[A-Za-z0-9]{20,}|\\bgithub_pat_[A-Za-z0-9_]{20,}|\\bxox[abprs]-[A-Za-z0-9-]{10,}'
+    + '|\\bAKIA[0-9A-Z]{16}\\b|\\beyJ[A-Za-z0-9_-]{8,}\\.[A-Za-z0-9_-]{8,}\\.[A-Za-z0-9_-]{8,})', 'g'),
+  // anything else long and random-looking: 32+ letters and digits, both kinds
+  /\b(?=[A-Za-z0-9_-]*\d)(?=[A-Za-z0-9_-]*[A-Za-z])[A-Za-z0-9_-]{32,}\b/g,
+];
+// "my password is hunter2", "PIN: 4821" - the value, not the label.
+const SECRET_AFTER_LABEL = /(\b(?:password|passwd|passcode|pwd|pin)\s*(?:is\s+|[:=]\s*))(\S+?)(?=[.,;!?]?(?:\s|$))/gi;
+
+const blank = (s) => s.replace(/[^\s-]/g, '•');
+
+/** The text with anything secret-looking blanked out. Same length as the input. */
+export function maskSecrets(text) {
+  let out = text;
+  for (const re of SECRETS) out = out.replace(re, blank);
+  return out.replace(SECRET_AFTER_LABEL, (_, label, value) => label + blank(value));
+}
+
+const isSecret = (s) => maskSecrets(s) !== s;
+
 export function toIssues(text, corrections) {
   const taken = [];
   const issues = [];
@@ -406,7 +436,9 @@ export async function checkWithAi(text, {
     );
   }
   const truncated = text.length > MAX_CHARS;
-  const body = truncated ? text.slice(0, MAX_CHARS) : text;
+  const body = maskSecrets(truncated ? text.slice(0, MAX_CHARS) : text);
+  // A word pressed Ignore on can itself be a key that got underlined.
+  leaveAlone = leaveAlone.filter((word) => !isSecret(String(word)));
   const call = {
     caret: callCaret, openai: callOpenAi, gemini: callGemini, anthropic: callAnthropic,
   }[provider];

@@ -3,6 +3,7 @@ import {
   DEFAULT_SETTINGS, MAX_FREE_DAILY, dailyCeiling,
 } from '../shared/defaults.js';
 import { AI_MODELS, DEFAULT_MODEL } from '../engine/ai.js';
+import { providerFor } from '../shared/apikey.js';
 
 const $ = (id) => document.getElementById(id);
 const ask = (message) => new Promise((resolve) => chrome.runtime.sendMessage(message, resolve));
@@ -154,7 +155,15 @@ function paintProviders() {
     input.value = option.value;
     input.checked = option.value === current;
     input.disabled = !settings.aiEnabled;
-    input.addEventListener('change', () => save({ aiProvider: option.value }));
+    input.addEventListener('change', () => {
+      const patch = { aiProvider: option.value };
+      // A limit that is only the free ceiling was never the person's choice;
+      // carried over to their own paid key it would cap them for no reason.
+      if (dailyCeiling(option.value) === 0 && Number(settings.aiDailyLimit) === MAX_FREE_DAILY) {
+        patch.aiDailyLimit = 0;
+      }
+      save(patch);
+    });
 
     const text = document.createElement('span');
     const strong = document.createElement('b');
@@ -344,7 +353,7 @@ function paint() {
     caret: 'Caret', gemini: 'Google', openai: 'OpenAI', anthropic: 'Anthropic',
   };
   $('ai-host').textContent = aiInfo.provider === 'caret'
-    ? 'the shared Caret server'
+    ? 'the Caret server, which runs on Cloudflare and uses Cloudflare’s AI'
     : aiInfo.provider ? `the ${PROVIDER_NAME[aiInfo.provider]} API` : 'an AI provider';
 
   $('ai-state').textContent = aiInfo.baked
@@ -407,7 +416,17 @@ $('showBadge').addEventListener('change', (e) => save({ showBadge: e.target.chec
 $('aiEnabled').addEventListener('change', (e) => save({ aiEnabled: e.target.checked }));
 $('aiModel').addEventListener('change', (e) => save({ aiModel: e.target.value }));
 $('aiEffort').addEventListener('change', (e) => save({ aiEffort: e.target.value }));
-$('aiKey').addEventListener('change', (e) => save({ aiKey: e.target.value.trim() }));
+$('aiKey').addEventListener('change', (e) => {
+  const aiKey = e.target.value.trim();
+  const patch = { aiKey };
+  // Same reasoning as switching provider: a free ceiling left over from
+  // before should not cap a paid key that was just pasted.
+  const provider = settings.aiProvider || providerFor(aiKey) || '';
+  if (dailyCeiling(provider) === 0 && Number(settings.aiDailyLimit) === MAX_FREE_DAILY) {
+    patch.aiDailyLimit = 0;
+  }
+  save(patch);
+});
 
 $('underlineStyle').addEventListener('click', (event) => {
   const button = event.target.closest('button[data-value]');

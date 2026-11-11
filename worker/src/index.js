@@ -75,7 +75,14 @@ async function spendKey(env, key) {
     return { ok: false, status: 401, error: 'That is not a Caret key.' };
   }
 
-  const record = await env.KEYS.get(`key:${key}`, { type: 'json' });
+  let record;
+  try {
+    record = await env.KEYS.get(`key:${key}`, { type: 'json' });
+  } catch (_) {
+    // KV itself is unreachable or over its daily quota. Nothing can be
+    // checked, so say that plainly instead of calling a good key unknown.
+    return { ok: false, status: 503, error: 'Caret cannot check keys right now. Try again in a minute.' };
+  }
   if (!record) return { ok: false, status: 401, error: 'This Caret key is not recognised.' };
   if (record.revoked) return { ok: false, status: 403, error: 'This Caret key has been turned off.' };
 
@@ -84,8 +91,14 @@ async function spendKey(env, key) {
     ? Number(record.daily)
     : Number(env.PER_KEY_DAILY) || DEFAULT_PER_KEY_DAILY;
 
+  // The count is a guard rail, not the gate: if KV cannot be read or written
+  // (the free plan allows 1,000 writes a day), the check goes ahead uncounted
+  // rather than failing. Each copy of Caret caps itself at 50 a day anyway.
   const counter = `use:${key}:${today()}`;
-  const used = Number(await env.KEYS.get(counter)) || 0;
+  let used = 0;
+  try {
+    used = Number(await env.KEYS.get(counter)) || 0;
+  } catch (_) { /* count unknown: carry on */ }
   if (limit > 0 && used >= limit) {
     return {
       ok: false,
@@ -98,7 +111,9 @@ async function spendKey(env, key) {
   // and given a "daily" of its own. Two checks landing together can both read
   // the same number; losing one off the count matters far less than making
   // every request wait on a lock.
-  await env.KEYS.put(counter, String(used + 1), { expirationTtl: 60 * 60 * 36 });
+  try {
+    await env.KEYS.put(counter, String(used + 1), { expirationTtl: 60 * 60 * 36 });
+  } catch (_) { /* over the write quota: carry on uncounted */ }
   return {
     ok: true,
     name: record.name || 'someone',

@@ -151,8 +151,9 @@
         it finds to the underlines. It never rewrites anything: it may swap a
         word or a short phrase, it is told to keep your vocabulary plain rather
         than make it sound fancier, and nothing changes until you click the
-        suggestion. Password fields, card numbers and anything that looks like a
-        key are never sent.
+        suggestion. Password fields are never read, and card numbers, passwords
+        and anything that looks like a key are blanked out before the text is
+        sent.
       </p>
       <p class="note">
         <b>It learns what to leave alone.</b> Every word you add to your
@@ -298,7 +299,7 @@
     </section>
 
     <footer>
-      <p><svg class="ico" aria-hidden="true"><use href="#i-lock"/></svg>Nothing you type leaves this computer unless you switch on AI proofreading.</p>
+      <p><svg class="ico" aria-hidden="true"><use href="#i-lock"/></svg>The built-in checks never send anything anywhere. Only AI proofreading does, and only when it is on.</p>
     </footer>
   </main>
 

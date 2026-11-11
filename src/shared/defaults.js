@@ -11,10 +11,15 @@ export const STORAGE_KEY = 'settings';
 // capped at all. 0 means no limit.
 export const MAX_FREE_DAILY = 50;
 export const FREE_PROVIDERS = new Set(['caret', 'gemini']);
+export const PAID_PROVIDERS = new Set(['openai', 'anthropic']);
 
-/** The most checks a day this provider may be set to. 0 means no limit. */
+/**
+ * The most checks a day this provider may be set to. 0 means no limit.
+ * Only a known paid provider is uncapped; anything else, including "not
+ * picked yet", is treated as free.
+ */
 export function dailyCeiling(provider) {
-  return FREE_PROVIDERS.has(provider) ? MAX_FREE_DAILY : 0;
+  return PAID_PROVIDERS.has(provider) ? 0 : MAX_FREE_DAILY;
 }
 
 export const DEFAULT_SETTINGS = {
@@ -57,9 +62,9 @@ export const DEFAULT_SETTINGS = {
   // Which service to use. Empty means "work it out from the key", which is how
   // it behaved before there was a chooser.
   aiProvider: '',
-  // Hard stop per day, whatever the trigger. The free options are shared or
-  // rate limited, so this is capped rather than open-ended.
-  aiDailyLimit: MAX_FREE_DAILY,
+  // Hard stop per day, whatever the trigger. 0 means "the default for this
+  // provider": the free ceiling on a free option, no limit on a paid key.
+  aiDailyLimit: 0,
   aiUsage: { day: '', count: 0 },
   disabledSites: [],
   customWords: [],

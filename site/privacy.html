@@ -36,7 +36,7 @@
   <div class="wrap">
     <p class="kicker arrive">Privacy</p>
     <h1 class="arrive d1">What Caret does with your writing</h1>
-    <p class="lede arrive d2">Short version: nothing leaves your computer unless you switch on the AI pass and press the button.</p>
+    <p class="lede arrive d2">Short version: the built-in checks never send anything anywhere. Only the optional AI pass does, and only once you switch it on.</p>
   </div>
 </section>
 
@@ -47,9 +47,9 @@
     <div>
       <p>
         The dictionary, the frequency list and every rule ship inside the
-        extension. Checking happens in your own browser. There is no Caret server,
-        no account, and no analytics — I do not know how many people use this or
-        what they type.
+        extension, and the checking happens in your own browser. No account, no
+        analytics, no tracking — I do not know how many people use this or what
+        they type.
       </p>
     </div>
   </section>
@@ -59,20 +59,22 @@
     <div>
       <p>
         Your settings, the words you add to your dictionary, the sites you turn it
-        off on, the suggestions you have ignored, and a few counters for the
-        Numbers section. All of it lives in your browser profile's extension
+        off on, the suggestions you have ignored, how many AI checks you have
+        used today, and a few counters for the Numbers section. All of it lives in your browser profile's extension
         storage. Removing the extension removes all of it.
       </p>
     </div>
   </section>
 
   <section data-reveal>
-    <h2>What is never looked at</h2>
+    <h2>What is never sent</h2>
     <div>
       <p>
         Password fields are skipped outright. So is any field a site marks as not
-        wanting a checker. Text that looks like a card number, an API key or
-        similar is left alone even when the AI pass is on.
+        wanting a checker. When the AI pass is on, card numbers, social security
+        numbers, passwords written out (“my password is …”) and anything that
+        looks like an API key or token are blanked out before the text leaves
+        your computer.
       </p>
     </div>
   </section>
@@ -81,10 +83,22 @@
     <h2>The optional AI pass</h2>
     <div>
       <p>
-        Off unless you turn it on and add your own API key. When you do, the
-        contents of the field you are typing in are sent to the service that key
-        belongs to — Google, OpenAI or Anthropic — and that service's own terms
-        apply to it. The key is kept in your browser profile and sent to nobody
+        Off until you switch it on. When it is on, the text of the field you are
+        working in is sent to the AI you picked in the settings — by default only
+        when you ask for it, or on the schedule you chose instead.
+      </p>
+      <p>
+        <b>Caret (the free, built-in option):</b> the text goes to a small server
+        I run on Cloudflare, which passes it to Cloudflare Workers AI and sends
+        the suggested corrections back. My server does not store or log your
+        text. The only thing it keeps is one number per day — how many checks the
+        shared key has made — with no record of who made them. Cloudflare handles
+        the request under its own terms.
+      </p>
+      <p>
+        <b>Google Gemini, OpenAI or Anthropic:</b> the text goes straight from
+        your browser to that company, using your own key, and that company's
+        terms apply. The key is kept in your browser profile and sent to nobody
         else.
       </p>
       <p>
@@ -94,7 +108,17 @@
         a list of your own choices, not anything inferred from your writing, and
         it goes to the same place the text does and nowhere else.
       </p>
-      <p>By default it only runs when you ask for it.</p>
+    </div>
+  </section>
+
+  <section data-reveal>
+    <h2>Removing Caret</h2>
+    <div>
+      <p>
+        When you remove the extension, Edge opens a page on this site asking
+        why. Answering is optional. The address of that page carries the version
+        of Caret you had, and nothing else.
+      </p>
     </div>
   </section>
 
