@@ -2,7 +2,7 @@ import {
   CATEGORY_INFO, AUTOCORRECT_INFO, AI_TRIGGER_INFO, AI_PROVIDER_INFO,
   DEFAULT_SETTINGS, MAX_FREE_DAILY, dailyCeiling,
 } from '../shared/defaults.js';
-import { AI_MODELS, DEFAULT_MODEL } from '../engine/ai.js';
+import { AI_MODELS, resolveModel } from '../engine/ai.js';
 import { providerFor } from '../shared/apikey.js';
 
 const $ = (id) => document.getElementById(id);
@@ -210,15 +210,15 @@ function paintTriggers() {
 
 function paintModels() {
   const select = $('aiModel');
-  const chosen = settings.aiModel
-    || (aiInfo.provider ? DEFAULT_MODEL[aiInfo.provider] : '');
+  // An id from an older version shows as the model that replaced it.
+  const chosen = aiInfo.provider ? resolveModel(aiInfo.provider, settings.aiModel) : settings.aiModel;
   select.textContent = '';
   // With no key yet there is no way to know which provider you will use, so
   // show both lists. Once a key is in, only its own models are offered.
   const providers = aiInfo.provider ? [aiInfo.provider] : Object.keys(AI_MODELS);
   for (const provider of providers) {
     const group = document.createElement('optgroup');
-    group.label = provider === 'openai' ? 'OpenAI' : 'Anthropic';
+    group.label = { caret: 'Caret', gemini: 'Google', openai: 'OpenAI', anthropic: 'Anthropic' }[provider] || provider;
     for (const model of AI_MODELS[provider]) {
       const option = document.createElement('option');
       option.value = model.id;

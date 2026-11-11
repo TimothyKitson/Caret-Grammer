@@ -26,28 +26,51 @@ export const AI_MODELS = {
   // The shared Worker picks its own model, so there is nothing to choose here.
   caret: [{ id: '', label: 'Chosen by the Caret server' }],
   // Google is first because its free tier is the only one that will proofread
-  // all day without a card on file.
+  // all day without a card on file. Both of these are on it.
   gemini: [
-    { id: 'gemini-2.5-flash', label: 'Gemini 2.5 Flash - free tier, plenty for this' },
-    { id: 'gemini-2.0-flash', label: 'Gemini 2.0 Flash - free tier, older and quicker' },
+    { id: 'gemini-3.5-flash-lite', label: 'Gemini 3.5 Flash-Lite - free tier, plenty for this' },
+    { id: 'gemini-3.6-flash', label: 'Gemini 3.6 Flash - free tier, more careful' },
   ],
   openai: [
-    { id: 'gpt-4o-mini', label: 'GPT-4o mini - cheapest, fine for proofreading' },
-    { id: 'gpt-4o', label: 'GPT-4o - more careful, several times the price' },
+    { id: 'gpt-6-luna', label: 'GPT-6 Luna - cheapest, fine for proofreading' },
+    { id: 'gpt-6.1-terra', label: 'GPT-6.1 Terra - more careful, about ten times the price' },
   ],
   anthropic: [
-    { id: 'claude-haiku-4-5', label: 'Haiku 4.5 - cheapest, about $1 per million words in' },
-    { id: 'claude-sonnet-5', label: 'Sonnet 5 - middle' },
-    { id: 'claude-opus-5', label: 'Opus 5 - most careful, most expensive' },
+    { id: 'claude-haiku-5-5', label: 'Haiku 5.5 - cheapest, fine for proofreading' },
+    { id: 'claude-sonnet-5-5', label: 'Sonnet 5.5 - middle' },
+    { id: 'claude-opus-5-5', label: 'Opus 5.5 - most careful, most expensive' },
   ],
 };
 
 export const DEFAULT_MODEL = {
   caret: '',
-  gemini: 'gemini-2.5-flash',
-  openai: 'gpt-4o-mini',
-  anthropic: 'claude-haiku-4-5',
+  gemini: 'gemini-3.5-flash-lite',
+  openai: 'gpt-6-luna',
+  anthropic: 'claude-haiku-5-5',
 };
+
+// Models an earlier version offered, mapped to the one that replaces them at
+// the same tier. Gemini 2.0 Flash is shut down, 2.5 Flash is closed to new
+// keys, and GPT-4o mini shuts down in January 2027; the older Claude models
+// still answer, but their replacements are cheaper and better.
+const MODEL_UPGRADES = {
+  'gemini-2.0-flash': 'gemini-3.5-flash-lite',
+  'gemini-2.5-flash': 'gemini-3.5-flash-lite',
+  'gpt-4o-mini': 'gpt-6-luna',
+  'gpt-4o': 'gpt-6.1-terra',
+  'claude-haiku-4-5': 'claude-haiku-5-5',
+  'claude-sonnet-5': 'claude-sonnet-5-5',
+  'claude-opus-5': 'claude-opus-5-5',
+};
+
+/** The model to actually call: a saved choice if it is still offered, else its replacement, else the default. */
+export function resolveModel(provider, model) {
+  const offered = (AI_MODELS[provider] || []).map((m) => m.id);
+  if (model && offered.includes(model)) return model;
+  const upgraded = MODEL_UPGRADES[model];
+  if (upgraded && offered.includes(upgraded)) return upgraded;
+  return DEFAULT_MODEL[provider] ?? '';
+}
 
 /** Gemini's responseSchema is an OpenAPI subset: no additionalProperties. */
 function geminiSchema(schema) {
@@ -61,8 +84,8 @@ function geminiSchema(schema) {
   return out;
 }
 
-// Effort is an Opus/Sonnet control. Haiku 4.5 rejects it with a 400, so the
-// parameter is left off for models that do not take it.
+// Haiku 4.5 rejects the effort parameter with a 400. Every model offered now
+// takes it; this stays for a request made with an old saved model id.
 const NO_EFFORT_MODELS = new Set(['claude-haiku-4-5']);
 
 // A correction may swap a word or two. Anything bigger is a rewrite, and this
@@ -220,6 +243,8 @@ export function toIssues(text, corrections) {
  * @returns {Promise<{issues: object[], truncated: boolean, usage: object}>}
  * @throws {Error} with .status set for HTTP failures
  */
+const REASONING_OPENAI = /^(?:gpt-(?:[5-9]|\d{2,})|o\d)/;
+
 /** Ask OpenAI. Returns the raw JSON string the model produced. */
 async function callOpenAi(text, { apiKey, model, system, fetchImpl, signal }) {
   const response = await fetchImpl(OPENAI_ENDPOINT, {
@@ -227,8 +252,10 @@ async function callOpenAi(text, { apiKey, model, system, fetchImpl, signal }) {
     headers: { 'content-type': 'application/json', authorization: `Bearer ${apiKey}` },
     body: JSON.stringify({
       model,
-      // Proofreading is not a reasoning task; keep it cheap and literal.
-      temperature: 0,
+      // Proofreading is not a reasoning task; keep it cheap and literal. The
+      // GPT-5 and later models are reasoning models: they reject a temperature
+      // other than the default, and take "none" to skip the thinking.
+      ...(REASONING_OPENAI.test(model) ? { reasoning_effort: 'none' } : { temperature: 0 }),
       messages: [
         { role: 'system', content: system },
         { role: 'user', content: userPrompt(text) },
@@ -444,7 +471,7 @@ export async function checkWithAi(text, {
   }[provider];
   const result = await call(body, {
     apiKey,
-    model: model || DEFAULT_MODEL[provider],
+    model: resolveModel(provider, model),
     effort,
     system: SYSTEM_PROMPT + leaveAloneNote(leaveAlone),
     leaveAlone,

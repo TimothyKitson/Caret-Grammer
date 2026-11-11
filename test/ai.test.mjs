@@ -3,7 +3,9 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { checkWithAi, toIssues, maskSecrets, AI_MODELS, DEFAULT_MODEL } from '../src/engine/ai.js';
+import {
+  checkWithAi, toIssues, maskSecrets, resolveModel, AI_MODELS, DEFAULT_MODEL,
+} from '../src/engine/ai.js';
 
 function stub(response, capture = {}) {
   return async (url, init) => {
@@ -55,11 +57,11 @@ test('the body asks for JSON in the shape the parser expects', async () => {
   const capture = {};
   await checkWithAi('I has went home.', {
     provider: 'anthropic',
-    apiKey: 'k', model: 'claude-sonnet-5', effort: 'medium',
+    apiKey: 'k', model: 'claude-sonnet-5-5', effort: 'medium',
     fetchImpl: stub({ payload: CORRECTIONS }, capture),
   });
   const body = capture.body;
-  assert.equal(body.model, 'claude-sonnet-5');
+  assert.equal(body.model, 'claude-sonnet-5-5');
   assert.equal(body.output_config.effort, 'medium');
   assert.equal(body.output_config.format.type, 'json_schema');
   const schema = body.output_config.format.schema;
@@ -154,7 +156,7 @@ test('long text is truncated rather than sent whole', async () => {
 
 test('every provider has models and a default that is one of them', () => {
   const shape = {
-    gemini: /^gemini-[0-9.]+-\w+$/,
+    gemini: /^gemini-[0-9.]+-[\w-]+$/,
     openai: /^gpt-[\w.-]+$/,
     anthropic: /^claude-(opus|sonnet|haiku)-[0-9-]+$/,
   };
@@ -190,10 +192,10 @@ test('a Gemini request carries the key in a header, not the URL', async () => {
   await checkWithAi('I has went home.', {
     provider: 'gemini',
     apiKey: 'AIzaSyTest',
-    model: 'gemini-2.5-flash',
+    model: 'gemini-3.5-flash-lite',
     fetchImpl: stub({ payload }, capture),
   });
-  assert.ok(capture.url.includes('gemini-2.5-flash:generateContent'), capture.url);
+  assert.ok(capture.url.includes('gemini-3.5-flash-lite:generateContent'), capture.url);
   assert.ok(!capture.url.includes('AIzaSyTest'), 'the key must not be in the URL');
   assert.equal(capture.init.headers['x-goog-api-key'], 'AIzaSyTest');
   assert.equal(capture.body.generationConfig.responseMimeType, 'application/json');
@@ -217,10 +219,10 @@ test('an OpenAI request uses a bearer token and a strict schema', async () => {
   const payload = {
     choices: [{ message: { content: JSON.stringify({ corrections: [] }) } }],
     usage: { prompt_tokens: 40 },
-    model: 'gpt-4o-mini',
+    model: 'gpt-6-luna',
   };
   await checkWithAi('I has went home.', {
-    provider: 'openai', apiKey: 'sk-test', model: 'gpt-4o-mini',
+    provider: 'openai', apiKey: 'sk-test', model: 'gpt-6-luna',
     fetchImpl: stub({ payload }, capture),
   });
   assert.equal(capture.url, 'https://api.openai.com/v1/chat/completions');
@@ -487,4 +489,39 @@ test('blanking keeps the length, and leaves ordinary numbers alone', () => {
   assert.equal(masked.length, text.length);
   assert.ok(masked.startsWith('Call 555-123-4567 at 10am on 2026-11-11. Order #12345678. PIN: '));
   assert.ok(masked.endsWith('••••.'));
+});
+
+// ------------------------------------------------------------------- models
+
+test('a model saved by an older version is swapped for its replacement', () => {
+  assert.equal(resolveModel('gemini', 'gemini-2.0-flash'), 'gemini-3.5-flash-lite');   // shut down
+  assert.equal(resolveModel('gemini', 'gemini-2.5-flash'), 'gemini-3.5-flash-lite');   // closed to new keys
+  assert.equal(resolveModel('openai', 'gpt-4o-mini'), 'gpt-6-luna');
+  assert.equal(resolveModel('openai', 'gpt-4o'), 'gpt-6.1-terra');
+  assert.equal(resolveModel('anthropic', 'claude-haiku-4-5'), 'claude-haiku-5-5');
+  assert.equal(resolveModel('anthropic', 'claude-opus-5'), 'claude-opus-5-5');
+  // A current choice is kept, and a model from another provider is not used.
+  assert.equal(resolveModel('openai', 'gpt-6.1-terra'), 'gpt-6.1-terra');
+  assert.equal(resolveModel('gemini', 'gpt-6-luna'), DEFAULT_MODEL.gemini);
+  assert.equal(resolveModel('anthropic', ''), DEFAULT_MODEL.anthropic);
+});
+
+test('the old id is what gets upgraded on the wire, too', async () => {
+  const capture = {};
+  await checkWithAi('I has went home.', {
+    provider: 'gemini', apiKey: 'AIzaSyTest', model: 'gemini-2.0-flash',
+    fetchImpl: stub({ payload: { candidates: [] } }, capture),
+  });
+  assert.ok(capture.url.includes('/gemini-3.5-flash-lite:generateContent'), capture.url);
+});
+
+test('GPT-6 is asked for no reasoning and sent no temperature', async () => {
+  const reply = { payload: { choices: [{ message: { content: '{"corrections":[]}' } }] } };
+  const modern = {};
+  await checkWithAi('I has went home.', {
+    provider: 'openai', apiKey: 'sk-test', model: 'gpt-6-luna', fetchImpl: stub(reply, modern),
+  });
+  assert.equal(modern.body.reasoning_effort, 'none');
+  assert.equal('temperature' in modern.body, false);
+  assert.equal('max_tokens' in modern.body, false);
 });
