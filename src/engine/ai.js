@@ -110,9 +110,25 @@ function locate(text, correction, taken) {
 
 // Words that carry the meaning of a sentence rather than decorate it. Losing
 // one of these does not correct a sentence, it contradicts it.
-const NEGATIONS = /\b(?:not|never|no|none|nothing|nobody|nowhere|neither|nor|cannot|can't|cant|won't|wont|don't|dont|doesn't|doesnt|didn't|didnt|isn't|isnt|aren't|arent|wasn't|wasnt|weren't|werent|haven't|havent|hasn't|hasnt|hadn't|hadnt|shouldn't|shouldnt|wouldn't|wouldnt|couldn't|couldnt|ain't|aint)\b|n['’]t\b/gi;
+const NEGATIONS = /\b(?:not|never|no|none|nothing|nobody|nowhere|neither|nor|cannot|hardly|barely|scarcely|rarely|seldom|without|can't|cant|won't|wont|don't|dont|doesn't|doesnt|didn't|didnt|isn't|isnt|aren't|arent|wasn't|wasnt|weren't|werent|haven't|havent|hasn't|hasnt|hadn't|hadnt|shouldn't|shouldnt|wouldn't|wouldnt|couldn't|couldnt|ain't|aint)\b|n['’]t\b/gi;
 
 const countNegations = (text) => (String(text).match(NEGATIONS) || []).length;
+
+// Every number, time, price and phone fragment, in order. A proofreader has no
+// business changing any of them: "15:30" -> "16:30" is a different meeting.
+const numbersIn = (text) => (String(text).match(/\d+/g) || []).join(' ');
+
+// "unclear" -> "clear", "nonprofit" -> "profit", "incorrect" -> "correct": a
+// negative prefix taken off a word turns it into its opposite.
+const NEG_PREFIX = /^(?:un|non-?|dis|in|im|il|ir)([a-z]{3,})$/i;
+function dropsANegativePrefix(original, replacement) {
+  const kept = new Set(String(replacement).toLowerCase().match(/[a-z]+(?:-[a-z]+)?/g) || []);
+  for (const word of String(original).toLowerCase().match(/[a-z]+(?:-[a-z]+)?/g) || []) {
+    const m = word.match(NEG_PREFIX);
+    if (m && !kept.has(word) && kept.has(m[1])) return true;
+  }
+  return false;
+}
 const wordCount = (text) => String(text).trim().split(/\s+/).filter(Boolean).length;
 
 /** Reject anything that is a rewrite rather than a word swap. */
@@ -130,6 +146,8 @@ function isWordSwap(original, replacement) {
   // the model's instructions. Gaining one can be right - "could care less"
   // really does want "couldn't" - so only losing is refused.
   if (countNegations(replacement) < countNegations(original)) return false;
+  if (numbersIn(replacement) !== numbersIn(original)) return false;
+  if (dropsANegativePrefix(original, replacement)) return false;
 
   // Dropping one word is a real fix: "the the" -> "the". Dropping two or more
   // is a sentence being rewritten, whatever it claims to be.

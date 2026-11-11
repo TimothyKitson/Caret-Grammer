@@ -438,3 +438,25 @@ test('the prompt says it too, not just the filter', async () => {
   assert.match(SYSTEM_PROMPT, /NEVER drop a negative/);
   assert.match(SYSTEM_PROMPT, /NEVER change what a sentence means/);
 });
+
+test('a correction may not change a number, a time, a price or a phone number', () => {
+  assert.equal(survives('we met at 15:30 on May 3', '15:30', '16:30'), false);
+  assert.equal(survives('it costs $40 a month', '$40', '$400'), false);
+  assert.equal(survives('call 555-0101 today', '555-0101', '555-0110'), false);
+  // Punctuation around a number is still fair game.
+  assert.equal(survives('in 2019 we moved', '2019', '2019,'), true);
+});
+
+test('hardly, barely, rarely and without count as negatives', () => {
+  assert.equal(survives('she hardly ever calls', 'hardly ever', 'ever'), false);
+  assert.equal(survives('he barely passed', 'barely passed', 'passed'), false);
+  assert.equal(survives('I rarely go there', 'rarely', 'often'), false);
+  assert.equal(survives('the room was without heat', 'without', 'with'), false);
+});
+
+test('taking a negative prefix off a word is refused', () => {
+  assert.equal(survives('it is unclear', 'unclear', 'clear'), false);
+  assert.equal(survives('a nonprofit group', 'nonprofit', 'profit'), false);
+  assert.equal(survives('that is incorrect', 'incorrect', 'correct'), false);
+  assert.equal(survives('it was unnecesary', 'unnecesary', 'unnecessary'), true);
+});
