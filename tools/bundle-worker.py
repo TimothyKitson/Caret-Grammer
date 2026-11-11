@@ -44,6 +44,7 @@ banner = """// Caret Worker - SINGLE FILE BUILD. Do not edit this one.
 //   QUICK_MODEL     force a model to the front of the quick-check list
 //   PER_KEY_DAILY   full checks a day per key when a key has no "daily"
 //   QUICK_DAILY     quick checks a day per key when a key has no "quickDaily"
+//   FULL_NEURONS_DAILY  the full checks' share of the free 10,000 a day (6000)
 
 """
 

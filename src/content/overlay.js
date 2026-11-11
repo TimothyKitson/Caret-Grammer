@@ -193,8 +193,22 @@
     let badge = null;
     let panel = null;
 
+    let attachedOnce = false;
     function attach() {
       if (host.isConnected) return;
+      if (attachedOnce) {
+        // The page rewrote its document (document.open), which also stripped
+        // the listeners off the badge, card and panel. Throw them away so the
+        // next draw builds fresh ones that work.
+        for (const el of [card, badge, panel]) if (el) el.remove();
+        card = null;
+        badge = null;
+        panel = null;
+        cardIssue = null;
+        cardSticky = false;
+        cardHovered = false;
+      }
+      attachedOnce = true;
       // <html>, not <body>: a transform or filter on an ancestor makes
       // position: fixed relative to that ancestor instead of the viewport,
       // and some sites do that to <body> for page transitions.
@@ -464,7 +478,7 @@
           wrap.className = 'panel-ai';
           const go = document.createElement('button');
           go.className = 'ai-check';
-          go.disabled = !!aiCheck.busy;
+          go.disabled = !!(aiCheck.busy || aiCheck.spent);
           const svgNS = 'http://www.w3.org/2000/svg';
           const icon = document.createElementNS(svgNS, 'svg');
           icon.setAttribute('viewBox', '0 0 16 16');
@@ -473,9 +487,11 @@
           star.setAttribute('d', 'M8 0l1.8 5.2L15 7l-5.2 1.8L8 14l-1.8-5.2L1 7l5.2-1.8z');
           icon.appendChild(star);
           const label = document.createElement('span');
-          label.textContent = aiCheck.busy ? 'Checking…' : 'Check with AI';
+          label.textContent = aiCheck.spent
+            ? 'No full AI checks left today'
+            : aiCheck.busy ? 'Checking…' : 'Check with AI';
           go.append(icon, label);
-          if (aiCheck.keys) {
+          if (aiCheck.keys && !aiCheck.spent) {
             const keys = document.createElement('span');
             keys.className = 'keys';
             keys.textContent = aiCheck.keys;

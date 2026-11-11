@@ -191,7 +191,12 @@ async function load() {
     text = 'Browser pages cannot be checked — that is an Edge restriction, not a setting.';
     look = 'blocked';
   } else if (!state.siteEnabled) {
-    text = `Turned off on ${host}.`;
+    // Say which entry is doing it when it is a parent domain, because turning
+    // the switch back on lifts that entry, and with it the whole site.
+    const by = (state.blockedBy || []).find((entry) => entry !== host);
+    text = by
+      ? `Turned off on ${by}, which covers this site. Switching it back on here turns it back on for all of ${by}.`
+      : `Turned off on ${host}.`;
     look = 'site-off';
   } else {
     let badge = '';

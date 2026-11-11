@@ -189,6 +189,28 @@ async function spendBudget(settings) {
   await patchSettings({ aiUsage: { day: today(), count: used + 1 } });
 }
 
+async function refundBudget() {
+  const usage = (await getSettings()).aiUsage || {};
+  if (usage.day !== today() || !usage.count) return;
+  await patchSettings({ aiUsage: { day: today(), count: usage.count - 1 } });
+}
+
+/** Full checks left today for the page to show: a number, or null for no limit. */
+function aiLeftFor(settings) {
+  const left = budgetLeft(settings);
+  return Number.isFinite(left) ? left : null;
+}
+
+/** The shortcut for "Proofread with AI", as the browser has it right now. */
+async function checkShortcut() {
+  try {
+    const command = (await chrome.commands.getAll()).find((c) => c.name === 'check-now');
+    return (command && command.shortcut) || '';
+  } catch (_) {
+    return '';
+  }
+}
+
 // ------------------------------------------------------------- quick check
 
 // The quick check runs on Caret's own server whatever AI is picked for the
@@ -196,6 +218,10 @@ async function spendBudget(settings) {
 // or a caret_ key pasted into the settings.
 function caretKey(settings) {
   if (providerFor(BUILT_IN_KEY) === 'caret') return BUILT_IN_KEY;
+  // Kept on its own when pasted, so picking another AI for the full check
+  // (and pasting that AI's key) does not take the quick check's key away.
+  const saved = (settings.caretKey || '').trim();
+  if (providerFor(saved) === 'caret') return saved;
   const typed = (settings.aiKey || '').trim();
   return providerFor(typed) === 'caret' ? typed : '';
 }
@@ -357,6 +383,10 @@ async function aiIssuesFor(text, settings) {
   }
   aiLastCall = now;
   aiRecent.push(now);
+  // Count the check before it goes out, from the stored count rather than the
+  // copy this request started with: two checks in flight at once must not
+  // both write "one more than before" and so count as one.
+  await spendBudget(await getSettings());
   try {
     const { key, provider, model } = aiCredentials(settings);
     const result = await checkWithAi(text, {
@@ -369,7 +399,6 @@ async function aiIssuesFor(text, settings) {
     if (aiCache.size >= AI_CACHE_MAX) aiCache.clear();
     aiCache.set(text, result.issues);
     bumpStats({ aiCalls: 1 });
-    await spendBudget(settings);
     if (settingsCache && settingsCache.lastAiError) {
       await patchSettings({ lastAiError: '' });
     }
@@ -379,11 +408,12 @@ async function aiIssuesFor(text, settings) {
     // fault: the local checks carry on and it works again tomorrow. Showing it
     // as an error every time would train people to ignore the error line.
     if (error.code === 'quiet') {
+      // Nothing ran, so it does not count against the person.
+      await refundBudget();
       await patchSettings({ lastAiError: '' });
       return { issues: [], ran: false };
     }
-    bumpStats({ aiErrors: 1 });
-    await spendBudget(settings);      // a failed call still costs a request
+    bumpStats({ aiErrors: 1 });       // a failed call still counted: it was a request
     await patchSettings({ lastAiError: `${new Date().toISOString().slice(0, 16).replace('T', ' ')} — ${error.message}` });
     return { issues: [], ran: false };
   }
@@ -441,7 +471,7 @@ async function handleCheck(message, sender) {
 
   bumpStats({ checks: 1, issues: result.issues.length });
   await setTabBadge(sender, result.issues.length);
-  return { issues: result.issues, stats: result.stats, aiRan };
+  return { issues: result.issues, stats: result.stats, aiRan, aiLeft: aiLeftFor(await getSettings()) };
 }
 
 // ------------------------------------------------------------------ messages
@@ -470,6 +500,12 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
           },
           siteEnabled: siteEnabled(settings, message.hrefs || message.href || ''),
           site: siteKey((message.hrefs && message.hrefs[0]) || message.href || ''),
+          // The entries on the list that turn this page off, for the popup to
+          // name when it is a parent domain rather than this exact site.
+          blockedBy: (message.hrefs || [message.href || ''])
+            .flatMap((href) => (href ? blockingEntries(settings.disabledSites, href) : [])),
+          checkKeys: await checkShortcut(),
+          aiLeftToday: aiLeftFor(settings),
         });
         return;
       }
@@ -550,7 +586,15 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
         return;
       }
       case 'reset-settings': {
-        const saved = await saveSettings({ ...DEFAULT_SETTINGS });
+        // A reset puts the settings back, not the day's allowance: the checks
+        // already used today stay used, and so does a pause for an old server.
+        const current = await getSettings();
+        const saved = await saveSettings({
+          ...DEFAULT_SETTINGS,
+          aiUsage: current.aiUsage,
+          quickAiUsage: current.quickAiUsage,
+          quickServerOldAt: current.quickServerOldAt,
+        });
         aiCache.clear();
         await broadcast({ type: 'settings-changed' });
         respond({ settings: saved });

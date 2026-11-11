@@ -24,3 +24,6 @@ id = "REPLACE_WITH_YOUR_KV_NAMESPACE_ID"
 #   QUICK_MODEL = "@cf/google/gemma-4-26b-a4b-it"   better, ~3x the neurons
 # 0 = no per-key cap on full checks. The extension limits each person instead.
 PER_KEY_DAILY = "0"
+# The full checks' share of the free plan's 10,000 neurons a day; the rest is
+# kept for the quick check. Leave unset for the default of 6000.
+# FULL_NEURONS_DAILY = "6000"

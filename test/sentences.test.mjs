@@ -57,10 +57,26 @@ function field(initial = '') {
       }
       return state;
     },
+    /** Deletes `count` characters before the caret in one go: Ctrl+Backspace, a cut. */
+    deleteBefore(count, kind = 'deleteWordBackward') {
+      state.text = state.text.slice(0, state.caret - count) + state.text.slice(state.caret);
+      state.caret -= count;
+      return collect(tracker.input(state.text, state.caret, kind));
+    },
     paste(input, kind = 'insertFromPaste') {
       state.text = state.text.slice(0, state.caret) + input + state.text.slice(state.caret);
       state.caret += input.length;
       return collect(tracker.input(state.text, state.caret, kind));
+    },
+    /**
+     * A paste the editor handles itself (ProseMirror, Quill, CKEditor, Lexical,
+     * TinyMCE): no input event, so the content script reports it a moment
+     * later from its paste listener, when the caret can still be unknown.
+     */
+    editorPaste(input, caretKnown = false) {
+      state.text = state.text.slice(0, state.caret) + input + state.text.slice(state.caret);
+      state.caret += input.length;
+      return collect(tracker.input(state.text, caretKnown ? state.caret : null, 'insertFromPaste'));
     },
     /** A click or an arrow key: the caret moves, the text does not. */
     moveTo(caret) {
@@ -347,6 +363,24 @@ test('list markers only count at the start of a line', () => {
   assert.deepEqual(texts('One here.\n2. Two here.\n- Three here.'), ['One here.', 'Two here.', 'Three here.']);
 });
 
+test('a question or exclamation mark inside quotes: the next word decides', () => {
+  assert.deepEqual(shape('"Are you coming with us today?" she asked.'),
+    [['"Are you coming with us today?" she asked.', true]]);
+  assert.deepEqual(shape('Did you hear him yell "Watch out!" at me?'),
+    [['Did you hear him yell "Watch out!" at me?', true]]);
+  assert.deepEqual(texts('The question "What is love?" is hard to answer.'),
+    ['The question "What is love?" is hard to answer.']);
+  assert.deepEqual(texts('He was (really!) tired that day.'), ['He was (really!) tired that day.']);
+  assert.deepEqual(texts('"Are you coming?" She asked me twice.'), ['"Are you coming?"', 'She asked me twice.']);
+  assert.deepEqual(texts('He shouted "Stop!"\nThen we ran.'), ['He shouted "Stop!"', 'Then we ran.']);
+  // At the very end of the text they may still be typing "...he said."
+  assert.deepEqual(shape('He shouted "Stop!"'), [['He shouted "Stop!"', false]]);
+  assert.deepEqual(shape('He shouted "Stop!" '), [['He shouted "Stop!"', false]]);
+  // Without a quote or bracket after it, a question mark still ends one at once.
+  assert.deepEqual(shape('Did you go? yes I did.'), [['Did you go?', true], ['yes I did.', true]]);
+  assert.deepEqual(shape('Did you go?'), [['Did you go?', true]]);
+});
+
 test('things that look like list markers but are not', () => {
   assert.deepEqual(texts('3.5 kg of flour is enough.'), ['3.5 kg of flour is enough.']);
   assert.deepEqual(texts('-5 degrees is cold.'), ['-5 degrees is cold.']);
@@ -485,6 +519,27 @@ test('?! and closing quotes are waited for before the sentence goes', () => {
   assert.deepEqual(f.due, ['Did you really say that?!']);
   const g = field().type('He said "stop it now." ');
   assert.deepEqual(g.due, ['He said "stop it now."']);
+});
+
+test('a quoted "!" or "?" in the middle of a sentence does not send half of it', () => {
+  const f = field().type('Did you hear him yell "Watch out!" at me? ');
+  assert.deepEqual(f.due, ['Did you hear him yell "Watch out!" at me?']);
+  const g = field().type('"Are you coming with us today?" she asked. ');
+  assert.deepEqual(g.due, ['"Are you coming with us today?" she asked.']);
+});
+
+test('a quoted "!" or "?" before a capital ends the sentence as you type', () => {
+  const f = field().type('He shouted "Stop the bus now!" ');
+  assert.deepEqual(f.due, [], 'not yet: "he said" may follow');
+  f.type('Then we ran.').idle();
+  assert.deepEqual(f.due, ['He shouted "Stop the bus now!"', 'Then we ran.']);
+});
+
+test('a quoted "!" at the end of the field goes when they leave, not when they pause', () => {
+  const f = field().type('He shouted "Stop the bus now!"').idle();
+  assert.deepEqual(f.due, []);
+  f.leave();
+  assert.deepEqual(f.due, ['He shouted "Stop the bus now!"']);
 });
 
 test('a paragraph, then a new indented paragraph', () => {
@@ -645,6 +700,42 @@ test('idle after "etc." or an initial at the end waits for the next word', () =>
   assert.deepEqual(g.due, []);
 });
 
+test('idle in the middle of a line, after a sentence being revised, sends nothing yet', () => {
+  const start = 'The quick brown fox jumps. It was a sunny day. We went to the park. Everyone had fun there.';
+  const f = field(start);
+  f.moveAfter('a sunny day.').backspace(4).type('morning.');
+  f.idle();
+  assert.deepEqual(f.due, [], 'the caret is after its full stop, but more of the line follows');
+  f.backspace(1).type(' in May.').idle();
+  assert.deepEqual(f.due, []);
+  f.moveAfter('Everyone');
+  assert.deepEqual(f.due, ['It was a sunny morning in May.'], 'once, when they move on');
+});
+
+test('a new sentence typed in the middle of a paragraph goes when they move on', () => {
+  const f = field('We went out. We came back.');
+  f.moveAfter('We went out.').type(' It was cold outside.').idle();
+  assert.deepEqual(f.due, []);
+  f.leave();
+  assert.deepEqual(f.due, ['It was cold outside.']);
+});
+
+test('idle at the end of a line still sends, with or without lines after it', () => {
+  const f = field('\n\nThe next paragraph is here.');
+  f.caret = 0;
+  f.type('We went to the park.').idle();
+  assert.deepEqual(f.due, ['We went to the park.']);
+  const g = field('\n');                  // a rich editor's trailing line break
+  g.caret = 0;
+  g.type('We went to the park.');
+  assert.deepEqual(g.due, []);
+  g.idle();
+  assert.deepEqual(g.due, ['We went to the park.']);
+  const h = field('We went out.  \nWe came back.');   // spaces left at the end of the line
+  h.moveAfter('We went out.').backspace(1).type('!').idle();
+  assert.deepEqual(h.due, ['We went out!']);
+});
+
 test('an edited sentence they paused in, then carried on with, is sent once it is finished', () => {
   const f = field().type('We went to the park.').idle();
   assert.deepEqual(f.due, ['We went to the park.']);
@@ -670,6 +761,62 @@ test('leave: "..." or "Inc." at the very end counts as finished', () => {
   assert.deepEqual(f.due, ['I am not really sure...']);
   const g = field().type('I work at Acme Inc. ').leave();
   assert.deepEqual(g.due, ['I work at Acme Inc.']);
+});
+
+test('a sentence only the end of its line can finish, left for elsewhere on that line, goes on leave', () => {
+  const endings = [
+    'I now work at Acme Inc.',
+    'I was not sure what to say...',
+    'In the end the answer was no.',
+    'My family moved to the U.S.',
+    'We met them at 9 am.',
+    'We bought apples, pears, etc.',
+    'He shouted "Stop the bus now!"',
+  ];
+  for (const last of endings) {
+    const f = field().type(`We went home after school. ${last}`);
+    f.moveTo(5).idle();
+    assert.deepEqual(f.due, ['We went home after school.'], `${last}: not while the line is open`);
+    f.moveTo(f.text.length).idle().moveTo(8);
+    f.leave();
+    assert.deepEqual(f.due, ['We went home after school.', last], last);
+    f.moveTo(3).leave();
+    assert.deepEqual(f.due, ['We went home after school.', last], `${last}: and only once`);
+  }
+});
+
+test('a pending sentence finished by a capital is sent on leave, once', () => {
+  const f = field().type('We went home after school. We bought apples, pears, etc.');
+  f.moveTo(5);
+  f.moveTo(f.text.length).type(' Then we left the shop.');
+  assert.deepEqual(f.due, ['We went home after school.']);
+  f.leave();
+  assert.deepEqual(f.due,
+    ['We went home after school.', 'Then we left the shop.', 'We bought apples, pears, etc.']);
+});
+
+test('a pending sentence that is changed is sent as it now reads, not as it was', () => {
+  const f = field().type('We went home after school. I now work at Acme Inc.');
+  f.moveTo(5);
+  f.moveAfter('Acme Inc.').type(' in town.');
+  f.leave();
+  assert.deepEqual(f.due, ['We went home after school.', 'I now work at Acme Inc. in town.']);
+  const g = field().type('We went home after school. I now work at Acme Inc.');
+  g.moveTo(5);
+  g.moveAfter('Acme').backspace(4).type('Initech');
+  g.moveTo(0).leave();
+  assert.deepEqual(g.due, ['We went home after school.', 'I now work at Initech Inc.']);
+});
+
+test('a pending sentence that is deleted, or was pasted, is not sent', () => {
+  const f = field().type('We went home after school. I now work at Acme Inc.');
+  f.moveTo(5);
+  f.moveTo(f.text.length).backspace('I now work at Acme Inc.'.length);
+  f.leave();
+  assert.deepEqual(f.due, ['We went home after school.']);
+  const g = field().paste('We went home after school. I now work at Acme Inc.');
+  g.moveTo(5).leave();
+  assert.deepEqual(g.due, []);
 });
 
 test('leave forgets the sentence: coming back and leaving again sends nothing', () => {
@@ -768,6 +915,52 @@ test('deleting a full stop merges two sentences; the merged one is checked when 
   assert.deepEqual(f.due, ['It was a sunny day and We went to the park.']);
 });
 
+test('deleting the opening word of a sentence, then moving on, sends what is left of it', () => {
+  const start = 'We had a long day. So I went home early. It was late.';
+  const f = field(start);
+  f.moveAfter('So').backspace(2);
+  assert.equal(f.text, 'We had a long day.  I went home early. It was late.');
+  f.idle();
+  assert.deepEqual(f.due, [], 'still there: they may type a new opening word');
+  f.moveTo(0);
+  assert.deepEqual(f.due, ['I went home early.']);
+  f.leave();
+  assert.deepEqual(f.due, ['I went home early.'], 'and only once');
+});
+
+test('deleting the opening word in one go, then leaving the field', () => {
+  const f = field('We had a long day. So I went home early. It was late.');
+  f.moveAfter('So').deleteBefore(2).leave();
+  assert.deepEqual(f.due, ['I went home early.']);
+  const g = field('We had a long day. So I went home early. It was late.');
+  g.moveAfter('So').deleteBefore(2, 'deleteByCut').moveTo(0);
+  assert.deepEqual(g.due, ['I went home early.']);
+});
+
+test('replacing the opening word sends only the new sentence', () => {
+  const f = field('We had a long day. So I went home early. It was late.');
+  f.moveAfter('So').backspace(2).type('Then');
+  f.moveTo(0).leave();
+  assert.deepEqual(f.due, ['Then I went home early.']);
+});
+
+test('after deleting the opening word, moving into the rest of the sentence is still being there', () => {
+  const f = field('We had a long day. So I went home early. It was late.');
+  f.moveAfter('So').backspace(2);
+  f.moveAfter(' I went');
+  assert.deepEqual(f.due, []);
+  f.type(' straight');
+  f.moveAfter('It was');
+  assert.deepEqual(f.due, ['I went straight home early.']);
+});
+
+test('deleting a whole sentence sends nothing', () => {
+  const f = field('We had a long day. So I went home early. It was late.');
+  f.moveAfter('So I went home early.').backspace('So I went home early.'.length);
+  f.moveTo(0).leave();
+  assert.deepEqual(f.due, []);
+});
+
 test('splitting a sentence in two sends both halves, each once', () => {
   const f = field('We went to the park and then we all went home together.');
   f.moveAfter('the park').type('. Then');
@@ -822,6 +1015,49 @@ test('pasting after the sentence being typed moves on from it', () => {
   assert.deepEqual(f.due, ['We went to the park.']);
   f.leave();
   assert.deepEqual(f.due, ['We went to the park.'], 'the pasted one is not checked');
+});
+
+test('an editor that pastes for itself, with the caret unknown after: not checked', () => {
+  // The paste lands on a new line; Backspace then joins the caret to the end
+  // of the pasted paragraph, which must not make it the person's sentence.
+  const f = field('My essay starts here today.').type(' I quote a book below.').type('\n');
+  assert.deepEqual(f.due, ['I quote a book below.']);
+  f.editorPaste('The dog barked at the cat all night long. It was very loud for all of us.\n');
+  f.backspace(1).idle().moveTo(3).leave();
+  assert.deepEqual(f.due, ['I quote a book below.']);
+});
+
+test('an editor that pastes for itself, with the caret known: the same as a paste', () => {
+  const f = field().editorPaste(PARAGRAPH, true).idle().leave();
+  assert.deepEqual(f.due, []);
+  const g = field().type('We went to the park.').editorPaste(' The dog barked at the cat.', true);
+  assert.deepEqual(g.due, ['We went to the park.']);
+  g.leave();
+  assert.deepEqual(g.due, ['We went to the park.']);
+});
+
+test('a paste reported twice - by its input event, then by the paste listener - is still a paste', () => {
+  const f = field().type('We went to the park. ').paste('The dog barked at the cat.');
+  f.tracker.input(f.text, f.caret, 'insertFromPaste');
+  f.tracker.input(f.text, null, 'insertFromPaste');
+  f.idle().leave();
+  assert.deepEqual(f.due, ['We went to the park.']);
+});
+
+test('an editor paste with the caret unknown that finishes what they were typing leaves it open', () => {
+  const f = field().type('I went to the ').editorPaste('shop with my friend.');
+  assert.deepEqual(f.due, []);
+  f.type(' ');
+  assert.deepEqual(f.due, ['I went to the shop with my friend.']);
+});
+
+test('an editor paste with the caret unknown into the middle of a sentence counts as changing it', () => {
+  const f = field(PARAGRAPH);
+  f.moveAfter('We went to the ').editorPaste('big ');
+  f.moveTo(0);
+  assert.deepEqual(f.due, ['We went to the big park.']);
+  const g = field().editorPaste(PARAGRAPH).type(' Then it rained on us.').idle();
+  assert.deepEqual(g.due, ['Then it rained on us.']);
 });
 
 test('a pasted unfinished sentence finished by typing is checked', () => {
@@ -893,6 +1129,46 @@ test('shift: a shorter fix before the sentence being edited', () => {
   f.tracker.shift(at, -' over the lazy sleeping dog'.length);
   f.moveTo(0);
   assert.deepEqual(f.due, ['It was a rainy day.']);
+});
+
+test('shift with the text after it: the next keystroke is followed too', () => {
+  const f = field(PARAGRAPH);
+  f.moveAfter('Everyone').type(' else');
+  // Caret applies a fix in sentence 1 and reports it with the text after.
+  const at = f.text.indexOf('quick');
+  const fix = 'very, very, very, very, very, very quick';
+  f.replaceText(f.text.slice(0, at) + fix + f.text.slice(at + 'quick'.length));
+  f.tracker.shift(at, fix.length - 'quick'.length, f.text);
+  // Without a click being reported, their very next keystroke is in sentence 1.
+  f.caret = f.text.indexOf('fox');
+  f.type('r');
+  assert.deepEqual(f.due, ['Everyone else had fun there.']);
+  f.type('ed ').leave();
+  assert.deepEqual(f.due,
+    ['Everyone else had fun there.', 'The very, very, very, very, very, very quick brown red fox jumps.']);
+});
+
+test('shift with the text after it: a fix inside the sentence being typed, then typing on', () => {
+  const f = field().type('We has gone to the park');
+  const at = f.text.indexOf('has');
+  f.replaceText(f.text.replace('has', 'have'));
+  f.tracker.shift(at, 1, f.text);
+  f.caret += 1;
+  f.type('. ');
+  assert.deepEqual(f.due, ['We have gone to the park.']);
+});
+
+test('shift with the text after it, when that text was already seen, does not move twice', () => {
+  const f = field(PARAGRAPH);
+  f.moveAfter('Everyone').type(' else');
+  const at = f.text.indexOf('quick');
+  const fix = 'very, very, very, very, very, very quick';
+  f.replaceText(f.text.slice(0, at) + fix + f.text.slice(at + 'quick'.length));
+  f.caret += fix.length - 'quick'.length;
+  f.tracker.caret(f.text, f.caret);                 // the change was followed here
+  f.tracker.shift(at, fix.length - 'quick'.length, f.text);
+  f.moveAfter('went home');
+  assert.deepEqual(f.due, ['Everyone else had fun there.']);
 });
 
 test('an edit before the sentence being edited is followed even without shift', () => {

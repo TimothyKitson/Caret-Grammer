@@ -513,8 +513,10 @@ export const QUICK_MAX_SENTENCE = 600;
 export function leaveAloneFor(sentence, leaveAlone = []) {
   const lower = sentence.toLowerCase();
   return leaveAlone.filter((word) => {
-    const w = String(word || '').trim().toLowerCase();
-    return w && lower.includes(w) && !isSecret(w);
+    const raw = String(word || '').trim();
+    const w = raw.toLowerCase();
+    // Judged as written: some key shapes (AKIA...) are capital letters only.
+    return w && lower.includes(w) && !isSecret(raw);
   });
 }
 

@@ -1,7 +1,7 @@
 import {
   CATEGORY_INFO, AUTOCORRECT_INFO, AI_TRIGGER_INFO, AI_PROVIDER_INFO,
   DEFAULT_SETTINGS, MAX_FREE_DAILY, dailyCeiling,
-  QUICK_DEFAULT_DAILY, QUICK_MAX_DAILY, clampQuickLimit, normalizeSite, addCustomWord,
+  QUICK_DEFAULT_DAILY, QUICK_MAX_DAILY, clampQuickLimit, normalizeSite, addCustomWord, entryCovers,
 } from '../shared/defaults.js';
 import { AI_MODELS, resolveModel } from '../engine/ai.js';
 import { providerFor } from '../shared/apikey.js';
@@ -487,6 +487,9 @@ $('aiEffort').addEventListener('change', (e) => save({ aiEffort: e.target.value 
 $('aiKey').addEventListener('change', (e) => {
   const aiKey = e.target.value.trim();
   const patch = { aiKey };
+  // A Caret key is also kept on its own, for the quick check, so it survives
+  // picking another AI for the full check later.
+  if (providerFor(aiKey) === 'caret') patch.caretKey = aiKey;
   // Same reasoning as switching provider: a free ceiling left over from
   // before should not cap a paid key that was just pasted.
   const provider = settings.aiProvider || providerFor(aiKey) || '';
@@ -556,7 +559,7 @@ async function addSite() {
     siteMessage('That does not look like a web address. Try something like example.com.', 'bad');
     return;
   }
-  const covering = settings.disabledSites.find((s) => site === s || site.endsWith(`.${s}`));
+  const covering = settings.disabledSites.find((s) => entryCovers(s, site));
   input.value = '';
   if (covering) {
     siteMessage(covering === site
@@ -565,7 +568,7 @@ async function addSite() {
     return;
   }
   // A broader entry makes narrower ones underneath it redundant.
-  const kept = settings.disabledSites.filter((s) => !s.endsWith(`.${site}`));
+  const kept = settings.disabledSites.filter((s) => !(s !== site && entryCovers(site, s)));
   await save({ disabledSites: [...kept, site].sort() });
   siteMessage(`Caret is now off on ${site}.`, 'good');
 }

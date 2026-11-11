@@ -52,7 +52,9 @@ const FIXTURE = `<!doctype html><meta charset="utf-8"><title>quick</title>
 <textarea id="ta"></textarea>
 <textarea id="pre">This was here before. Nobody typed it just now. It stays unchecked.</textarea>
 <textarea id="code" style="font-family:Menlo, Consolas, monospace"></textarea>
-<input id="other" placeholder="somewhere else">`;
+<input id="other" placeholder="somewhere else">
+<div id="wrap2"><div id="ce2" contenteditable="true" style="width:640px;height:80px;border:1px solid #888;padding:6px"></div></div>
+<button id="rebuild" onclick="const o=document.getElementById('ce2');document.getElementById('wrap2').innerHTML='<div id=&quot;ce2&quot; contenteditable=&quot;true&quot; style=&quot;width:640px;height:80px;border:1px solid #888;padding:6px&quot;>'+o.innerHTML+'</div>';document.getElementById('ce2').focus();">rebuild</button>`;
 
 // What the stand-in "model" finds: one deliberately odd suggestion the local
 // rules would never make, so an underline from it can only have come from here.
@@ -71,13 +73,11 @@ function fakeCorrections(text) {
   return out;
 }
 
+// No CORS headers, like the real Worker: the extension's own pages and
+// service worker reach it through their host permission, not through CORS.
 const server = http.createServer((req, res) => {
-  const cors = {
-    'access-control-allow-origin': '*',
-    'access-control-allow-methods': 'POST, OPTIONS',
-    'access-control-allow-headers': 'content-type, x-caret-key',
-  };
-  if (req.method === 'OPTIONS') { res.writeHead(204, cors); res.end(); return; }
+  const cors = {};
+  if (req.method === 'OPTIONS') { res.writeHead(204); res.end(); return; }
   if (req.method === 'POST' && req.url === '/check') {
     let body = '';
     req.on('data', (chunk) => { body += chunk; });
@@ -334,6 +334,54 @@ await step('a field in a code font is left alone', async () => {
   assert.equal(quickTexts().length, before);
 });
 
+await step('"Fix all" does not send a checked sentence again', async () => {
+  await patch({ quickAiDailyLimit: 80 });
+  await sleep(400);
+  const before = quickTexts().length;
+  await page.click('#ta');
+  await page.keyboard.press('Control+End');
+  await page.keyboard.type(' We walked to the libary with my freind today.', { delay: 8 });
+  await page.click('#other');
+  await waitForCount(before + 1);
+  await page.click('#ta');
+  await sleep(1200);
+  await page.evaluate(async () => {
+    const host = document.querySelector('div[data-caret="ui"]');
+    host.shadowRoot.querySelector('.badge').click();
+    await new Promise((r) => setTimeout(r, 300));
+    const all = [...host.shadowRoot.querySelectorAll('.panel h4 button')].find((b) => /Fix all/.test(b.textContent));
+    if (all) all.click();
+  });
+  await sleep(500);
+  const value = await page.locator('#ta').inputValue();
+  assert.match(value, /library with my friend today\./, 'Fix all applied');
+  await page.keyboard.press('Control+End');
+  await page.keyboard.type(' Then we went home after that.', { delay: 8 });
+  await page.click('#other');
+  await waitForCount(before + 2);
+  await sleep(600);
+  assert.deepEqual(quickTexts().slice(before), [
+    'We walked to the libary with my freind today.',
+    'Then we went home after that.',
+  ]);
+});
+
+await step('when the site rebuilds its editor, what the quick check found is still shown', async () => {
+  const before = quickTexts().length;
+  await page.click('#ce2');
+  await page.keyboard.type('The pond is near the big trees. ', { delay: 8 });
+  await waitForCount(before + 1);
+  const rowsBefore = await waitForRows((r) => r.some((x) => x.title === 'QUICK-AI says close.'));
+  assert.ok(rowsBefore.length);
+  await page.keyboard.press('Escape');
+  await page.click('#rebuild');
+  await sleep(2600);
+  const rows = await waitForRows((r) => r.some((x) => x.title === 'QUICK-AI says close.'));
+  assert.ok(rows.length, 'the finding came back');
+  await page.keyboard.press('Escape');
+  assert.equal(quickTexts().length, before + 1, 'and nothing was sent again');
+});
+
 await step('the daily limit stops it, and nothing more is sent', async () => {
   const used = quickTexts().length;
   await patch({ quickAiDailyLimit: used + 1 });
@@ -346,6 +394,27 @@ await step('the daily limit stops it, and nothing more is sent', async () => {
   assert.deepEqual(quickTexts().slice(used), ['One more sentence fits today.']);
   const state = await message({ type: 'get-settings' });
   assert.equal(state.quickLeftToday, 0);
+});
+
+await step('raising the limit lets it carry on straight away', async () => {
+  const used = quickTexts().length;
+  await patch({ quickAiDailyLimit: 80 });
+  await sleep(400);
+  await page.click('#ta');
+  await page.keyboard.press('Control+End');
+  await page.keyboard.type(' Now there is room for one more.', { delay: 8 });
+  await page.click('#other');
+  await waitForCount(used + 1, 3000);
+  assert.equal(quickTexts().at(-1), 'Now there is room for one more.');
+});
+
+await step("'Reset' puts the settings back, not the day's used checks", async () => {
+  const before = await message({ type: 'get-settings' });
+  const usedQuick = before.settings.quickAiUsage.count;
+  await message({ type: 'reset-settings' });
+  const after = await message({ type: 'get-settings' });
+  assert.equal(after.settings.quickAiEnabled, false, 'settings went back');
+  assert.equal(after.settings.quickAiUsage.count, usedQuick, 'used checks stayed used');
 });
 
 await step('the quick check never asks the big model', async () => {

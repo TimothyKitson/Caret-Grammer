@@ -89,6 +89,9 @@ export const DEFAULT_SETTINGS = {
   quickAiEnabled: false,
   quickAiDailyLimit: QUICK_DEFAULT_DAILY,
   quickAiUsage: { day: '', count: 0 },
+  // A caret_ key someone pasted, kept apart from aiKey so the quick check can
+  // still use it while another AI is picked for the full check.
+  caretKey: '',
   disabledSites: [],
   customWords: [],
   ignored: [],
@@ -217,14 +220,23 @@ export function normalizeSite(input) {
  * "englewoodfl.ignitiaschools.com".
  */
 export function siteBlocked(list, href) {
-  const host = siteKey(href);
-  return (list || []).some((entry) => entry && (host === entry || host.endsWith(`.${entry}`)));
+  return blockingEntries(list, href).length > 0;
+}
+
+/**
+ * Does this list entry cover this host? 'local' stands for files and other
+ * pages with no host at all, so it only ever matches itself - not every
+ * printer.local and myapp.local on the network.
+ */
+export function entryCovers(entry, host) {
+  if (!entry) return false;
+  return host === entry || (entry !== 'local' && host.endsWith(`.${entry}`));
 }
 
 /** The entries on the list that cover this address. */
 export function blockingEntries(list, href) {
   const host = siteKey(href);
-  return (list || []).filter((entry) => entry && (host === entry || host.endsWith(`.${entry}`)));
+  return (list || []).filter((entry) => entryCovers(entry, host));
 }
 
 /**

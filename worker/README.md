@@ -6,18 +6,21 @@ pastes a short `caret_…` key and never touches an API console.
 
 **This is not a service.** Workers AI's free plan gives the whole account
 **10,000 neurons a day**, reset at 00:00 UTC, and when they are gone every
-request fails until the reset. It does two kinds of check, and they cost very
-different amounts of that:
+request fails until the reset. They fail; they are never billed. It does two
+kinds of check, and they cost very different amounts of that:
 
 | | model | neurons each | on its own, that is |
 |---|---|---|---|
-| **full check** — the whole field | Llama 3.3 70B | about 55 | ~180 a day |
-| **quick check** — one finished sentence | IBM Granite 4.0 micro | about 1 (3–4 on Gemma) | thousands a day |
+| **full check** — the whole field | Llama 3.3 70B | 30–60 for a paragraph, about 110 for an essay-length field (3,000 characters), 240 at most | ~90 essay-length checks a day |
+| **quick check** — one finished sentence | IBM Granite 4.0 micro | about 1, 3 at most (about 3, up to 10, if it falls back to Gemma) | thousands a day |
 
-So the full check is the one that can run the account dry, and the caps below
-are what stop it: without them, one person leaving *after every pause* switched
-on takes the day's allowance before lunch. See
-[Staying on the free plan](#staying-on-the-free-plan) for the numbers to set.
+The 70B charges about eight times as much for each token it writes as for each
+one it reads, and its system prompt alone is about 630 tokens, so a full check
+is never cheap. A hundred essay-length full checks is more than the whole day.
+That is why full checks have a share of the day to themselves — 6,000 neurons
+by default, for everybody together — and the rest is left for quick checks.
+See [Staying on the free plan](#staying-on-the-free-plan) for how that works
+and the numbers to set.
 
 Nobody pays for any of it. Not you — everything here is on Cloudflare's free
 plan and needs no card — and not the people you give a key to.
@@ -52,7 +55,7 @@ and changing it later is awkward, so choose one you like.
 
 Then make keys from **Storage & databases** → **KV** → your namespace → **Add
 entry**: key `key:caret_` plus a dozen random characters, value
-`{"name":"Everyone","daily":100}`.
+`{"name":"Everyone","daily":50}`.
 
 ---
 
@@ -86,15 +89,18 @@ A key is any string starting `caret_`. Make them unguessable, not memorable:
 
 ```sh
 npx wrangler kv key put --binding=KEYS "key:caret_$(openssl rand -hex 12)" \
-  '{"name":"Dad","daily":100}' --remote
+  '{"name":"Dad","daily":20}' --remote
 ```
+
+20 is what Caret allows one person anyway. On the key that everybody's copy
+shares, use 50 (see [Staying on the free plan](#staying-on-the-free-plan)).
 
 What a key's record can say:
 
 | field | meaning |
 |---|---|
 | `name` | only so you can tell them apart in the KV list |
-| `daily` | full checks a day on this key. `0` or missing = not capped here (the extension still caps each person) |
+| `daily` | full checks a day on this key. `0` or missing = not capped here (the extension still caps each person at 20, and the full-check share caps everybody) |
 | `quickDaily` | quick checks a day on this key. `0` or missing = `QUICK_DAILY`, or 2,000 |
 | `revoked` | `true` turns the key off, for both kinds of check |
 
@@ -102,8 +108,9 @@ What a key's record can say:
 
 Paste the `https://caret-ai.….workers.dev` URL into the chat and I will set
 `CARET_ENDPOINT` in `src/shared/apikey.js`, rebuild the package, and send you a
-version to upload. The URL is not a secret — the per-person key is what gates
-it, which is why the Worker checks one on every single request.
+version to upload. The URL is not a secret. Neither, in the end, is a key
+that is built into the extension — see [Who can call it](#who-can-call-it) for
+what that means and what limits it.
 
 ## Updating it
 
@@ -120,16 +127,32 @@ still what answers — including, after this change, a Worker that does not know
 what a quick check is and treats every sentence as a full check on the 70B.
 Re-paste before giving anyone a build with the quick check in it.
 
+### After pasting this version
+
+1. That is all that is required — the full checks' daily share is on by
+   itself, at 6,000 neurons, and it is what keeps room for the quick check.
+2. Optional: set `"daily"` on the shared key to about **50** (**Storage &
+   databases** → **KV** → `CARET_KEYS` → the `key:caret_…` entry everybody's
+   copy of Caret uses → `{"name":"Everyone","daily":50}`, keeping any other
+   fields → Save). 100 works too; the meter stops full checks first on a
+   heavy day either way.
+
+If you want to change anything else, these are all optional, plain text
+variables under the Worker's **Settings** → **Variables and Secrets**:
+`FULL_NEURONS_DAILY`, `QUICK_MODEL`, `QUICK_DAILY`, `MODEL`, `PER_KEY_DAILY`.
+[Settings](#settings) says what each one does.
+
 ## The quick check
 
 The extension can send each sentence to the Worker as the person finishes it.
 That request carries `"mode": "quick"` and gets a different, much cheaper
 treatment:
 
-- **Its own models.** IBM Granite 4.0 micro first, then Gemma 4 26B. Never the
-  70B, not even as a last resort: at a couple of thousand sentences a day,
-  quietly falling back to a model twenty times the price would empty the
-  account.
+- **Its own models.** IBM Granite 4.0 micro first, then Gemma 4 26B, which it
+  falls back to by itself if Granite stops answering — at three to five times
+  the neurons. Never the 70B, not even as a last resort: at a couple of
+  thousand sentences a day, quietly falling back to a model twenty times the
+  price would empty the account.
 - **Its own prompt.** `QUICK_SYSTEM_PROMPT` in `src/shared/proofread.js` — the
   full check's rules cut down to under 900 characters, because it is paid for
   on every sentence. Same JSON answer, so the extension handles it the same way.
@@ -137,7 +160,9 @@ treatment:
   tokens. Only the person's leave-alone words that actually appear in the
   sentence go into the prompt.
 - **Its own count.** Kept apart from the full check's, so a day of typing never
-  uses up anybody's full checks, and the other way round.
+  uses up anybody's full checks, and the other way round. Quick checks are not
+  on the full checks' meter either: when the full checks' share runs out, quick
+  checks carry on.
 
 Anything without `"mode": "quick"` — including every copy of Caret from before
 this existed — is the full check, exactly as it always was.
@@ -158,8 +183,9 @@ everybody's day. The `left` the Worker reports for a quick check is an estimate
 for the same reason.
 
 If KV cannot be read or written, the check goes ahead uncounted rather than
-failing — both kinds. Only a key that cannot be looked up at all is refused
-(503), since then nobody knows whether it is a real one.
+failing — both kinds, and the full checks' meter too. Only a key that cannot
+be looked up at all is refused (503), since then nobody knows whether it is a
+real one.
 
 ## Settings
 
@@ -168,47 +194,100 @@ under `[vars]` in `wrangler.toml`.
 
 | variable | default | what it does |
 |---|---|---|
-| `MODEL` | *(empty)* | forces a model to the front of the full check's list |
-| `PER_KEY_DAILY` | `0` | full checks a day for a key with no `daily` of its own. `0` = not capped here |
+| `FULL_NEURONS_DAILY` | `6000` | neurons a day full checks may use between them, every key together. Past it, full checks get a 429 until midnight UTC; quick checks carry on. `0` = the default |
 | `QUICK_MODEL` | *(empty)* | forces a model to the front of the quick check's list |
 | `QUICK_DAILY` | `2000` | quick checks a day for a key with no `quickDaily` of its own. `0` = the default, not "no cap" |
+| `MODEL` | *(empty)* | forces a model to the front of the full check's list |
+| `PER_KEY_DAILY` | `0` | full checks a day for a key with no `daily` of its own. `0` = not capped here |
 
 ## Staying on the free plan
 
-Most copies of Caret share one key, so that key's two caps are, in practice,
-the whole group's budget. Set them so the two kinds of check fit under 10,000
-neurons together:
+The whole account gets 10,000 neurons a day. The Worker splits them like this:
 
-| | cap | neurons each | worst day |
+| | what holds it | neurons each | a full day |
 |---|---|---|---|
-| full checks | `"daily": 100` on the shared key | ~55 | ~5,500 |
-| quick checks | `QUICK_DAILY` 2,000 (the default) | ~1 on Granite | ~2,000 |
-| **total** | | | **~7,500 of 10,000** |
+| full checks | `FULL_NEURONS_DAILY`, 6,000 by default, for every key together | ~110 essay-length, 240 at most | ~6,000: about 50 essay-length checks |
+| quick checks | each person's own 30–80; `QUICK_DAILY` 2,000 per key as a backstop | ~1, 3 at most | the ~4,000 left: over 1,000 sentences even at the most each can cost |
+| **total** | | | **~10,000, and usually well under** |
 
-- **Set `"daily"` to about 100 on the shared key.** At 200, full checks alone
-  could cost ~11,000 neurons — more than the whole day — and the quick check
-  would have nothing left.
-- **If you switch `QUICK_MODEL` to Gemma**, each quick check costs three or four
-  times as much. Bring `QUICK_DAILY` down to about 1,000 (~3,500 neurons) to
-  stay under.
-- Never point `QUICK_MODEL` at the 70B. It would work, at 10–20 neurons a
-  sentence, and the default 2,000 would cost two to four times the day's
-  allowance.
-- KV stays well inside its free plan too: about one write per full check and
-  one per ten quick checks (~300 a day at the caps above, of 1,000), and two
-  reads per check of either kind (~4,200, of 100,000).
+**The full checks' meter.** The Worker keeps one running total for the whole
+account, `neurons:full:<date>` in KV: roughly what full checks have cost since
+midnight UTC. Before each full check it looks at the total, and once that has
+reached `FULL_NEURONS_DAILY` every full check gets a 429 — *"The full AI checks
+for today are used up for everyone. The quick check and the built-in checks
+still work. They come back at midnight UTC."* — and Caret treats that as a
+pause, not an error. After each full check it adds what the check cost: the
+token counts Workers AI reports, at that model's price, or, if it reports none,
+four characters to a token. A check that is let in near the line can take the
+total a little past it, by one check's worth at most when they come one at a
+time.
 
-Each copy of Caret also caps its own person — 10 full checks a day, and 30
-quick ones unless they raise it, never past 100. Ten people using every check
-they have come to 100 full checks and 300–1,000 quick ones: right at the full
-cap, well under the quick one. The Worker's caps are for the day something goes
-wrong — a key that got out, or more people than planned — and a key that
-reaches one gets a 429, which Caret treats as "quiet until tomorrow", not as an
-error.
+- **Set `"daily"` on the shared key to about 50.** That is roughly what the
+  meter's 6,000 buys in essay-length checks, so neither runs out long before
+  the other. With the meter in place it is a backstop for that one key, not the
+  thing that keeps you on the free plan.
+- **Quick checks fall back to Gemma by themselves** if Granite stops answering,
+  and then each costs about 3 neurons, up to 10. If you set `QUICK_MODEL` to
+  Gemma on purpose, bring `QUICK_DAILY` down to about 500.
+- **The quick backstop is generous.** 2,000 quick checks on Granite is usually
+  under 2,000 neurons, but if every one were a long sentence whose answer ran
+  to the cap it would be about 6,000 — more than the 4,000 left. Real use comes
+  nowhere near it (see below). If you want even that worst case to fit, set
+  `QUICK_DAILY` to 1,200.
+- Never point `QUICK_MODEL` at the 70B. It would work, at about 10 neurons a
+  sentence and over 60 at worst, and the default 2,000 would cost at least
+  twice the day's allowance.
+- KV stays well inside its free plan too. A full check reads KV four times (the
+  key, its count, and the meter before and after) and writes twice (its count
+  and the meter); a quick check reads twice and writes one time in ten. About 50
+  full checks and 2,000 quick ones is ~300 writes, of 1,000, and ~4,200 reads,
+  of 100,000.
+
+**What one person can use, and what that means for the group.** Each copy of
+Caret caps its own person at 20 full checks a day, and 30 quick ones unless
+they raise it, never past 80. Those are much looser than the shared limits. At
+20 full checks each, the day's share — about 50 essay-length full checks for
+everybody — covers **two or three people** using every full check they have,
+not ten. If more people than that lean on the full check on the same day,
+whoever comes after them gets the "used up for everyone" message until
+midnight UTC; their quick checks and Caret's built-in checks carry on. Quick
+checks are the easy part: a dozen people each at the most they can set, 80, is
+under 1,000 sentences, about 1,000 neurons on Granite and 3,000 at the very
+most, inside the ~4,000 left.
 
 When the account's allowance does run out anyway, every request gets a 429
 with `"spent": true` until midnight UTC, and Caret goes quiet rather than
 showing an error. The built-in checks carry on as normal.
+
+## Who can call it
+
+The shared key is built into the extension, so anyone who unpacks it can read
+the key and call the Worker from a script. Nothing here can stop that. The caps
+are what limit it, and you should know how far:
+
+- **No web page can call it from someone's browser.** The Worker sends no CORS
+  headers, so a browser will not hand a page the answer, and a preflight gets a
+  204 that allows nothing. Caret itself is not affected: its service worker and
+  settings page have permission for every site and are not held to CORS.
+- **The caps are approximate when requests arrive at the same moment.** Every
+  count here — the meter and both per-key counts — is read from KV, compared
+  and written back, and KV has no locks. Requests that land together all read
+  the same number, all go ahead, and are added to the total as if they were
+  about one. One at a time, the meter is close to exact. In a test, a script
+  sending five full checks at once, over and over, spent about 9,600 neurons
+  before the meter stopped it, against a share of 6,000, and twenty at once
+  went through the whole day. Making the counts exact would need a Durable
+  Object, which cannot be set up by pasting one file into the dashboard, so
+  this Worker does not use one.
+- **The worst case is still free.** Past the meter, the account's own 10,000
+  neurons is the ceiling: when they are gone Workers AI refuses, and on the
+  free plan it never bills. The worst anyone can do is use the day up early,
+  so the AI checks go quiet for everybody until midnight UTC. KV is the same:
+  a script hammering the Worker could use up the day's 100,000 reads, and then
+  keys cannot be checked (a 503) until midnight. Neither costs you anything.
+- **If the shared key is being abused**, set `"revoked": true` on it. That
+  turns off everybody's AI checks until a build with a new key is out, so it is
+  for a real problem, not a busy day.
 
 ## Models
 
@@ -222,8 +301,8 @@ full check    @cf/meta/llama-3.3-70b-instruct-fp8-fast   best; on the JSON-mode 
               @cf/zai-org/glm-4.7-flash
               @cf/ibm-granite/granite-4.0-h-micro         last resort only
 
-quick check   @cf/ibm-granite/granite-4.0-h-micro         ~1 neuron a sentence
-              @cf/google/gemma-4-26b-a4b-it               ~3-4
+quick check   @cf/ibm-granite/granite-4.0-h-micro         ~1 neuron a sentence, 3 at most
+              @cf/google/gemma-4-26b-a4b-it               ~3, up to 10; used by itself if Granite stops answering
 ```
 
 Llama 3.1 8B and Llama 3.2 3B used to be on the full list. Both are retired on
@@ -245,9 +324,10 @@ checks, not these models.)
 ## What it does and does not keep
 
 The Worker never stores or logs the text it is sent. The only things written to
-KV are the keys themselves and two per-key day counters — `use:<key>:<date>`
-for full checks and `quick:<key>:<date>` for quick ones — which expire after 36
-hours.
+KV are the keys themselves, two per-key day counters — `use:<key>:<date>` for
+full checks and `quick:<key>:<date>` for quick ones — and one for the whole
+account, `neurons:full:<date>`, the full checks' running cost: a number, with
+no key or text in it. The counters expire after 36 hours.
 
 But be clear with the people you give a key to: with a `caret_` key their text
 goes through **your** Cloudflare account on its way to the model. That is a
@@ -269,8 +349,9 @@ POST /check
 400  the body is not a JSON object
 401  not a key / unknown key
 403  key turned off
-429  this key's daily cap for that kind of check, or the account
-     allowance is spent ("spent": true)                         → Caret goes quiet
+429  this key's daily cap for that kind of check; or, for a full
+     check, today's full-check share is used up for everyone; or
+     the account allowance is spent ("spent": true)             → Caret goes quiet
 502  no model would answer
 503  KV is unreachable, so the key cannot be checked
 
@@ -281,6 +362,9 @@ GET /health
 
 `left` is `null` for a full check on a key with no cap here, and an estimate
 for a quick check (see above).
+
+No answer carries CORS headers, and `OPTIONS` gets a bare 204 — see
+[Who can call it](#who-can-call-it).
 
 The `corrections` shape is identical to what every other provider returns, so
 the extension runs it through exactly the same code. The system prompts and the

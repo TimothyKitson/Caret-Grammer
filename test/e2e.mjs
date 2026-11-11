@@ -652,6 +652,7 @@ await step('a site pasted into settings turns Caret off there, subdomains includ
   assert.match(refused, /does not look like a web address/);
   assert.ok(stored.settings.disabledSites.includes('example-school.test'), JSON.stringify(stored.settings.disabledSites));
   assert.equal(sub.siteEnabled, false, 'a subdomain is covered');
+  assert.deepEqual(sub.blockedBy, ['example-school.test'], 'and the popup is told which entry covers it');
   assert.equal(other.siteEnabled, true, 'a lookalike domain is not');
 });
 

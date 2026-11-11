@@ -45,6 +45,8 @@
   let quickIdleTimer = null;
   let quickBlockedUntil = 0;
   let quickSuppress = 0;        // > 0 while Caret itself is editing the field
+  let checkKeys = '';           // the "Proofread with AI" shortcut, as the browser has it
+  let aiLeftToday = null;       // full AI checks left today; null = no limit or not known
 
   // ---------------------------------------------------------------- plumbing
 
@@ -95,6 +97,8 @@
     if (!response) return false;
     settings = response.settings;
     siteEnabled = response.siteEnabled;
+    checkKeys = typeof response.checkKeys === 'string' ? response.checkKeys : '';
+    aiLeftToday = typeof response.aiLeftToday === 'number' ? response.aiLeftToday : null;
     overlay.setUnderlineStyle(settings.underlineStyle);
     return true;
   }
@@ -118,10 +122,14 @@
 
   // ------------------------------------------------------------------ checks
 
-  function scheduleCheck({ immediate = false, ai = false } = {}) {
+  function scheduleCheck({ immediate = false, ai = false, localOnly = false } = {}) {
     if (!enabled() || !active) return;
     clearTimeout(localTimer);
     localTimer = setTimeout(runCheck, immediate ? 0 : LOCAL_DELAY);
+    // A redraw for something Caret did itself - a quick-check answer, a full
+    // check's answer arriving late - is not a pause in typing, and must not
+    // set the full check's timer going again.
+    if (localOnly) return;
     clearTimeout(aiTimer);
     // An AI pass costs money every time, so when it happens is the user's call.
     //   manual    only when asked - the right-click menu, Ctrl+Shift+. , or the
@@ -163,7 +171,20 @@
       kind: adapter.kind,
       quickIssues: quickIssuesIn(adapter, text),
     });
-    if (!response || mine !== version || !active || active.adapter !== adapter) return;
+    if (!response || !active || active.adapter !== adapter) return;
+    if (mine !== version) {
+      // Something newer started while this was out - often just a redraw for
+      // a quick-check answer. If this one carried a full AI check that ran on
+      // text still in the field, keep it: note it as done, so it is not paid
+      // for twice, and redraw, which picks its findings up from the cache.
+      if (wantAi && response.aiRan && adapter.getText().slice(0, MAX_CHARS) === text) {
+        lastAiText = text;
+        lastAiAt = Date.now();
+        scheduleCheck({ immediate: true, localOnly: true });
+      }
+      return;
+    }
+    if (typeof response.aiLeft === 'number') aiLeftToday = response.aiLeft;
     if (response.error) {
       active.issues = active.issues || [];
       render();
@@ -303,7 +324,9 @@
         const family = getComputedStyle(el).fontFamily || '';
         // A box a site deliberately set in a plain "monospace" is a code box;
         // a textarea in it is just unstyled.
-        code = CODE_FONT.test(family) || (el.tagName !== 'TEXTAREA' && /^\s*monospace\s*$/i.test(family));
+        const fonts = family.split(',').map((f) => f.trim().replace(/["']/g, '').toLowerCase());
+        code = fonts.some((f) => f !== 'monospace' && (/mono/.test(f) || CODE_FONT.test(f)))
+          || (el.tagName !== 'TEXTAREA' && /^\s*monospace\s*$/i.test(family));
       } catch (_) { /* detached */ }
     }
     facts = {
@@ -400,6 +423,10 @@
   // this part only listens, queues and places the answers.
 
   const quickState = new WeakMap();   // adapter -> {tracker, results, queue, busy}
+  // Answers are kept per frame, not per field: when a site rebuilds its editor
+  // (Ignitia's check button), the new field holds the same sentences, and the
+  // answers already paid for still apply to them.
+  const quickResults = new Map();     // sentence -> issues relative to it
   const QUICK_RESULTS_MAX = 300;
 
   function quickOn() {
@@ -425,7 +452,7 @@
       // typed just now, so it is not checked unless it is changed.
       state = {
         tracker: NS.sentences.createTracker(adapter.getText().slice(0, MAX_CHARS)),
-        results: new Map(),
+        results: quickResults,
         queue: [],
         busy: false,
       };
@@ -445,8 +472,11 @@
       due = state.tracker.leave(text);
     } else {
       const caret = adapter.caret();
-      if (caret === null || caret === undefined) return;
-      if (kind === 'input') due = state.tracker.input(text, caret, inputType);
+      const pasted = kind === 'input' && /^insertFrom/.test(inputType);
+      // After a paste the caret can be unknown for a moment; the tracker still
+      // needs to hear about the paste so the pasted sentences are not sent.
+      if ((caret === null || caret === undefined) && !pasted) return;
+      if (kind === 'input') due = state.tracker.input(text, caret ?? null, inputType);
       else if (kind === 'idle') due = state.tracker.idle(text, caret);
       else due = state.tracker.caret(text, caret);
     }
@@ -485,7 +515,7 @@
         }
         state.results.set(sentence, reply.issues);
         if (reply.issues.length && active && active.adapter === adapter) {
-          scheduleCheck({ immediate: true });
+          scheduleCheck({ immediate: true, localOnly: true });
         }
       }
     } finally {
@@ -519,7 +549,7 @@
     const state = quickState.get(adapter);
     if (!state) return;
     const delta = replacement.length - (issue.end - issue.start);
-    state.tracker.shift(issue.start, delta);
+    state.tracker.shift(issue.start, delta, adapter.getText().slice(0, MAX_CHARS));
     const old = NS.sentences.segmentAt(before, issue.start);
     if (!old || issue.end > old.end) return;
     const after = adapter.getText();
@@ -581,14 +611,15 @@
       .filter((issue) => issue.source !== 'ai')
       .filter((issue) => issue.replacements && issue.replacements.length && issue.confidence !== 'low')
       .sort((a, b) => b.start - a.start);   // back to front keeps offsets valid
-    const state = quickState.get(active.adapter);
     quickSuppress += 1;
     try {
       for (const issue of fixable) {
-        const current = active.adapter.getText().slice(issue.start, issue.end);
-        if (current !== issue.text) continue;
-        if (active.adapter.replaceRange(issue.start, issue.end, issue.replacements[0]) && state) {
-          state.tracker.shift(issue.start, issue.replacements[0].length - (issue.end - issue.start));
+        const before = active.adapter.getText();
+        if (before.slice(issue.start, issue.end) !== issue.text) continue;
+        if (active.adapter.replaceRange(issue.start, issue.end, issue.replacements[0])) {
+          // Same as one fix at a time: the sentence counts as checked still,
+          // and what the quick check found in it stays.
+          quickAfterFix(active.adapter, before, issue, issue.replacements[0]);
         }
       }
     } finally {
@@ -602,7 +633,12 @@
     onApply: applyFix,
     onAddWord: async (issue) => {
       overlay.hideCard();
-      await send({ type: 'add-word', word: issue.text });
+      // "Vlogging is fun." - the capital is the sentence's, not the word's.
+      // Saving it would flag every lower-case "vlogging" as a misspelled name.
+      const before = active ? active.adapter.getText().slice(0, issue.start) : '';
+      const atStart = /(^|[.!?…]["'”’)\]]*\s+|\n\s*)$/.test(before);
+      const word = atStart && /^[A-Z][a-z'’-]*$/.test(issue.text) ? issue.text.toLowerCase() : issue.text;
+      await send({ type: 'add-word', word });
       lastAiText = null;
       scheduleCheck({ immediate: true });
     },
@@ -634,7 +670,7 @@
       rect,
       fixableCount: issues.filter((i) => i.source !== 'ai'
         && i.replacements && i.replacements.length && i.confidence !== 'low').length,
-      aiCheck: settings.aiEnabled ? { keys: 'Ctrl+Shift+.' } : null,
+      aiCheck: settings.aiEnabled ? { keys: checkKeys, spent: aiLeftToday === 0 } : null,
       handlers: {
         onApply: (issue, replacement) => { overlay.hidePanel(); applyFix(issue, replacement); },
         onFixAll: fixAll,
@@ -765,6 +801,9 @@
     // The person is usually already back in the new editor: pick it up now
     // rather than waiting for a focus event that has already happened.
     setTimeout(() => {
+      // An unfocused frame's editor is its activeElement too; only pick up
+      // the one the person is actually in.
+      if (!document.hasFocus()) return;
       const el = focusedElement();
       if (!active && el && NS.isEditable(el) && !NS.isOptedOut(el)) activate(el);
     }, 0);
@@ -821,9 +860,30 @@
   }, true);
   on(document, 'focusout', (event) => {
     if (!active || deepTarget(event) !== active.adapter.element) return;
+    // Switching to another tab or window blurs the field too, but the person
+    // has not moved on: they come back to the same spot. In the top frame the
+    // field keeps being the active element while the document loses focus.
+    if (window === window.top && !document.hasFocus() && focusedElement() === active.adapter.element) return;
     clearTimeout(quickIdleTimer);
+    if (window !== window.top) {
+      // Inside a frame a tab switch looks like any other blur; the only tell
+      // is that the page is hidden a moment later.
+      setTimeout(() => { if (document.visibilityState !== 'hidden') quickNote('leave'); }, 60);
+      return;
+    }
     quickNote('leave');
   }, true);
+
+  // Editors that handle paste themselves (ProseMirror, Quill, CKEditor,
+  // Lexical, TinyMCE) cancel the browser's paste, so no "insertFromPaste"
+  // input event arrives. Tell the quick check about the paste directly, once
+  // the editor has put the text in.
+  const notePaste = (event) => {
+    if (!active || !isInActive(deepTarget(event))) return;
+    setTimeout(() => quickNote('input', 'insertFromPaste'), 0);
+  };
+  on(document, 'paste', notePaste, true);
+  on(document, 'drop', notePaste, true);
 
   on(document, 'mousemove', (event) => {
     if (!active || !enabled()) return;
@@ -885,6 +945,7 @@
     if (!active) {
       // Focus can land in an editor without a focus event reaching us - a
       // site moving it there by script while it rebuilt the page.
+      if (!document.hasFocus()) return;
       const el = focusedElement();
       if (el && NS.isEditable(el) && !NS.isOptedOut(el)) activate(el);
       return;
@@ -910,6 +971,9 @@
           else quietNative(active.adapter.element);
         }
         lastAiText = null;
+        // A new limit, or the quick check switched back on: ask again now
+        // rather than waiting out a pause from before.
+        quickBlockedUntil = 0;
         if (active && quickOn() && !quickSkipsField(active.adapter)) quickFor(active.adapter);
         if (active) scheduleCheck({ immediate: true });
         else {

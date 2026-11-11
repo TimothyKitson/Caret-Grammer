@@ -88,6 +88,21 @@ test('a word added with capitals keeps them, and asks for them back', () => {
   }
 });
 
+test('adding a name Caret already knows keeps its capital suggestion', () => {
+  // Before anything is added, these are names.
+  assert.deepEqual(findAt('We ate at mcdonald yesterday.', 'mcdonald').replacements, ['McDonald']);
+  dict.setUserWords(['McDonald', 'Kitson']);
+  try {
+    const mc = findAt('We ate at mcdonald yesterday.', 'mcdonald');
+    assert.ok(mc, 'adding McDonald must not switch its capital off');
+    assert.deepEqual(mc.replacements, ['McDonald']);
+    assert.equal(mc.confidence, 'high');
+    assert.deepEqual(findAt('I met kitson at the store.', 'kitson').replacements, ['Kitson']);
+  } finally {
+    dict.setUserWords([]);
+  }
+});
+
 // ----------------------------------------------------------------- spelling
 
 test('suggests the right word for common typos', () => {

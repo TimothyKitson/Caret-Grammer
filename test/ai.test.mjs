@@ -593,3 +593,14 @@ test('a server that answers a quick check with the big model is reported, not tr
     (error) => error.code === 'old-server',
   );
 });
+
+test('a key in the leave-alone list is dropped from a quick check, whatever its case', async () => {
+  const capture = {};
+  await checkQuick('The deploy user is AKIAIOSFODNN7EXAMPLE and it works fine.', {
+    apiKey: 'caret_testtesttest',
+    leaveAlone: ['AKIAIOSFODNN7EXAMPLE', 'deploy'],
+    fetchImpl: stub({ payload: { corrections: [], mode: 'quick' } }, capture),
+  });
+  assert.ok(!JSON.stringify(capture.body).includes('AKIAIOSFODNN7EXAMPLE'));
+  assert.deepEqual(capture.body.leaveAlone, ['deploy']);
+});

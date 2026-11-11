@@ -62,7 +62,14 @@ export function createDictionary({
           // A capital on an everyday word ("Will", "Grace") is a name only
           // some of the time, so it is treated like the built-in ambiguous
           // names: capitalized only where the sentence clearly means the name.
-          userForms.set(lower, { form, ambiguous: words.has(lower) || rank.has(lower) });
+          // A name the built-in list already knows keeps its verdict
+          // ("McDonald" is always a name, "Grace" only sometimes); only a
+          // word new to Caret is judged by whether it is also an everyday word.
+          const builtIn = proper.get(lower);
+          userForms.set(lower, {
+            form,
+            ambiguous: builtIn ? builtIn.ambiguous : (words.has(lower) || rank.has(lower)),
+          });
         }
       }
     },

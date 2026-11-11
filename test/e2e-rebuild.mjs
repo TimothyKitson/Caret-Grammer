@@ -99,6 +99,19 @@ async function scenario(target, button) {
 console.log(`\nextension: ${ROOT}\n`);
 
 await step('an editor rewritten with document.open() keeps Caret (Ignitia Writer)', () => scenario({ frame: 'fa' }, '#ba'));
+await step('after a document.open() rebuild the badge still opens the panel', async () => {
+  const frame = await frameFor('fa');
+  const opened = await frame.evaluate(async () => {
+    const host = document.querySelector('div[data-caret="ui"]');
+    const badge = host && host.shadowRoot.querySelector('.badge');
+    if (!badge || badge.hidden) return 'no badge';
+    badge.click();
+    await new Promise((r) => setTimeout(r, 300));
+    const panel = host.shadowRoot.querySelector('.panel');
+    return panel && !panel.hidden ? 'open' : 'closed';
+  });
+  assert.equal(opened, 'open');
+});
 await step('an editor element swapped for a new one keeps Caret', () => scenario({ sel: '#edB' }, '#bb'));
 await step("an editor's contents rewritten with markup keeps Caret", () => scenario({ sel: '#edC' }, '#bc'));
 await step('an editor iframe replaced by a new iframe keeps Caret', () => scenario({ frame: 'fd' }, '#bd'));

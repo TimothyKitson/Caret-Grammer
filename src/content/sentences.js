@@ -10,7 +10,8 @@
 //
 // A sentence is due once it has its full stop, question mark or exclamation
 // mark AND the person has moved on from it: typed the space after it, gone to
-// another sentence, stopped at its end, or left the field. It is sent once.
+// another sentence, stopped at its end with nothing after it on the line, or
+// left the field. It is sent once.
 // It is sent again only if they change it and move on again, so clicking
 // around, text that was already in the field and text a site puts there never
 // cost a check. Every check comes out of a small shared free allowance, so
@@ -25,6 +26,8 @@
   const MAX_SENTENCE = 600;
   // How many checked sentences one field remembers. The oldest go first.
   const SETTLED_MAX = 2000;
+  // How many sentences one field keeps waiting for the end of their line.
+  const PENDING_MAX = 50;
 
   // A full stop after one of these is an abbreviation, not the end of a
   // sentence. The same list autocorrect uses, so the two agree on where a
@@ -182,7 +185,8 @@
    *
    * `closeLine` says the person is done with this line - they have moved to
    * another one, or left the field - so a stop at the very end of it ends the
-   * sentence whatever the dots were for: "I wonder..." and "...at Acme Inc."
+   * sentence whatever the dots were for: "I wonder...", "...at Acme Inc." and
+   * 'He shouted "Stop!"'
    * Without it, the end of a line is not enough on its own: a rich editor
    * reports a line break after the line being typed, and "I met Mr." there is
    * not finished.
@@ -192,11 +196,17 @@
     while (next < lineEnd && isSpace(text[next])) next += 1;
     if (next === lineEnd && closeLine) return true;
     const run = text.slice(runStart, runEnd);
-    if (DEFINITE_STOP.test(run)) return true;
+    // A question or exclamation mark ends the sentence there and then, unless
+    // a closing quote or bracket follows it. Then the sentence may carry on -
+    // '"Are you coming?" she asked.'  'He yelled "Watch out!" at me.' - and,
+    // as after "etc.", the next word decides.
+    const definite = DEFINITE_STOP.test(run);
+    if (definite && after === runEnd) return true;
     // The next word may be on a later line, past blank lines and indentation:
     // "...pears, etc.\nThen we left."
     while (next < text.length && isSpace(text[next])) next += 1;
     const capitalNext = next < text.length && capitalAt(text, next);
+    if (definite) return capitalNext;
     // An ellipsis trails off: "Wait... then it rained" is one sentence, and
     // "Wait... Then it rained." is two. Two dots is a typo for three.
     if (run.length > 1 || run === '…') return capitalNext;
@@ -355,13 +365,19 @@
    * before the person started typing, so it is not sent unless they change it.
    *
    * Only the sentence the person is editing - the one their last keystroke
-   * was in - can ever become due. It is remembered by where it starts.
+   * was in - can ever become due. It is remembered by where it starts. The
+   * one exception is a sentence they finished that only the end of its line
+   * can decide ("...at Acme Inc."), which waits for them to leave the field.
    */
   function createTracker(initialText) {
     const settled = new Map();   // key -> true, oldest first
     let editStart = null;        // where the sentence being edited starts
     let seen = typeof initialText === 'string' ? initialText : '';
     let shifted = false;         // shift() has already allowed for the latest change
+    // Sentences only the end of their line can finish - "...the answer was
+    // no.", "...at Acme Inc.", "I wonder..." - that the person left for
+    // somewhere else on the same line. They are finished once the field is.
+    const pending = new Set();
 
     function remember(sentence) {
       const key = keyFor(sentence);
@@ -423,30 +439,69 @@
       out.push(segment.text);
     }
 
+    /** Past the spaces at `at`, without leaving the line: where a next sentence would start. */
+    function nextOnLine(text, at) {
+      return skipSpaces(text, at, lineEndOf(text, at));
+    }
+
     /** If the caret has left the sentence being edited, that sentence may be due. */
     function checkLeft(text, caret, out) {
       if (editStart === null) return;
       let segment = findAt(text, editStart, false);
+      if (!segment) {
+        // Its opening word was deleted - "So I went home." is now " I went
+        // home." - and what is left of it starts after the space. Until the
+        // caret moves past that space, they may be about to type a new one.
+        const rest = nextOnLine(text, editStart);
+        if (caret >= editStart && caret <= rest) return;
+        segment = findAt(text, rest, false);
+      }
       if (segment && within(segment, caret, text)) {
         editStart = segment.start;
         return;
       }
-      // Gone to another line - Enter, a click, the arrow keys: that line is
-      // finished, and so is a sentence ending "..." or "Inc." at the end of it.
-      if (segment && !segment.complete
-          && (caret < lineStartOf(text, segment.start) || caret > lineEndOf(text, segment.end))) {
-        segment = findAt(text, editStart, true);
+      if (segment && !segment.complete) {
+        const closed = findAt(text, segment.start, true);
+        if (caret < lineStartOf(text, segment.start) || caret > lineEndOf(text, segment.end)) {
+          // Gone to another line - Enter, a click, the arrow keys: that line is
+          // finished, and so is a sentence ending "..." or "Inc." at the end of it.
+          segment = closed;
+        } else if (isCheckable(closed) && !isSettled(closed.text)) {
+          // Somewhere else on the same line. The line is not finished yet, so
+          // neither is the sentence; it is when they leave the field.
+          pending.delete(closed.text);
+          pending.add(closed.text);
+          if (pending.size > PENDING_MAX) pending.delete(pending.values().next().value);
+        }
       }
       claim(segment, out);
       editStart = null;
     }
 
+    /** A pending sentence is due if it is still there, exactly, at the end of its line. */
+    function claimPending(text, sentence, out) {
+      for (let at = text.indexOf(sentence); at >= 0; at = text.indexOf(sentence, at + 1)) {
+        const segment = findAt(text, at, true);
+        if (segment && segment.start === at && segment.text === sentence) {
+          claim(segment, out);
+          return;
+        }
+      }
+    }
+
+    const validCaret = (caret) => Number.isInteger(caret) && caret >= 0;
+
     // Pasted or dropped sentences are someone else's finished text, or the
     // person's own from elsewhere: not checked unless they are edited here.
     // The sentence the caret ends up in stays open if the paste only finished
     // what they were typing.
-    function settlePasted(before, text) {
-      const { from, newTo } = diff(before, text);
+    function settlePasted(before, text, caret) {
+      const { from, newTo: changed } = diff(before, text);
+      // The paste ends at the caret. The shortest difference can stop short
+      // of it when something else changed too since the last call - a site
+      // adding a line at the top - and the pasted text ends the way the text
+      // did: "...went home." then "...ran by." share the full stop.
+      const newTo = validCaret(caret) && caret <= text.length ? Math.max(changed, caret) : changed;
       for (const segment of segmentsBetween(text, from, newTo)) {
         if (segment.end <= from || segment.start >= newTo) continue;
         const wholly = segment.start >= from && segment.end <= newTo;
@@ -454,8 +509,6 @@
         remember(segment.text);
       }
     }
-
-    const validCaret = (caret) => Number.isInteger(caret) && caret >= 0;
 
     return {
       /**
@@ -466,14 +519,38 @@
         if (typeof text !== 'string') return [];
         const before = seen;
         follow(text);
-        if (!validCaret(caret)) return [];
+        const type = typeof inputType === 'string' ? inputType : '';
+        const pasted = /^insertFrom/.test(type);
+        if (!validCaret(caret)) {
+          // Editors that paste for themselves (ProseMirror, Quill, CKEditor,
+          // Lexical, TinyMCE) can leave the caret unknown for a moment. What
+          // they pasted is still pasted. Nothing has been left - without a
+          // caret there is no telling - but a sentence that was already there
+          // and that the paste only added to stays open, as it would with the
+          // caret known. One that starts in the paste is taken to be pasted.
+          if (pasted && before !== text) {
+            if (editStart === null) {
+              const { from, newTo } = diff(before, text);
+              const here = findAt(text, newTo, false);
+              if (here && here.start < from) editStart = here.start;
+            }
+            settlePasted(before, text);
+          }
+          return [];
+        }
         const out = [];
         checkLeft(text, caret, out);
         if (editStart === null) {
           const here = findAt(text, caret, false);
-          editStart = here ? here.start : null;
+          if (here) {
+            editStart = here.start;
+          } else if (/^delete/.test(type) && findAt(text, nextOnLine(text, caret), false)) {
+            // Deleted the opening word, and the caret is left in the space
+            // before the rest of the sentence: that sentence was changed.
+            editStart = caret;
+          }
         }
-        if (/^insertFrom/.test(inputType || '')) settlePasted(before, text);
+        if (pasted) settlePasted(before, text, caret);
         return out;
       },
 
@@ -487,7 +564,10 @@
         return out;
       },
 
-      /** They stopped typing. A sentence they just finished, and stopped at, is due. */
+      /**
+       * They stopped typing. A sentence they just finished, and stopped at the
+       * end of its line, is due.
+       */
       idle(text, caret) {
         if (typeof text !== 'string') return [];
         follow(text);
@@ -496,9 +576,16 @@
         checkLeft(text, caret, out);
         if (editStart !== null) {
           const segment = findAt(text, editStart, false);
-          // An open quote or bracket means they may be about to close it,
-          // which would change the sentence and cost a second check.
-          if (segment && caret === segment.end && !stillOpen(segment.text)) claim(segment, out);
+          // Only at the end of its line. A pause after "...a sunny morning."
+          // with "We went..." still to come on the same line is someone
+          // revising, not done; the sentence goes when they move on. And an
+          // open quote or bracket means they may be about to close it. Either
+          // would change the sentence and cost a second check.
+          if (segment && caret === segment.end
+              && nextOnLine(text, segment.end) === lineEndOf(text, segment.end)
+              && !stillOpen(segment.text)) {
+            claim(segment, out);
+          }
         }
         return out;
       },
@@ -512,17 +599,32 @@
         if (typeof text !== 'string') return [];
         follow(text);
         const out = [];
-        if (editStart !== null) claim(findAt(text, editStart, true), out);
+        if (editStart !== null) {
+          // Or, with its opening word deleted, what is left of it.
+          claim(findAt(text, editStart, true) || findAt(text, nextOnLine(text, editStart), true), out);
+        }
         editStart = null;
+        for (const sentence of pending) claimPending(text, sentence, out);
+        pending.clear();
         return out;
       },
 
       /**
        * Caret changed the text itself (applying a suggestion): the length at
-       * `at` changed by `delta`. Call it instead of passing that edit to input().
+       * `at` changed by `delta`. Call it instead of passing that edit to
+       * input(). `textAfter`, the whole text once the change is made, lets the
+       * next keystroke be followed on its own; without it, the next change is
+       * taken to be this one and not followed at all.
        */
-      shift(at, delta) {
-        shifted = true;
+      shift(at, delta, textAfter) {
+        if (typeof textAfter === 'string') {
+          // Already seen through input() or caret(), and followed there.
+          if (textAfter === seen) return;
+          seen = textAfter;
+          shifted = false;
+        } else {
+          shifted = true;
+        }
         if (editStart === null || !Number.isFinite(at) || !Number.isFinite(delta)) return;
         if (at < editStart) editStart = Math.max(at, editStart + delta);
       },

@@ -7,7 +7,7 @@ import assert from 'node:assert/strict';
 import {
   DEFAULT_SETTINGS, MAX_FREE_DAILY, dailyCeiling, mergeSettings,
   QUICK_DEFAULT_DAILY, QUICK_MAX_DAILY, clampQuickLimit,
-  normalizeSite, siteBlocked, blockingEntries, addCustomWord,
+  normalizeSite, siteBlocked, blockingEntries, addCustomWord, entryCovers,
 } from '../src/shared/defaults.js';
 
 test('free options are capped, paid keys are not', () => {
@@ -72,4 +72,12 @@ test('added words keep their capitals and are never stored twice', () => {
   assert.equal(addCustomWord(list, 'Ignitia'), list);
   assert.deepEqual(addCustomWord(['zebra'], 'McDonald'), ['McDonald', 'zebra']);
   assert.deepEqual(addCustomWord([], '   '), []);
+});
+
+test("'local' (files and pages with no host) does not cover every .local host", () => {
+  assert.equal(siteBlocked(['local'], 'file:///C:/notes/page.html'), true);
+  assert.equal(siteBlocked(['local'], 'http://printer.local/'), false);
+  assert.equal(siteBlocked(['local'], 'http://myapp.local:3000/'), false);
+  assert.equal(entryCovers('local', 'printer.local'), false);
+  assert.equal(entryCovers('printer.local', 'printer.local'), true);
 });

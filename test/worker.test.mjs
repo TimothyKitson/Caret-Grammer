@@ -181,10 +181,15 @@ test('/health says nothing about any key', async () => {
   assert.ok(!JSON.stringify(body).includes('caret_'));
 });
 
-test('a browser preflight is answered', async () => {
+test('a browser preflight is answered, but allows nothing', async () => {
+  // Caret calls from its service worker and its own pages, which have host
+  // permission and are not held to CORS. A web page is, and must not be able
+  // to make a visitor's browser spend the allowance.
   const res = await worker.fetch(new Request('https://w.example/check', { method: 'OPTIONS' }), fakeEnv());
   assert.equal(res.status, 204);
-  assert.match(res.headers.get('access-control-allow-headers'), /x-caret-key/);
+  assert.equal(res.headers.get('access-control-allow-origin'), null);
+  assert.equal(res.headers.get('access-control-allow-headers'), null);
+  assert.equal(res.headers.get('access-control-allow-methods'), null);
 });
 
 test('anything else is a 404', async () => {
@@ -547,7 +552,7 @@ test('no mode, or any mode but "quick", is the full check exactly as before', as
     assert.equal(body.model, BIG);
     assert.equal(body.left, 2);
     assert.equal(env.calls[0].body.messages[0].content, SYSTEM_PROMPT);
-    assert.equal(env.calls[0].body.max_tokens, 1200);
+    assert.equal(env.calls[0].body.max_tokens, 800);
     assert.equal(env.KEYS.store.get(FULL_COUNTER()), '1');
     assert.equal(env.KEYS.store.get(QUICK_COUNTER()), undefined);
   }
@@ -733,6 +738,286 @@ test('a quick check whose key cannot be looked up gets the same 503', async () =
   assert.equal(res.status, 503);
   assert.match((await res.json()).error, /cannot check keys right now/);
   assert.equal(env.calls.length, 0);
+});
+
+// ------------------------------------------------- the full checks' meter
+//
+// One count for the whole account of what full checks have cost today, so
+// they can never take more than their share of the free 10,000 neurons and
+// leave the quick check with nothing. These are the numbers that keep the
+// owner on the free plan.
+
+const METER = () => `neurons:full:${day()}`;
+const FULL_SHARE_USED = 'The full AI checks for today are used up for everyone. '
+  + 'The quick check and the built-in checks still work. They come back at midnight UTC.';
+
+/** Neurons per million tokens, [read, written], as the Worker prices them. */
+const PRICE = {
+  [BIG]: [26668, 204805],
+  [GEMMA]: [9091, 27273],
+  '@cf/zai-org/glm-4.7-flash': [5500, 36400],
+  [GRANITE]: [1542, 10158],
+};
+const cost = (model, tokensIn, tokensOut) => (tokensIn * PRICE[model][0] + tokensOut * PRICE[model][1]) / 1e6;
+
+/** A KV with the usual key, and the meter already at this many neurons. */
+const metered = (neurons, record = { name: 'Everyone' }) => fakeKv({
+  'key:caret_abcdef123456': JSON.stringify(record),
+  ...(neurons === undefined ? {} : { [METER()]: String(neurons) }),
+});
+
+test('a full check asks for at most 800 tokens, on every model it tries', async () => {
+  // Down from 1,200. The 70B's answer is most of what a full check costs, and
+  // 800 still holds fifteen or more corrections.
+  const env = fakeEnv({ ai: () => { throw new Error('everything is on fire'); } });
+  delete env.MODEL;
+  await worker.fetch(post({ text: 'I teh cat' }, KEY), env);
+  assert.equal(env.calls.length, 8);
+  assert.ok(env.calls.every((c) => c.body.max_tokens === 800), env.calls.map((c) => c.body.max_tokens).join());
+
+  const small = fakeEnv();
+  await withRandom(0.5, () => worker.fetch(quick('I saw teh dog.'), small));
+  assert.equal(small.calls[0].body.max_tokens, 256, 'the quick cap is unchanged');
+});
+
+test('once the full checks have used their share, everyone gets a plain 429', async () => {
+  for (const neurons of [6000, 6001, 9999]) {
+    const env = fakeEnv({ kv: metered(neurons) });
+    const res = await worker.fetch(post({ text: 'I teh cat' }, KEY), env);
+    assert.equal(res.status, 429, `meter at ${neurons}`);
+    const body = await res.json();
+    assert.deepEqual(body, { error: FULL_SHARE_USED });
+    assert.equal(body.spent, undefined, 'the account is not spent: quick checks still run');
+    assert.equal(env.calls.length, 0, 'the model must not be asked');
+    assert.equal(env.KEYS.store.get(FULL_COUNTER()), undefined, "a refusal does not use up one of the key's own checks");
+    assert.equal(env.KEYS.store.get(METER()), String(neurons), 'and nothing was added to the meter');
+  }
+
+  // One under is still a yes.
+  const env = fakeEnv({ kv: metered(5999) });
+  assert.equal((await worker.fetch(post({ text: 'I teh cat' }, KEY), env)).status, 200);
+});
+
+test('the full checks running out does not stop the quick check', async () => {
+  const env = fakeEnv({ kv: metered(1e9) });
+  const res = await withRandom(0.05, () => worker.fetch(quick('I saw teh dog.'), env));
+  assert.equal(res.status, 200);
+  assert.deepEqual((await res.json()).corrections, CORRECTIONS.corrections);
+  assert.equal(env.KEYS.store.get(METER()), String(1e9), 'quick checks are not metered here');
+  assert.equal(env.KEYS.store.get(QUICK_COUNTER()), '10', 'they keep their own count instead');
+});
+
+test('a full check adds what Workers AI says it used, at that model\'s price', async () => {
+  const env = fakeEnv({
+    kv: metered(undefined),
+    ai: () => ({
+      response: JSON.stringify(CORRECTIONS),
+      usage: { prompt_tokens: 1000, completion_tokens: 100, total_tokens: 1100 },
+    }),
+  });
+  delete env.MODEL;
+  await worker.fetch(post({ text: 'I teh cat' }, KEY), env);
+  const one = cost(BIG, 1000, 100);   // about 47
+  assert.equal(env.KEYS.store.get(METER()), String(Math.ceil(one)));
+
+  await worker.fetch(post({ text: 'I teh cat' }, KEY), env);
+  assert.equal(env.KEYS.store.get(METER()), String(Math.ceil(Math.ceil(one) + one)), 'added to, not replaced');
+
+  // When the 70B is gone and Granite answers, it is Granite's price.
+  const fallback = fakeEnv({
+    kv: metered(undefined),
+    ai: (model) => {
+      if (model !== GRANITE) throw new Error('5028: deprecated');
+      return { response: JSON.stringify(CORRECTIONS), usage: { prompt_tokens: 1000, completion_tokens: 100 } };
+    },
+  });
+  delete fallback.MODEL;
+  const res = await worker.fetch(post({ text: 'I teh cat' }, KEY), fallback);
+  assert.equal((await res.json()).model, GRANITE);
+  assert.equal(fallback.KEYS.store.get(METER()), String(Math.ceil(cost(GRANITE, 1000, 100))));
+  assert.equal(fallback.KEYS.store.get(METER()), '3');
+});
+
+test('a model the Worker has no price for is metered at the 70B\'s price', async () => {
+  const env = fakeEnv({
+    kv: metered(undefined),
+    ai: () => ({ response: JSON.stringify(CORRECTIONS), usage: { prompt_tokens: 1000, completion_tokens: 100 } }),
+  });
+  env.MODEL = '@cf/someone/brand-new-model';
+  await worker.fetch(post({ text: 'I teh cat' }, KEY), env);
+  assert.equal(env.calls[0].model, '@cf/someone/brand-new-model');
+  assert.equal(env.KEYS.store.get(METER()), String(Math.ceil(cost(BIG, 1000, 100))));
+});
+
+test('with no usage from Workers AI, the meter goes by characters, four to a token', async () => {
+  const answer = JSON.stringify(CORRECTIONS);
+  const prompt = SYSTEM_PROMPT + userPrompt('I teh cat');
+  const byChars = cost(BIG, prompt.length / 4, answer.length / 4);
+
+  // No usage at all, an empty one, and one that says 0 for both.
+  for (const usage of [undefined, {}, { prompt_tokens: 0, completion_tokens: 0 }, { prompt_tokens: 'lots' }]) {
+    const env = fakeEnv({
+      kv: metered(undefined),
+      ai: () => ({ response: answer, ...(usage === undefined ? {} : { usage }) }),
+    });
+    delete env.MODEL;
+    await worker.fetch(post({ text: 'I teh cat' }, KEY), env);
+    assert.equal(env.KEYS.store.get(METER()), String(Math.ceil(byChars)), `usage ${JSON.stringify(usage)}`);
+  }
+
+  // Half a usage: what it says is used, and characters fill in the rest.
+  const half = fakeEnv({
+    kv: metered(10),
+    ai: () => ({ response: answer, usage: { prompt_tokens: 2000 } }),
+  });
+  delete half.MODEL;
+  await worker.fetch(post({ text: 'I teh cat' }, KEY), half);
+  assert.equal(half.KEYS.store.get(METER()), String(Math.ceil(10 + cost(BIG, 2000, answer.length / 4))));
+
+  // A model that answers with a bare string has no usage to give.
+  const bare = fakeEnv({ kv: metered(undefined), ai: () => answer });
+  delete bare.MODEL;
+  await worker.fetch(post({ text: 'I teh cat' }, KEY), bare);
+  assert.equal(bare.KEYS.store.get(METER()), String(Math.ceil(byChars)));
+});
+
+test('the meter counts what ran: an unreadable answer yes, a failed call no', async () => {
+  // It answered, so it cost something, even though nothing could be read.
+  const prose = fakeEnv({ kv: metered(undefined), ai: () => ({ response: 'I am sorry, I cannot do that.' }) });
+  const unread = await worker.fetch(post({ text: 'I teh cat' }, KEY), prose);
+  assert.equal((await unread.json()).unparsed, true);
+  assert.ok(Number(prose.KEYS.store.get(METER())) > 0, 'an unreadable answer still cost neurons');
+
+  // Nothing answered at all: nothing to add.
+  const broken = fakeEnv({ kv: metered(undefined), ai: () => { throw new Error('everything is on fire'); } });
+  assert.equal((await worker.fetch(post({ text: 'I teh cat' }, KEY), broken)).status, 502);
+  assert.equal(broken.KEYS.store.get(METER()), undefined);
+
+  // The account already out: nothing ran.
+  const spent = fakeEnv({ kv: metered(undefined), ai: () => { throw new Error('out of neurons for today (3040)'); } });
+  assert.equal((await worker.fetch(post({ text: 'I teh cat' }, KEY), spent)).status, 429);
+  assert.equal(spent.KEYS.store.get(METER()), undefined);
+
+  // A quick check never touches it.
+  const sentence = fakeEnv({ kv: metered(undefined) });
+  await withRandom(0.05, () => worker.fetch(quick('I saw teh dog.'), sentence));
+  assert.equal(sentence.KEYS.store.get(METER()), undefined);
+});
+
+test('full checks stop once what they have cost reaches the share', async () => {
+  // About 47 neurons each against a share of 100: three get in (0, 48, 96 at
+  // the time they ask), and the fourth is turned away.
+  const env = fakeEnv({
+    kv: metered(undefined),
+    ai: () => ({ response: JSON.stringify(CORRECTIONS), usage: { prompt_tokens: 1000, completion_tokens: 100 } }),
+  });
+  delete env.MODEL;
+  env.FULL_NEURONS_DAILY = '100';
+  const statuses = [];
+  for (let i = 0; i < 5; i += 1) statuses.push((await worker.fetch(post({ text: 'I teh cat' }, KEY), env)).status);
+  assert.deepEqual(statuses, [200, 200, 200, 429, 429]);
+  assert.equal(env.calls.length, 3);
+});
+
+test('FULL_NEURONS_DAILY changes the share, and 0 or nonsense means 6,000', async () => {
+  const ask = async (neurons, setting) => {
+    const env = fakeEnv({ kv: metered(neurons) });
+    if (setting !== undefined) env.FULL_NEURONS_DAILY = setting;
+    return (await worker.fetch(post({ text: 'I teh cat' }, KEY), env)).status;
+  };
+  assert.equal(await ask(99, '100'), 200);
+  assert.equal(await ask(100, '100'), 429);
+  assert.equal(await ask(7999, '8000'), 200, 'raised above the default');
+  for (const setting of [undefined, '', '0', '-5', 'lots']) {
+    assert.equal(await ask(5999, setting), 200, `FULL_NEURONS_DAILY ${JSON.stringify(setting)}`);
+    assert.equal(await ask(6000, setting), 429, `FULL_NEURONS_DAILY ${JSON.stringify(setting)}`);
+  }
+});
+
+test('the meter is read again before it is written, so a check that finished meanwhile is kept', async () => {
+  // Another full check finishes while this one is with the model.
+  const kv = metered(100);
+  const env = fakeEnv({
+    kv,
+    ai: () => {
+      kv.store.set(METER(), '300');
+      return { response: JSON.stringify(CORRECTIONS), usage: { prompt_tokens: 1000, completion_tokens: 100 } };
+    },
+  });
+  delete env.MODEL;
+  const puts = [];
+  const put = kv.put.bind(kv);
+  kv.put = async (key, value, options) => { puts.push({ key, options }); return put(key, value, options); };
+  await worker.fetch(post({ text: 'I teh cat' }, KEY), env);
+  assert.equal(kv.store.get(METER()), String(Math.ceil(300 + cost(BIG, 1000, 100))), 'not 100 + this one');
+  const meterPuts = puts.filter((p) => p.key === METER());
+  assert.equal(meterPuts.length, 1, 'one write per full check');
+  assert.ok(meterPuts[0].options && meterPuts[0].options.expirationTtl > 0, 'the meter expires like the other counters');
+});
+
+test('a meter KV cannot read or write never stops a full check', async () => {
+  // Cannot read: the check goes ahead, and nothing is written over a count
+  // that could not be seen.
+  const blind = metered(1e9);
+  const get = blind.get.bind(blind);
+  blind.get = async (key, options) => {
+    if (key.startsWith('neurons:')) throw new Error('KV get() limit exceeded');
+    return get(key, options);
+  };
+  const env = fakeEnv({ kv: blind });
+  const res = await worker.fetch(post({ text: 'I teh cat' }, KEY), env);
+  assert.equal(res.status, 200);
+  assert.deepEqual((await res.json()).corrections, CORRECTIONS.corrections);
+  assert.equal(blind.store.get(METER()), String(1e9), 'not reset to one check\'s worth');
+  assert.equal(blind.store.get(FULL_COUNTER()), '1', 'the key is still counted');
+
+  // Cannot write: still answered.
+  const full = metered(10);
+  const put = full.put.bind(full);
+  full.put = async (key, value, options) => {
+    if (key.startsWith('neurons:')) throw new Error('KV put() limit exceeded for the day.');
+    return put(key, value, options);
+  };
+  const env2 = fakeEnv({ kv: full });
+  const res2 = await worker.fetch(post({ text: 'I teh cat' }, KEY), env2);
+  assert.equal(res2.status, 200);
+  assert.equal(full.store.get(METER()), '10');
+  assert.equal(full.store.get(FULL_COUNTER()), '1');
+
+  // Could not read it before the check, could after: added to what is there.
+  const flaky = metered(500);
+  const flakyGet = flaky.get.bind(flaky);
+  let meterReads = 0;
+  flaky.get = async (key, options) => {
+    if (key.startsWith('neurons:') && (meterReads += 1) === 1) throw new Error('KV unavailable');
+    return flakyGet(key, options);
+  };
+  const env3 = fakeEnv({
+    kv: flaky,
+    ai: () => ({ response: JSON.stringify(CORRECTIONS), usage: { prompt_tokens: 1000, completion_tokens: 100 } }),
+  });
+  delete env3.MODEL;
+  assert.equal((await worker.fetch(post({ text: 'I teh cat' }, KEY), env3)).status, 200);
+  assert.equal(flaky.store.get(METER()), String(Math.ceil(500 + cost(BIG, 1000, 100))));
+});
+
+// ------------------------------------------------------------------- no CORS
+
+test('no answer carries CORS headers, so no web page can call this from a browser', async () => {
+  const responses = [
+    await worker.fetch(post({ text: 'I teh cat' }, KEY), fakeEnv()),                          // 200
+    await withRandom(0.5, () => worker.fetch(quick('I saw teh dog.'), fakeEnv())),            // 200 quick
+    await worker.fetch(post({ text: 'I teh cat' }), fakeEnv()),                               // 401
+    await worker.fetch(post({ text: 'I teh cat' }, KEY), fakeEnv({ kv: metered(1e9) })),      // 429
+    await worker.fetch(new Request('https://w.example/'), fakeEnv()),                         // 404
+    await worker.fetch(new Request('https://w.example/health'), fakeEnv()),                   // 200 health
+  ];
+  assert.deepEqual(responses.map((r) => r.status), [200, 200, 401, 429, 404, 200]);
+  for (const res of responses) {
+    assert.equal(res.headers.get('access-control-allow-origin'), null, `${res.status} allowed an origin`);
+    assert.equal(res.headers.get('access-control-allow-headers'), null);
+    assert.equal(res.headers.get('content-type'), 'application/json');
+  }
 });
 
 // ------------------------------------------------------------------ the rest
