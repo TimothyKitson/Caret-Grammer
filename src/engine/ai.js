@@ -393,6 +393,9 @@ async function callCaret(text, { apiKey, leaveAlone, mode, fetchImpl, signal }) 
     usage: payload && typeof payload.left === 'number' ? { left: payload.left } : {},
     model: (payload && payload.model) || 'caret',
     mode: (payload && payload.mode) || '',
+    // The server could not read its model's answer: nothing to go on, and
+    // nothing that should be remembered as this text's result.
+    unparsed: !!(payload && payload.unparsed),
   };
 }
 
@@ -487,13 +490,14 @@ export async function checkWithAi(text, {
   // The schema is meant to guarantee valid JSON, but never trust a remote
   // shape: a bad response should be a no-op, not a broken field.
   const corrections = parseCorrections(result.json);
-  if (!corrections) return { issues: [], truncated, usage: result.usage };
+  if (!corrections) return { issues: [], truncated, usage: result.usage, unparsed: true };
 
   return {
     issues: toIssues(text, corrections),
     truncated,
     usage: result.usage,
     model: result.model,
+    unparsed: !!result.unparsed,
   };
 }
 

@@ -489,7 +489,13 @@ $('aiKey').addEventListener('change', (e) => {
   const patch = { aiKey };
   // A Caret key is also kept on its own, for the quick check, so it survives
   // picking another AI for the full check later.
-  if (providerFor(aiKey) === 'caret') patch.caretKey = aiKey;
+  if (providerFor(aiKey) === 'caret') {
+    patch.caretKey = aiKey;
+  } else if (!aiKey && settings.caretKey && settings.caretKey === (settings.aiKey || '').trim()) {
+    // The Caret key was taken out of the box: it is gone, quick check included.
+    // (Replacing it with another AI's key keeps it, for the quick check.)
+    patch.caretKey = '';
+  }
   // Same reasoning as switching provider: a free ceiling left over from
   // before should not cap a paid key that was just pasted.
   const provider = settings.aiProvider || providerFor(aiKey) || '';
@@ -537,10 +543,16 @@ $('quickAiDailyLimit').addEventListener('change', (e) => {
 
 async function addWord() {
   const input = $('new-word');
-  // Kept exactly as typed: "Ignitia" stays "Ignitia".
-  const next = addCustomWord(settings.customWords, input.value);
+  // Kept exactly as typed: "Ignitia" stays "Ignitia", and typed here the
+  // capital is meant, so it is no longer a maybe-name.
+  const typed = input.value.trim();
+  const next = addCustomWord(settings.customWords, typed);
   input.value = '';
-  if (next !== settings.customWords) await save({ customWords: next });
+  const lower = typed.toLowerCase();
+  const softCapWords = (settings.softCapWords || []).filter((w) => w !== lower);
+  if (next !== settings.customWords || softCapWords.length !== (settings.softCapWords || []).length) {
+    await save({ customWords: next, softCapWords });
+  }
 }
 
 function siteMessage(text, tone) {

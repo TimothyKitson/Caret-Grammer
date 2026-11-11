@@ -511,3 +511,19 @@ test('a capitalised OK is correct, and lowercase ok is only mentioned when extra
   assert.deepEqual(idsFor('ok that works for me'), []);
   assert.ok(idsFor('ok that works for me', { categories: { advanced: true } }).includes('informal'));
 });
+
+test('a word added from the start of a sentence keeps its capital, but only as a maybe-name', () => {
+  // "Jaxon went home." / "Vlogging is fun.": the capital could be the
+  // sentence's. A lower-case use is only questioned where it is clearly a name.
+  dict.setUserWords(['Jaxon', 'Vlogging'], ['jaxon', 'vlogging']);
+  try {
+    assert.equal(findAt('Jaxon went home early.', 'Jaxon'), undefined, 'accepted as written');
+    assert.equal(findAt('We talked about vlogging again.', 'vlogging'), undefined, 'no false "name" flag');
+    assert.equal(findAt('I sat with jaxon at lunch.', 'jaxon'), undefined);
+    const named = findAt('My name is jaxon and I like dogs.', 'jaxon');
+    assert.ok(named, 'questioned where the sentence says it is a name');
+    assert.deepEqual(named.replacements, ['Jaxon']);
+  } finally {
+    dict.setUserWords([]);
+  }
+});

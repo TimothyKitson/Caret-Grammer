@@ -733,7 +733,29 @@ test('idle at the end of a line still sends, with or without lines after it', ()
   assert.deepEqual(g.due, ['We went to the park.']);
   const h = field('We went out.  \nWe came back.');   // spaces left at the end of the line
   h.moveAfter('We went out.').backspace(1).type('!').idle();
+  // A revision of a sentence that was already there is not sent on a pause,
+  // only once they move on from it: one change, one check.
+  assert.deepEqual(h.due, []);
+  h.moveTo(h.text.length);
   assert.deepEqual(h.due, ['We went out!']);
+});
+
+test('changing a checked sentence and pausing in it does not send it again until they leave', () => {
+  const f = field().type('I has a big dog.').idle();
+  assert.deepEqual(f.due, ['I has a big dog.']);
+  f.backspace(4).type('cat.').idle();
+  assert.deepEqual(f.due, ['I has a big dog.'], 'not on the pause');
+  f.backspace(4).type('cow.').idle();
+  assert.deepEqual(f.due, ['I has a big dog.'], 'nor on the next one');
+  f.leave();
+  assert.deepEqual(f.due, ['I has a big dog.', 'I has a big cow.'], 'once, on leaving');
+});
+
+test('deleting text and then pasting sentences there does not send the pasted ones', () => {
+  const f = field().type('Hello');
+  f.backspace(5).paste('It was a cold and windy day. We stayed inside all afternoon.');
+  f.type(' ').leave();
+  assert.deepEqual(f.due, []);
 });
 
 test('an edited sentence they paused in, then carried on with, is sent once it is finished', () => {

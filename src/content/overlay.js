@@ -478,7 +478,7 @@
           wrap.className = 'panel-ai';
           const go = document.createElement('button');
           go.className = 'ai-check';
-          go.disabled = !!(aiCheck.busy || aiCheck.spent);
+          go.disabled = !!(aiCheck.busy || aiCheck.reason);
           const svgNS = 'http://www.w3.org/2000/svg';
           const icon = document.createElementNS(svgNS, 'svg');
           icon.setAttribute('viewBox', '0 0 16 16');
@@ -487,11 +487,9 @@
           star.setAttribute('d', 'M8 0l1.8 5.2L15 7l-5.2 1.8L8 14l-1.8-5.2L1 7l5.2-1.8z');
           icon.appendChild(star);
           const label = document.createElement('span');
-          label.textContent = aiCheck.spent
-            ? 'No full AI checks left today'
-            : aiCheck.busy ? 'Checking…' : 'Check with AI';
+          label.textContent = aiCheck.reason || (aiCheck.busy ? 'Checking…' : 'Check with AI');
           go.append(icon, label);
-          if (aiCheck.keys && !aiCheck.spent) {
+          if (aiCheck.keys && !aiCheck.reason) {
             const keys = document.createElement('span');
             keys.className = 'keys';
             keys.textContent = aiCheck.keys;

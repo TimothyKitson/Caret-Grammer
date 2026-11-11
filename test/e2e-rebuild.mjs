@@ -141,6 +141,25 @@ await step("Caret's own panel offers the AI check when the site hides the right-
   assert.match(label || '', /Check with AI/);
 });
 
+await step('the panel says why the AI cannot run instead of doing nothing', async () => {
+  await page.evaluate(() => { document.getElementById('edC').textContent = 'Hi there.'; });
+  await page.click('#edC');
+  await sleep(800);
+  const state = await page.evaluate(async () => {
+    const host = document.querySelector('div[data-caret="ui"]');
+    const panel = host.shadowRoot.querySelector('.panel');
+    if (panel && !panel.hidden) host.shadowRoot.querySelector('.badge').click();
+    await new Promise((r) => setTimeout(r, 200));
+    host.shadowRoot.querySelector('.badge').click();
+    await new Promise((r) => setTimeout(r, 300));
+    const button = host.shadowRoot.querySelector('.panel button.ai-check');
+    return button ? { text: button.textContent, disabled: button.disabled } : null;
+  });
+  assert.ok(state, 'the button is there');
+  assert.match(state.text, /Too short to check with AI/);
+  assert.equal(state.disabled, true);
+});
+
 await context.close();
 server.close();
 console.log(`\n${passes} passed, ${failures.length} failed`);

@@ -94,6 +94,10 @@ export const DEFAULT_SETTINGS = {
   caretKey: '',
   disabledSites: [],
   customWords: [],
+  // Words added from a card where they started a sentence ("Jaxon went
+  // home."), in lower case. Their capital may only be the sentence's, so a
+  // lower-case use is only questioned where the sentence clearly means a name.
+  softCapWords: [],
   ignored: [],
   stats: { checks: 0, issues: 0, aiCalls: 0, aiErrors: 0, quickCalls: 0 },
   lastAiError: '',
@@ -178,6 +182,7 @@ export function mergeSettings(stored) {
   merged.autocorrect = { ...DEFAULT_SETTINGS.autocorrect, ...((stored && stored.autocorrect) || {}) };
   merged.disabledSites = Array.isArray(merged.disabledSites) ? merged.disabledSites : [];
   merged.customWords = Array.isArray(merged.customWords) ? merged.customWords : [];
+  merged.softCapWords = Array.isArray(merged.softCapWords) ? merged.softCapWords : [];
   merged.ignored = Array.isArray(merged.ignored) ? merged.ignored : [];
   return merged;
 }

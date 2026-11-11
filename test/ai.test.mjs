@@ -3,6 +3,7 @@
 
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { parseCorrections } from '../src/shared/proofread.js';
 import {
   checkWithAi, checkQuick, leaveAloneFor, toIssues, maskSecrets, resolveModel, AI_MODELS, DEFAULT_MODEL,
 } from '../src/engine/ai.js';
@@ -603,4 +604,25 @@ test('a key in the leave-alone list is dropped from a quick check, whatever its 
   });
   assert.ok(!JSON.stringify(capture.body).includes('AKIAIOSFODNN7EXAMPLE'));
   assert.deepEqual(capture.body.leaveAlone, ['deploy']);
+});
+
+test('an answer cut off at the length limit keeps every correction that was finished', () => {
+  const full = JSON.stringify({ corrections: [
+    { before: 'a ', original: 'teh', replacement: 'the', kind: 'spelling', explanation: 'with a } and "quotes" in it' },
+    { before: 'b ', original: 'recieve', replacement: 'receive', kind: 'spelling', explanation: 'y' },
+  ] });
+  const cut = full.slice(0, full.length - 30);
+  const kept = parseCorrections(cut);
+  assert.equal(kept.length, 1);
+  assert.equal(kept[0].original, 'teh');
+  assert.equal(parseCorrections('{"corrections":[{"orig'), null);
+  assert.equal(parseCorrections('not json at all'), null);
+});
+
+test('a Caret answer the server could not read is not remembered as the result', async () => {
+  const result = await checkWithAi('I has went home today.', {
+    provider: 'caret', apiKey: 'caret_testtesttest',
+    fetchImpl: stub({ payload: { corrections: [], unparsed: true } }),
+  });
+  assert.equal(result.unparsed, true);
 });

@@ -309,7 +309,7 @@
   const fieldFacts = new WeakMap();
   // Named code fonts. Not the bare word "monospace": that is what Chrome gives
   // every <textarea> nobody styled, and most of those are ordinary boxes.
-  const CODE_FONT = /\b(?:courier|consolas|menlo|monaco|source code|fira (?:code|mono)|jetbrains|sf mono|ubuntu mono|roboto mono|dejavu sans mono|liberation mono|cascadia|hack|inconsolata|andale mono|lucida console)\b/i;
+  const CODE_FONT = /\b(?:courier|consolas|menlo|monaco|source code|fira (?:code|mono)|jetbrains|sf ?mono|sfmono[\w-]*|ui-monospace|ubuntu mono|roboto mono|dejavu sans mono|liberation mono|cascadia|hack|inconsolata|andale mono|lucida console|iosevka)\b/i;
   const CODE_EDITOR = '.CodeMirror, .cm-editor, .monaco-editor, .ace_editor, pre, code, [data-language]';
 
   function factsFor(adapter) {
@@ -325,7 +325,9 @@
         // A box a site deliberately set in a plain "monospace" is a code box;
         // a textarea in it is just unstyled.
         const fonts = family.split(',').map((f) => f.trim().replace(/["']/g, '').toLowerCase());
-        code = fonts.some((f) => f !== 'monospace' && (/mono/.test(f) || CODE_FONT.test(f)))
+        // "Mono" as a word ("IBM Plex Mono", "Noto Sans Mono"), not inside
+        // another one ("Monotype Corsiva").
+        code = fonts.some((f) => f !== 'monospace' && (/\bmono\b/.test(f) || CODE_FONT.test(f)))
           || (el.tagName !== 'TEXTAREA' && /^\s*monospace\s*$/i.test(family));
       } catch (_) { /* detached */ }
     }
@@ -461,15 +463,18 @@
     return state;
   }
 
-  function quickNote(kind, inputType = '') {
-    if (!quickOn() || !active) return;
-    const adapter = active.adapter;
+  function quickNote(kind, inputType = '', target = null) {
+    if (!quickOn()) return;
+    const adapter = target || (active && active.adapter);
+    if (!adapter) return;
     if (quickSkipsField(adapter)) return;
     const state = quickFor(adapter);
     const text = adapter.getText().slice(0, MAX_CHARS);
     let due;
     if (kind === 'leave') {
       due = state.tracker.leave(text);
+    } else if (!active || active.adapter !== adapter) {
+      return;
     } else {
       const caret = adapter.caret();
       const pasted = kind === 'input' && /^insertFrom/.test(inputType);
@@ -633,12 +638,13 @@
     onApply: applyFix,
     onAddWord: async (issue) => {
       overlay.hideCard();
-      // "Vlogging is fun." - the capital is the sentence's, not the word's.
-      // Saving it would flag every lower-case "vlogging" as a misspelled name.
+      // "Vlogging is fun." or "Jaxon went home." - the capital may be the
+      // sentence's or the word's; there is no telling. It is kept, and the
+      // background treats it as a maybe-name: a lower-case use is questioned
+      // only where the sentence clearly means a name.
       const before = active ? active.adapter.getText().slice(0, issue.start) : '';
-      const atStart = /(^|[.!?…]["'”’)\]]*\s+|\n\s*)$/.test(before);
-      const word = atStart && /^[A-Z][a-z'’-]*$/.test(issue.text) ? issue.text.toLowerCase() : issue.text;
-      await send({ type: 'add-word', word });
+      const atSentenceStart = /(^|[.!?…]["'”’)\]]*\s+|\n\s*)$/.test(before);
+      await send({ type: 'add-word', word: issue.text, atSentenceStart });
       lastAiText = null;
       scheduleCheck({ immediate: true });
     },
@@ -650,6 +656,16 @@
     },
     onSettings: () => send({ type: 'open-options' }),
   };
+
+  /** Why the AI pass cannot run on this field right now, or '' if it can. */
+  function aiBlockedReason() {
+    if (aiLeftToday === 0) return 'No full AI checks left today';
+    if (!active) return '';
+    const text = active.adapter.getText().slice(0, MAX_CHARS);
+    if (text.trim().length < MIN_AI_CHARS) return 'Too short to check with AI';
+    if (SENSITIVE.some((re) => re.test(text))) return 'Not sent: it looks like it has a card number or a key in it';
+    return '';
+  }
 
   /** The AI pass, because someone asked for it. */
   function runAiNow() {
@@ -670,7 +686,7 @@
       rect,
       fixableCount: issues.filter((i) => i.source !== 'ai'
         && i.replacements && i.replacements.length && i.confidence !== 'low').length,
-      aiCheck: settings.aiEnabled ? { keys: checkKeys, spent: aiLeftToday === 0 } : null,
+      aiCheck: settings.aiEnabled ? { keys: checkKeys, reason: aiBlockedReason() } : null,
       handlers: {
         onApply: (issue, replacement) => { overlay.hidePanel(); applyFix(issue, replacement); },
         onFixAll: fixAll,
@@ -865,13 +881,16 @@
     // field keeps being the active element while the document loses focus.
     if (window === window.top && !document.hasFocus() && focusedElement() === active.adapter.element) return;
     clearTimeout(quickIdleTimer);
-    if (window !== window.top) {
-      // Inside a frame a tab switch looks like any other blur; the only tell
-      // is that the page is hidden a moment later.
-      setTimeout(() => { if (document.visibilityState !== 'hidden') quickNote('leave'); }, 60);
+    // The field being left, not whichever one is active when this runs: in a
+    // frame, focus may already be in the next box by then.
+    const leaving = active.adapter;
+    if (window !== window.top && !document.hasFocus()) {
+      // The whole frame lost focus. That is a tab switch or a click outside
+      // the frame, and the only tell is that a tab switch hides the page.
+      setTimeout(() => { if (document.visibilityState !== 'hidden') quickNote('leave', '', leaving); }, 60);
       return;
     }
-    quickNote('leave');
+    quickNote('leave', '', leaving);
   }, true);
 
   // Editors that handle paste themselves (ProseMirror, Quill, CKEditor,

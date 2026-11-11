@@ -153,7 +153,50 @@ function parseCorrections(raw) {
       if (parsed && Array.isArray(parsed.corrections)) return parsed.corrections;
     } catch (_) { /* try the next shape */ }
   }
-  return null;
+  // An answer cut off at the length limit - a long field with a lot wrong in
+  // it - is not worthless: every correction that was finished before the cut
+  // is still a good one.
+  return salvageCorrections(raw);
+}
+
+/** The complete correction objects from a "corrections" list that was cut off. */
+function salvageCorrections(raw) {
+  const key = raw.indexOf('"corrections"');
+  const open = key === -1 ? -1 : raw.indexOf('[', key);
+  if (open === -1) return null;
+  const out = [];
+  let depth = 0;
+  let inString = false;
+  let escaped = false;
+  let objectStart = -1;
+  for (let i = open + 1; i < raw.length; i += 1) {
+    const ch = raw[i];
+    if (inString) {
+      if (escaped) escaped = false;
+      else if (ch === '\\') escaped = true;
+      else if (ch === '"') inString = false;
+      continue;
+    }
+    if (ch === '"') {
+      inString = true;
+    } else if (ch === '{') {
+      if (depth === 0) objectStart = i;
+      depth += 1;
+    } else if (ch === '}') {
+      depth -= 1;
+      if (depth === 0 && objectStart !== -1) {
+        try {
+          const item = JSON.parse(raw.slice(objectStart, i + 1));
+          if (item && typeof item === 'object') out.push(item);
+        } catch (_) { /* a broken one is skipped */ }
+        objectStart = -1;
+      }
+      if (depth < 0) break;
+    } else if (ch === ']' && depth === 0) {
+      break;
+    }
+  }
+  return out.length ? out : null;
 }
 
 // How many "leave this alone" items to send. Long enough to cover the words a

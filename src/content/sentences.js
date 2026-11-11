@@ -374,6 +374,10 @@
     let editStart = null;        // where the sentence being edited starts
     let seen = typeof initialText === 'string' ? initialText : '';
     let shifted = false;         // shift() has already allowed for the latest change
+    // The sentence being edited was already checked (or was there before)
+    // when the edit began, or has been checked since. A pause does not send
+    // such a sentence again; leaving it does - one change, one check.
+    let reEditing = false;
     // Sentences only the end of their line can finish - "...the answer was
     // no.", "...at Acme Inc.", "I wonder..." - that the person left for
     // somewhere else on the same line. They are finished once the field is.
@@ -476,6 +480,7 @@
       }
       claim(segment, out);
       editStart = null;
+      reEditing = false;
     }
 
     /** A pending sentence is due if it is still there, exactly, at the end of its line. */
@@ -505,7 +510,10 @@
       for (const segment of segmentsBetween(text, from, newTo)) {
         if (segment.end <= from || segment.start >= newTo) continue;
         const wholly = segment.start >= from && segment.end <= newTo;
-        if (segment.start === editStart && !wholly) continue;
+        // Only partly pasted, and being edited - or about to be, with the caret
+        // in it: the person changed that sentence, so it stays open.
+        const holdsCaret = validCaret(caret) && caret >= segment.start && caret <= segment.end;
+        if (!wholly && (segment.start === editStart || holdsCaret)) continue;
         remember(segment.text);
       }
     }
@@ -532,25 +540,35 @@
             if (editStart === null) {
               const { from, newTo } = diff(before, text);
               const here = findAt(text, newTo, false);
-              if (here && here.start < from) editStart = here.start;
+              if (here && here.start < from) {
+                editStart = here.start;
+                reEditing = true;            // it was there before the paste
+              }
             }
             settlePasted(before, text);
           }
           return [];
         }
         const out = [];
+        // Pasted sentences first, so a paste landing where the person had just
+        // deleted something is not taken for the sentence they were editing.
+        if (pasted) settlePasted(before, text, caret);
         checkLeft(text, caret, out);
         if (editStart === null) {
           const here = findAt(text, caret, false);
           if (here) {
             editStart = here.start;
+            // Was this sentence already there, checked or not to be checked,
+            // before this edit? Then this is a revision.
+            const prior = findAt(before, here.start, false);
+            reEditing = !!prior && isSettled(prior.text);
           } else if (/^delete/.test(type) && findAt(text, nextOnLine(text, caret), false)) {
             // Deleted the opening word, and the caret is left in the space
             // before the rest of the sentence: that sentence was changed.
             editStart = caret;
+            reEditing = true;
           }
         }
-        if (pasted) settlePasted(before, text, caret);
         return out;
       },
 
@@ -581,10 +599,13 @@
           // revising, not done; the sentence goes when they move on. And an
           // open quote or bracket means they may be about to close it. Either
           // would change the sentence and cost a second check.
-          if (segment && caret === segment.end
+          if (!reEditing && segment && caret === segment.end
               && nextOnLine(text, segment.end) === lineEndOf(text, segment.end)
               && !stillOpen(segment.text)) {
             claim(segment, out);
+            // Checked now. Changing it again while still here is a revision,
+            // sent once they move on.
+            if (out.length) reEditing = true;
           }
         }
         return out;
@@ -604,6 +625,7 @@
           claim(findAt(text, editStart, true) || findAt(text, nextOnLine(text, editStart), true), out);
         }
         editStart = null;
+        reEditing = false;
         for (const sentence of pending) claimPending(text, sentence, out);
         pending.clear();
         return out;

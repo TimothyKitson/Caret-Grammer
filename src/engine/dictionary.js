@@ -50,9 +50,10 @@ export function createDictionary({
   const api = {
     size: words.size,
 
-    setUserWords(list) {
+    setUserWords(list, softCaps = []) {
       userWords = new Set();
       userForms = new Map();
+      const soft = new Set((softCaps || []).map((w) => String(w).toLowerCase()));
       for (const entry of list || []) {
         const form = String(entry || '').trim();
         if (!form) continue;
@@ -68,7 +69,9 @@ export function createDictionary({
           const builtIn = proper.get(lower);
           userForms.set(lower, {
             form,
-            ambiguous: builtIn ? builtIn.ambiguous : (words.has(lower) || rank.has(lower)),
+            ambiguous: builtIn
+              ? builtIn.ambiguous
+              : (soft.has(lower) || words.has(lower) || rank.has(lower)),
           });
         }
       }

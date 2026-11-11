@@ -397,7 +397,9 @@ async function aiIssuesFor(text, settings) {
       leaveAlone: leaveAloneList(settings),
     });
     if (aiCache.size >= AI_CACHE_MAX) aiCache.clear();
-    aiCache.set(text, result.issues);
+    // An answer that could not be read is not this text's result: asking
+    // again should really ask again.
+    if (!result.unparsed) aiCache.set(text, result.issues);
     bumpStats({ aiCalls: 1 });
     if (settingsCache && settingsCache.lastAiError) {
       await patchSettings({ lastAiError: '' });
@@ -450,7 +452,7 @@ async function handleCheck(message, sender) {
   } catch (error) {
     return { issues: [], error: `dictionary: ${error.message}` };
   }
-  dictionary.setUserWords(settings.customWords);
+  dictionary.setUserWords(settings.customWords, settings.softCapWords);
 
   let extra = [];
   let aiRan = false;
@@ -532,7 +534,7 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
           respond({ fix: null });
           return;
         }
-        dictionary.setUserWords(settings.customWords);
+        dictionary.setUserWords(settings.customWords, settings.softCapWords);
         const corrections = dictionary.correctionsFor(lower);
         if (!corrections || corrections.length !== 1 || dictionary.hasExact(lower)) {
           respond({ fix: null });
@@ -550,7 +552,15 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
         const settings = await getSettings();
         const word = String(message.word || '').trim();
         const next = addCustomWord(settings.customWords, word);
-        if (next !== settings.customWords) await saveSettings({ ...settings, customWords: next });
+        // Added from a sentence start: the capital may be the sentence's.
+        const lower = word.toLowerCase();
+        const soft = message.atSentenceStart && /^[A-Z][a-z'’-]*$/.test(word);
+        const softCapWords = soft
+          ? [...settings.softCapWords.filter((w) => w !== lower), lower]
+          : settings.softCapWords;
+        if (next !== settings.customWords || softCapWords !== settings.softCapWords) {
+          await saveSettings({ ...settings, customWords: next, softCapWords });
+        }
         aiCache.clear();
         respond({ ok: true });
         return;
@@ -608,7 +618,7 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
         if (!settings.enabled || !text.trim()) { respond({ issues: [] }); return; }
         try {
           const dictionary = await getDictionary();
-          dictionary.setUserWords(settings.customWords);
+          dictionary.setUserWords(settings.customWords, settings.softCapWords);
           const result = check(text, { dict: dictionary }, {
             categories: settings.categories,
             checkNames: settings.checkNames,
