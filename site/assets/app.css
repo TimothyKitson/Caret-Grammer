@@ -1138,7 +1138,7 @@ code {
   border-top: 1px solid var(--line);
   counter-increment: clause;
 }
-.policy > section:last-child { padding-bottom: 0; }
+.policy > section:last-child { padding-bottom: 72px; }
 .policy h2 { font-size: 1.5rem; letter-spacing: -.035em; line-height: 1.15; }
 .policy h2::before {
   content: counter(clause, decimal-leading-zero);
