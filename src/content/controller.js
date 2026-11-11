@@ -464,15 +464,11 @@
     if (!el || quieted.has(el)) return;
     if (!settings || settings.quietOthers === false) return;
     quieted.set(el, el.hasAttribute('spellcheck') ? el.getAttribute('spellcheck') : null);
+    // Set as the field gains focus, which is before Chrome's idle-time spell
+    // pass gets to it. No blur-and-refocus to force a re-read: that fires the
+    // site's own blur handlers (validation, "stopped typing", closing a
+    // suggestions list) every time someone clicks into a box.
     el.setAttribute('spellcheck', 'false');
-    // Chrome only re-reads spellcheck when the field is next focused, so a
-    // field already focused keeps its squiggles until nudged.
-    if (document.activeElement === el) {
-      try {
-        el.blur();
-        el.focus({ preventScroll: true });
-      } catch (_) { /* some editors refuse to be blurred */ }
-    }
   }
 
   function restoreNative(el) {

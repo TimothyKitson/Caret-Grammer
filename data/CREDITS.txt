@@ -1,0 +1,56 @@
+Caret - where the word lists come from
+======================================
+
+Caret's checking runs on four data files in this folder. They are built from
+the public sources below by tools/build-data.py and tools/hunspell-expand.py
+in the Caret source repository, then filtered and added to by hand.
+
+
+words.txt - the dictionary
+--------------------------
+* dwyl/english-words
+  https://github.com/dwyl/english-words
+  Released into the public domain (the Unlicense).
+
+* The en_US Hunspell dictionary from SCOWL, via wooorm/dictionaries
+  http://wordlist.aspell.net/  https://github.com/wooorm/dictionaries
+  Used for word forms (plurals, tenses) the base list was missing.
+  Copyright Kevin Atkinson and others; the full notice, which must travel
+  with any copy, is in LICENSE-hunspell-en_US.txt next to this file.
+
+* Words added for Caret (tools/sources/extra-words.txt).
+
+
+propernouns.txt - names, places and brands that take a capital
+---------------------------------------------------------------
+* The capitalized entries of the same en_US Hunspell dictionary (SCOWL),
+  under the notice in LICENSE-hunspell-en_US.txt, plus additions for Caret.
+
+
+frequency.txt - how common each word is
+---------------------------------------
+* hermitdave/FrequencyWords, 2018 English list
+  https://github.com/hermitdave/FrequencyWords
+  Word counts from the OpenSubtitles 2018 corpus (http://opus.nlpl.eu/).
+  Code MIT, (c) 2016 Hermit Dave. Content licensed CC BY-SA 4.0.
+
+  frequency.txt is an adaptation of that list (trimmed and filtered) and is
+  itself licensed under CC BY-SA 4.0:
+  https://creativecommons.org/licenses/by-sa/4.0/
+
+
+misspellings.json - common typos and their fixes
+------------------------------------------------
+* Wikipedia: Lists of common misspellings / For machines
+  https://en.wikipedia.org/wiki/Wikipedia:Lists_of_common_misspellings/For_machines
+  By Wikipedia contributors, licensed CC BY-SA 4.0.
+
+  misspellings.json is an adaptation of that list (entries that are also
+  ordinary words removed, format changed) and is itself licensed under
+  CC BY-SA 4.0: https://creativecommons.org/licenses/by-sa/4.0/
+
+
+Fonts on the settings page
+--------------------------
+Inter and Space Grotesk, SIL Open Font License 1.1. See
+src/options/fonts/README.txt and the LICENSE files beside it.

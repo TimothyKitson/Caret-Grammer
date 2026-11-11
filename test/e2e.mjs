@@ -252,6 +252,30 @@ await step('correct writing gets no underlines at all', async () => {
   assert.match((badge && badge.className) || '', /clean/);
 });
 
+await step("clicking into a field does not fire the site's blur handler", async () => {
+  // Sites run validation, "stopped typing" and close suggestion lists on blur.
+  // Caret switching off the native spellchecker must not set any of that off.
+  const blurs = await page.evaluate(async () => {
+    // A field Caret has never seen, so it really is activated on this focus.
+    const field = document.createElement('textarea');
+    document.body.appendChild(field);
+    await new Promise((r) => setTimeout(r, 100));
+    let count = 0;
+    const onBlur = () => { count += 1; };
+    field.addEventListener('blur', onBlur);
+    field.focus();
+    await new Promise((r) => setTimeout(r, 600));
+    field.removeEventListener('blur', onBlur);
+    const result = { count, spellcheck: field.getAttribute('spellcheck'), focused: document.activeElement === field };
+    field.blur();
+    field.remove();
+    return result;
+  });
+  assert.equal(blurs.count, 0, 'the field was blurred behind the user\'s back');
+  assert.equal(blurs.focused, true);
+  assert.equal(blurs.spellcheck, 'false', 'the native spellchecker should still be quieted');
+});
+
 await step('password fields are never checked', async () => {
   await page.click('#pw');
   await page.locator('#pw').fill('recieved teh wierd');
