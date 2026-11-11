@@ -1,77 +1,644 @@
-:root {
-  --bg: #ffffff;
-  --fg: #1b1b1b;
-  --muted: #5e5e5e;
-  --line: rgba(0, 0, 0, 0.09);
-  --accent: #5b4bff;
-  --chip: #f1f3f6;
+/* Caret popup: what opens when you click Caret in the toolbar.
+
+   It has to feel instant, so nothing animates in, the fonts are the two the
+   settings page already ships, and transitions only switch on once the first
+   real state has been drawn (body.ready) - otherwise the switches would visibly
+   flick from off to on every time the popup opens. */
+
+@font-face {
+  font-family: "Caret Sans";
+  src: url("../options/fonts/inter.woff2") format("woff2");
+  font-weight: 100 900;
+  font-display: block;
 }
+
+@font-face {
+  font-family: "Caret Display";
+  src: url("../options/fonts/grotesk.woff2") format("woff2");
+  font-weight: 300 700;
+  font-display: block;
+}
+
+:root {
+  color-scheme: light dark;
+  --bg: #f6f6fb;
+  --card: #ffffff;
+  --fg: #16161d;
+  --soft: #3d3d4e;
+  --muted: #5b5b70;
+  --faint: #6b6b80;
+  --line: rgba(22, 22, 29, .09);
+  --edge: #84849a;                 /* outlines that have to be seen: 3:1 on the card */
+  --hover: rgba(91, 75, 255, .055);
+  --chip: rgba(22, 22, 29, .055);
+  --key-top: #ffffff;
+  --key-bottom: #f1f1f8;
+  --key-edge: rgba(22, 22, 29, .16);
+  --iris: #5b4bff;
+  --iris-text: #5b4bff;
+  --mint: #00c68f;
+  --bad: #c62f20;
+  --bad-soft: rgba(198, 47, 32, .08);
+  --glow-iris: rgba(91, 75, 255, .22);
+  --glow-mint: rgba(0, 198, 143, .16);
+  --peak: rgba(91, 75, 255, .16);
+  --glow-card: rgba(91, 75, 255, .07);
+  --rim: .55;
+  --lift: 0 1px 2px rgba(22, 22, 29, .04), 0 10px 24px -16px rgba(22, 22, 29, .2);
+  --ease: cubic-bezier(.2, .7, .3, 1);
+}
+
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg: #23262b; --fg: #ececec; --muted: #a8a8a8;
-    --line: rgba(255, 255, 255, 0.12); --accent: #8e82ff; --chip: #32363d;
+    --bg: #0b0b12;
+    --card: #14141c;
+    --fg: #f0f0f6;
+    --soft: #d3d3de;
+    --muted: #a4a4b8;
+    --faint: #8d8da3;
+    --line: rgba(255, 255, 255, .08);
+    --edge: #77778c;
+    --hover: rgba(167, 159, 255, .07);
+    --chip: rgba(255, 255, 255, .07);
+    --key-top: #24242f;
+    --key-bottom: #1a1a23;
+    --key-edge: rgba(255, 255, 255, .16);
+    --iris-text: #a79fff;
+    --bad: #ff8b7d;
+    --bad-soft: rgba(255, 139, 125, .09);
+    --glow-iris: rgba(91, 75, 255, .42);
+    --glow-mint: rgba(0, 198, 143, .24);
+    --peak: rgba(167, 159, 255, .14);
+    --glow-card: rgba(91, 75, 255, .16);
+    --rim: .7;
+    --lift: 0 1px 0 rgba(255, 255, 255, .03) inset, 0 12px 28px -18px rgba(0, 0, 0, .9);
   }
 }
+
 * { box-sizing: border-box; }
+[hidden] { display: none !important; }
+
+html { background: var(--bg); }
+
 body {
-  width: 268px; margin: 0; padding: 12px 14px 10px;
-  font: 13px/1.45 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-  background: var(--bg); color: var(--fg);
+  position: relative;
+  isolation: isolate;
+  width: 340px;
+  margin: 0;
+  padding: 0 0 0;
+  overflow-x: hidden;
+  background: var(--bg);
+  color: var(--fg);
+  font: 13px/1.45 "Caret Sans", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
 }
-header { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
-h1 { font-size: 14px; margin: 0; font-weight: 650; }
+
+/* The aurora: iris into mint, blurred, behind the top of the popup only. */
+body::before {
+  content: "";
+  position: absolute;
+  z-index: -2;
+  inset: 0 0 auto 0;
+  height: 190px;
+  background:
+    radial-gradient(230px 150px at 8% -8%, var(--glow-iris), transparent 70%),
+    radial-gradient(210px 130px at 96% -22%, var(--glow-mint), transparent 72%);
+  pointer-events: none;
+}
+
+/* Carets as a quiet pattern: a field of small peaks that fades out to the left
+   and downwards, so it is texture behind the header and nothing more. */
+body::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 0 0 auto 0;
+  height: 120px;
+  background-color: var(--peak);
+  -webkit-mask:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='16'%3E%3Cpath d='M6.5 10.5 11 6l4.5 4.5' fill='none' stroke='%23000' stroke-width='1.3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") 0 0 / 22px 16px,
+    radial-gradient(260px 120px at 100% 0%, #000, transparent 72%);
+  -webkit-mask-composite: source-in;
+  mask:
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='22' height='16'%3E%3Cpath d='M6.5 10.5 11 6l4.5 4.5' fill='none' stroke='%23000' stroke-width='1.3' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E") 0 0 / 22px 16px,
+    radial-gradient(260px 120px at 100% 0%, #000, transparent 72%);
+  mask-composite: intersect;
+  pointer-events: none;
+}
+
+/* Caret off - everywhere, on this site, or because the browser will not let
+   it in - and the light goes out: the aurora drains, the logo stops glowing
+   and the readout loses its lit edge. */
+body[data-state="off"],
+body[data-state="site-off"],
+body[data-state="blocked"] {
+  --rim: 0;
+  --glow-card: transparent;
+}
+body[data-state="off"]::before,
+body[data-state="site-off"]::before,
+body[data-state="blocked"]::before { opacity: .3; filter: saturate(.15); }
+body[data-state="off"] .logo::before,
+body[data-state="site-off"] .logo::before,
+body[data-state="blocked"] .logo::before { opacity: .12; }
+body.ready::before { transition: opacity .4s var(--ease), filter .4s var(--ease); }
+body.ready .logo::before,
+body.ready .readout::before { transition: opacity .4s var(--ease); }
+
+/* ---------------------------------------------------------------- header */
+
+header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 14px 2px 16px;
+}
+
+.logo { position: relative; display: block; flex: none; }
+.logo img { display: block; width: 30px; height: 30px; border-radius: 7px; }
+.logo::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 2px -3px -7px;
+  border-radius: 12px;
+  background: linear-gradient(120deg, #5b4bff 20%, #00c68f 120%);
+  filter: blur(9px);
+  opacity: .55;
+}
+
+h1 {
+  margin: 0;
+  font: 600 18px/1 "Caret Display", "Caret Sans", sans-serif;
+  letter-spacing: -.03em;
+}
+
+.pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 26px;
+  margin: 0 0 0 auto;
+  padding: 0 11px 0 9px;
+  border-radius: 99px;
+  background: color-mix(in srgb, var(--card) 82%, transparent);
+  box-shadow: inset 0 0 0 1px var(--line), var(--lift);
+  color: var(--soft);
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: -.005em;
+  white-space: nowrap;
+}
+body[data-state="loading"] .pill { visibility: hidden; }
+
+.dot {
+  position: relative;
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--edge);
+}
+.dot::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: inherit;
+  opacity: 0;
+}
+body[data-state="watching"] .dot,
+body[data-state="found"] .dot {
+  background: var(--mint);
+  box-shadow: 0 0 8px color-mix(in srgb, var(--mint) 70%, transparent);
+}
+/* The one ambient effect in the popup: the dot breathes while Caret is on. */
+body[data-state="watching"] .dot::after,
+body[data-state="found"] .dot::after {
+  animation: breathe 2.6s var(--ease) infinite;
+}
+@keyframes breathe {
+  0% { transform: scale(1); opacity: .5; }
+  70%, 100% { transform: scale(3.2); opacity: 0; }
+}
+
+/* --------------------------------------------------------------- readout */
+
+/* The one thing to look at. A line of text with the caret in front of it,
+   lit along its edge while Caret is watching and plain when it is not. */
+.readout {
+  position: relative;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 13px;
+  min-height: 78px;
+  margin: 12px 14px 0;
+  padding: 15px 16px;
+  border-radius: 16px;
+  background:
+    radial-gradient(150px 90px at 0% 100%, var(--glow-card), transparent 72%),
+    var(--card);
+  box-shadow: inset 0 0 0 1px var(--line), var(--lift);
+}
+.readout::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  padding: 1px;
+  border-radius: inherit;
+  background: linear-gradient(115deg, #5b4bff, #00c68f 46%, transparent 78%);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask: linear-gradient(#000 0 0) content-box exclude, linear-gradient(#000 0 0);
+  opacity: var(--rim);
+  pointer-events: none;
+}
+
+.figure {
+  display: flex;
+  align-items: center;
+  flex: none;
+  gap: 5px;
+}
+
+.num {
+  position: relative;
+  padding-bottom: 7px;
+  color: var(--fg);
+  font: 700 40px/1 "Caret Display", "Caret Sans", sans-serif;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -.05em;
+}
+/* The count is underlined the way Caret underlines a word, and the line
+   draws itself. Brand colours here: the four underline colours each mean a
+   kind of mistake, and this number is all kinds at once. */
+.num::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 0 1px;
+  height: 3px;
+  border-radius: 3px;
+  background: linear-gradient(90deg, #5b4bff, #00c68f);
+  animation: draw .42s var(--ease) .06s both;
+}
+.num.wavy::after {
+  inset: auto 0 -2px 0;
+  height: 7px;
+  border-radius: 0;
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='7'%3E%3Cpath d='M0 4.8Q3 .2 6 4.8T12 4.8' fill='none' stroke='%23000' stroke-width='2.2' stroke-linecap='round'/%3E%3C/svg%3E") 0 50% / 12px 7px repeat-x;
+  mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='7'%3E%3Cpath d='M0 4.8Q3 .2 6 4.8T12 4.8' fill='none' stroke='%23000' stroke-width='2.2' stroke-linecap='round'/%3E%3C/svg%3E") 0 50% / 12px 7px repeat-x;
+}
+@keyframes draw {
+  from { clip-path: inset(0 100% 0 0); }
+  to { clip-path: inset(0 0 0 0); }
+}
+
+/* The namesake. It blinks while Caret is watching; when Caret is off it is
+   still there, grey and still. */
+.caret {
+  flex: none;
+  width: 3px;
+  height: 36px;
+  border-radius: 3px;
+  background: linear-gradient(#7a6cff, #5b4bff);
+  box-shadow: 0 0 14px rgba(91, 75, 255, .75);
+  animation: blink 1.06s steps(1, end) infinite;
+}
+@keyframes blink {
+  0%, 55% { opacity: 1; }
+  56%, 100% { opacity: 0; }
+}
+body[data-state="off"] .caret,
+body[data-state="site-off"] .caret,
+body[data-state="blocked"] .caret {
+  background: var(--edge);
+  box-shadow: none;
+  opacity: .55;
+  animation: none;
+}
+
+/* #status holds the sentence and, when there is one, the AI error. Its two
+   parts are laid out by the readout itself, so the error can take a full row. */
+.status {
+  display: contents;
+  color: var(--soft);
+  font-size: 13.5px;
+  line-height: 1.5;
+  letter-spacing: -.003em;
+  overflow-wrap: anywhere;
+}
+.status .say { flex: 1 1 0; min-width: 0; }
+body[data-state="off"] .status,
+body[data-state="site-off"] .status,
+body[data-state="blocked"] .status { color: var(--muted); }
+
+.vh {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.ai-error {
+  flex: 0 0 100%;
+  margin-top: 12px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  background: var(--bad-soft);
+  color: var(--bad);
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+/* --------------------------------------------------------------- switches */
+
+.group {
+  margin: 10px 14px 0;
+  border-radius: 16px;
+  background: var(--card);
+  box-shadow: inset 0 0 0 1px var(--line), var(--lift);
+}
+
 .row {
-  display: flex; align-items: center; gap: 10px; padding: 7px 0;
-  border-top: 1px solid var(--line); cursor: pointer;
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  min-height: 48px;
+  padding: 0 14px 0 11px;
+  cursor: pointer;
 }
-.row .label { flex: 1 1 auto; }
-.row b { font-weight: 650; }
-.switch input { position: absolute; opacity: 0; pointer-events: none; }
+.row + .row { border-top: 1px solid var(--line); }
+.row:first-child { border-radius: 16px 16px 0 0; }
+.row:last-child { border-radius: 0 0 16px 16px; }
+.row:hover { background: var(--hover); }
+.row:has(input:disabled) { cursor: default; }
+.row:has(input:disabled):hover { background: none; }
+.row:has(input:disabled) .label,
+.row:has(input:disabled) .ico { opacity: .6; }
+
+.ico {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 28px;
+  height: 28px;
+  border-radius: 9px;
+  background: var(--chip);
+  color: var(--muted);
+}
+.row:has(input:checked) .ico {
+  background: color-mix(in srgb, var(--iris-text) 13%, transparent);
+  color: var(--iris-text);
+}
+svg { display: block; fill: none; stroke: currentColor; stroke-width: 1.6; stroke-linecap: round; stroke-linejoin: round; }
+
+.label {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 13.5px;
+  font-weight: 500;
+  letter-spacing: -.005em;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.label b { font-weight: 650; }
+
+/* A real checkbox, hidden but still focusable, wrapped by its label. Off is an
+   outlined track with a small thumb; on is filled, with the thumb grown and
+   ticked - so the state never rests on colour alone. */
+.switch input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  opacity: 0;
+  pointer-events: none;
+}
 .track {
-  width: 34px; height: 19px; border-radius: 10px; background: #c9ccd2;
-  position: relative; transition: background 120ms ease; flex: 0 0 auto;
+  position: relative;
+  flex: none;
+  width: 40px;
+  height: 24px;
+  border-radius: 99px;
+  background: var(--chip);
+  box-shadow: inset 0 0 0 1.5px var(--edge);
 }
 .track::after {
-  content: ""; position: absolute; top: 2px; left: 2px; width: 15px; height: 15px;
-  border-radius: 50%; background: #fff; transition: transform 120ms ease;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+  content: "";
+  position: absolute;
+  top: 5px;
+  left: 5px;
+  width: 14px;
+  height: 14px;
+  border-radius: 99px;
+  background: var(--edge) center / 10px 10px no-repeat;
 }
-.switch input:checked + .track { background: var(--accent); }
-.switch input:checked + .track::after { transform: translateX(15px); }
-.switch input:focus-visible + .track { outline: 2px solid var(--accent); outline-offset: 2px; }
-.status {
-  margin: 10px 0 8px; padding: 7px 9px; border-radius: 7px; background: var(--chip);
-  color: var(--muted); font-size: 12px;
+.switch input:checked + .track {
+  background: linear-gradient(135deg, #6a5bff, #4a39ea);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .25), 0 4px 12px -5px rgba(91, 75, 255, .9);
 }
-.hint { color: var(--muted); font-size: 11.5px; line-height: 1.6; margin-bottom: 10px; }
-.hint b { color: var(--fg); font-weight: 600; }
-footer { display: flex; gap: 6px; border-top: 1px solid var(--line); padding-top: 9px; }
-button {
-  font: inherit; padding: 6px 11px; border-radius: 7px; border: 1px solid var(--line);
-  background: var(--chip); color: var(--fg); cursor: pointer; flex: 1 1 auto;
+.switch input:checked + .track::after {
+  top: 3px;
+  left: 3px;
+  width: 18px;
+  height: 18px;
+  transform: translateX(16px);
+  background-color: #fff;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 10'%3E%3Cpath d='M2.3 5.2 4.3 7.1 7.7 3.2' fill='none' stroke='%235b4bff' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  box-shadow: 0 1px 3px rgba(11, 11, 18, .35);
 }
-button.primary { background: var(--accent); border-color: transparent; color: #fff; font-weight: 600; }
-button:hover { filter: brightness(1.06); }
+.row:hover input:not(:disabled):not(:checked) + .track { box-shadow: inset 0 0 0 1.5px var(--iris-text); }
+.row:hover input:not(:disabled):not(:checked) + .track::after { background-color: var(--iris-text); }
+.row:active input:not(:disabled) + .track::after { width: 18px; }
+.row:active input:not(:disabled):checked + .track::after { width: 21px; transform: translateX(13px); }
+.switch input:disabled + .track { opacity: .5; }
+.switch input:focus-visible + .track { outline: 2px solid var(--iris-text); outline-offset: 2px; }
 
-/* The ask-for-an-AI-pass button. Hidden unless AI is switched on. */
-button.ai {
-  display: block;
-  width: 100%;
-  margin: 2px 0 10px;
-  padding: 9px 12px;
-  border: 1px solid var(--line, #d8d8e0);
-  border-radius: 10px;
-  background: var(--card, #fff);
-  cursor: pointer;
-  text-align: left;
+/* Checking is off everywhere, so the site switch is remembered, not live. */
+body[data-state="off"] .row + .row input:checked + .track { filter: saturate(.25) opacity(.7); }
+body[data-state="off"] .row + .row:has(input:checked) .ico { background: var(--chip); color: var(--muted); }
+
+body.ready .track,
+body.ready .ico { transition: background-color .2s var(--ease), box-shadow .2s var(--ease), color .2s var(--ease), filter .2s var(--ease); }
+body.ready .track::after {
+  transition: transform .26s cubic-bezier(.3, 1.35, .5, 1), width .2s var(--ease), height .2s var(--ease),
+    top .2s var(--ease), left .2s var(--ease), background-color .2s var(--ease);
+}
+
+/* ---------------------------------------------------------- check with AI */
+
+.ai {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 12px;
+  width: calc(100% - 28px);
+  min-height: 62px;
+  margin: 12px 14px 0;
+  padding: 11px 13px 11px 14px;
+  border: 0;
+  border-radius: 16px;
+  background: linear-gradient(135deg, #5b4bff 0%, #4a39ea 62%, #3f2fd6 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, .26),
+    inset 0 0 0 1px rgba(255, 255, 255, .08),
+    -12px 14px 26px -18px rgba(91, 75, 255, .95),
+    14px 14px 28px -16px rgba(0, 198, 143, .6);
+  color: #fff;
   font: inherit;
-  transition: border-color .12s, background .12s;
+  text-align: left;
+  cursor: pointer;
 }
-button.ai:hover:not(:disabled) { border-color: #5b4bff; background: #f6f5ff; }
-button.ai:disabled { opacity: .6; cursor: default; }
-button.ai .ai-label { display: block; font-weight: 600; }
-button.ai .ai-sub { display: block; font-size: 11px; opacity: .65; margin-top: 1px; }
+/* Mint light in the far corner, under the keycaps only - never under text. */
+.ai::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  background: radial-gradient(130px 78px at 100% 0%, rgba(0, 198, 143, .62), transparent 72%);
+}
+/* A sheen that crosses the button once when the pointer arrives. */
+.ai::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  background: linear-gradient(105deg, transparent 38%, rgba(255, 255, 255, .2) 50%, transparent 62%);
+  transform: translateX(-110%);
+}
+.ai:hover:not(:disabled)::after { transform: translateX(110%); transition: transform .65s var(--ease); }
+.ai:hover:not(:disabled) { filter: brightness(1.06); }
+.ai:active:not(:disabled) { transform: scale(.985); }
+.ai:focus-visible { outline: 2px solid var(--iris-text); outline-offset: 2px; }
+.ai:disabled { cursor: default; filter: saturate(.7); opacity: .78; }
 
-@media (prefers-color-scheme: dark) {
-  button.ai:hover:not(:disabled) { background: #221f3a; }
+.spark { fill: #fff; stroke: none; filter: drop-shadow(0 0 6px rgba(255, 255, 255, .55)); }
+.spark .star { transform-box: fill-box; transform-origin: center; }
+.spark .small { opacity: .8; }
+.ai:hover:not(:disabled) .star { transform: rotate(20deg) scale(1.1); }
+.ai:hover:not(:disabled) .small { transform: rotate(-30deg) scale(1.3); opacity: 1; }
+body.ready .ai { transition: transform .15s var(--ease), filter .2s var(--ease); }
+body.ready .spark .star { transition: transform .4s cubic-bezier(.3, 1.35, .5, 1), opacity .3s var(--ease); }
+
+.ai-text { min-width: 0; }
+.ai-label {
+  display: block;
+  font: 600 14.5px/1.25 "Caret Display", "Caret Sans", sans-serif;
+  letter-spacing: -.012em;
+}
+.ai-sub {
+  display: block;
+  margin-top: 2px;
+  color: rgba(255, 255, 255, .92);
+  font-size: 11.5px;
+  line-height: 1.35;
+}
+.ai-sub:empty { display: none; }
+
+.ai-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 8px 16px 0;
+  color: var(--muted);
+  font-size: 11.5px;
+  font-variant-numeric: tabular-nums;
+}
+.ai-meta b { color: var(--soft); font-weight: 600; }
+.ai-meta .sep { color: var(--faint); }
+.ai-meta.warn { color: var(--bad); }
+
+/* --------------------------------------------------------------- keycaps */
+
+.combo { display: inline-flex; flex: none; gap: 3px; }
+
+kbd {
+  display: inline-grid;
+  place-items: center;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 6px;
+  border-radius: 6px;
+  background: linear-gradient(var(--key-top), var(--key-bottom));
+  box-shadow: inset 0 0 0 1px var(--key-edge), inset 0 -1.5px 0 var(--key-edge), 0 1px 1px rgba(11, 11, 18, .06);
+  color: var(--soft);
+  font: 600 10.5px/1 "Caret Sans", sans-serif;
+  letter-spacing: .01em;
+  white-space: nowrap;
+}
+.unset {
+  height: 22px;
+  padding: 0 8px;
+  border-radius: 6px;
+  box-shadow: inset 0 0 0 1px var(--line);
+  color: var(--faint);
+  font-size: 10.5px;
+  line-height: 22px;
+}
+.ai kbd {
+  background: rgba(11, 11, 18, .34);
+  box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .2);
+  color: #fff;
+}
+.ai .unset { display: none; }
+
+.keys {
+  display: grid;
+  gap: 7px;
+  margin: 13px 16px 0;
+  padding: 0;
+  list-style: none;
+  color: var(--muted);
+  font-size: 12px;
+}
+.keys li { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 22px; }
+
+/* ---------------------------------------------------------------- footer */
+
+footer {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  margin-top: 13px;
+  padding: 7px 8px;
+  border-top: 1px solid var(--line);
+  background: color-mix(in srgb, var(--card) 55%, transparent);
+}
+footer button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 30px;
+  padding: 0 10px 0 8px;
+  border: 0;
+  border-radius: 9px;
+  background: none;
+  color: var(--muted);
+  font: 550 12.5px/1 "Caret Sans", sans-serif;
+  cursor: pointer;
+}
+footer button:hover { background: var(--chip); color: var(--fg); }
+footer button:active { transform: scale(.97); }
+footer button:focus-visible { outline: 2px solid var(--iris-text); outline-offset: -1px; }
+body.ready footer button { transition: background-color .15s var(--ease), color .15s var(--ease), transform .12s var(--ease); }
+
+.ver {
+  margin-left: auto;
+  padding-right: 8px;
+  color: var(--faint);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
 }

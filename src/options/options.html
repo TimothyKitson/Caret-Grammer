@@ -2,62 +2,96 @@
 <html lang="en">
 <head>
   <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="color-scheme" content="light dark">
   <title>Caret settings</title>
+  <link rel="preload" href="fonts/inter.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="fonts/grotesk.woff2" as="font" type="font/woff2" crossorigin>
   <link rel="stylesheet" href="options.css">
 </head>
 <body>
+
+<!-- One icon per section, drawn once and reused by the sidebar and the
+     headings. Nothing here is fetched: the page has to work on a plane. -->
+<svg class="sprite" aria-hidden="true" focusable="false">
+  <symbol id="i-preview" viewBox="0 0 20 20"><path d="M4 5.5h12M4 9.5h7"/><path d="M4 14.6q1.25-2.2 2.5 0t2.5 0 2.5 0 2.5 0"/></symbol>
+  <symbol id="i-checks" viewBox="0 0 20 20"><path d="m3.5 6 1.6 1.6L8 4.6M11.2 6h5.3M3.5 13.4 5.1 15 8 12M11.2 13.4h5.3"/></symbol>
+  <symbol id="i-auto" viewBox="0 0 20 20"><path d="M11.2 2.6 4.6 11h4.6l-.9 6.4 6.6-8.6h-4.7z"/></symbol>
+  <symbol id="i-ai" viewBox="0 0 20 20"><path d="M8.5 3.2c.6 3.5 1.8 4.7 5.3 5.3-3.5.6-4.7 1.8-5.3 5.3-.6-3.5-1.8-4.7-5.3-5.3 3.5-.6 4.7-1.8 5.3-5.3z"/><path d="M15.3 12.4c.2 1.3.7 1.8 2 2-1.3.2-1.8.7-2 2-.2-1.3-.7-1.8-2-2 1.3-.2 1.8-.7 2-2z"/></symbol>
+  <symbol id="i-words" viewBox="0 0 20 20"><path d="M4.5 4.8A1.8 1.8 0 0 1 6.3 3h9.2v11.2H6.3a1.8 1.8 0 0 0-1.8 1.8z"/><path d="M4.5 16a1.8 1.8 0 0 0 1.8 1.8h9.2M8 6.8h4.2"/></symbol>
+  <symbol id="i-sites" viewBox="0 0 20 20"><circle cx="10" cy="10" r="7"/><path d="M3 10h14M10 3c2.4 2.4 2.4 11.6 0 14M10 3c-2.4 2.4-2.4 11.6 0 14"/></symbol>
+  <symbol id="i-keys" viewBox="0 0 20 20"><rect x="2.5" y="5" width="15" height="10" rx="2.4"/><path d="M5.9 8.5h.2M8.6 8.5h.2M11.3 8.5h.2M14 8.5h.2M7 11.7h6"/></symbol>
+  <symbol id="i-numbers" viewBox="0 0 20 20"><path d="M4.5 16.5v-5M10 16.5v-13M15.5 16.5v-8.5"/></symbol>
+  <symbol id="i-search" viewBox="0 0 20 20"><circle cx="9" cy="9" r="5.5"/><path d="m13.2 13.2 3.3 3.3"/></symbol>
+  <symbol id="i-lock" viewBox="0 0 20 20"><rect x="4.5" y="9" width="11" height="8" rx="2.2"/><path d="M7 9V6.8a3 3 0 0 1 6 0V9"/></symbol>
+  <symbol id="i-caret" viewBox="0 0 20 20"><path d="m5 13 5-6 5 6"/></symbol>
+  <symbol id="i-ask" viewBox="0 0 20 20"><path d="m5.5 3.8 3.3 11.6 2.1-4.5 4.5-2.1z"/><path d="m11.8 11.8 3.7 3.7"/></symbol>
+  <symbol id="i-clock" viewBox="0 0 20 20"><circle cx="10" cy="10" r="7"/><path d="M10 6v4.3l2.8 1.7"/></symbol>
+</svg>
+
 <div class="shell">
 
   <aside class="side">
     <div class="brand">
-      <img src="../../icons/icon128.png" alt="" width="34" height="34">
-      <div>
-        <strong>Caret</strong>
+      <span class="logo"><img src="../../icons/icon128.png" alt="" width="40" height="40"></span>
+      <div class="brand-text">
+        <h1>Caret</h1>
         <span id="version"></span>
       </div>
+      <p class="pill">
+        <span class="dot" id="master-dot"></span>
+        <span id="master-text">Checking</span>
+      </p>
     </div>
 
     <div class="search">
-      <input type="search" id="search" placeholder="Search settings" spellcheck="false" autocomplete="off">
+      <svg class="ico" aria-hidden="true"><use href="#i-search"/></svg>
+      <input type="search" id="search" placeholder="Search settings" aria-label="Search settings" spellcheck="false" autocomplete="off">
     </div>
 
-    <nav id="nav">
-      <a href="#sec-preview">Preview</a>
-      <a href="#sec-checks">What to check</a>
-      <a href="#sec-autocorrect">Autocorrect</a>
-      <a href="#sec-ai">AI proofreading</a>
-      <a href="#sec-words">My dictionary</a>
-      <a href="#sec-sites">Sites</a>
-      <a href="#sec-keys">Keyboard</a>
-      <a href="#sec-about">Numbers</a>
+    <nav id="nav" aria-label="Sections">
+      <a href="#sec-preview"><svg class="ico" aria-hidden="true"><use href="#i-preview"/></svg>Preview</a>
+      <a href="#sec-checks"><svg class="ico" aria-hidden="true"><use href="#i-checks"/></svg>What to check</a>
+      <a href="#sec-autocorrect"><svg class="ico" aria-hidden="true"><use href="#i-auto"/></svg>Autocorrect</a>
+      <a href="#sec-ai"><svg class="ico" aria-hidden="true"><use href="#i-ai"/></svg>AI proofreading</a>
+      <a href="#sec-words"><svg class="ico" aria-hidden="true"><use href="#i-words"/></svg>My dictionary</a>
+      <a href="#sec-sites"><svg class="ico" aria-hidden="true"><use href="#i-sites"/></svg>Sites</a>
+      <a href="#sec-keys"><svg class="ico" aria-hidden="true"><use href="#i-keys"/></svg>Keyboard</a>
+      <a href="#sec-about"><svg class="ico" aria-hidden="true"><use href="#i-numbers"/></svg>Numbers</a>
     </nav>
 
-    <p class="side-foot">
-      <span class="dot" id="master-dot"></span>
-      <span id="master-text">Checking</span>
-    </p>
+    <p class="side-note">Writing that catches itself.</p>
   </aside>
 
   <main>
     <p class="no-results" id="no-results" hidden>Nothing matches that.</p>
 
     <!-- ---------------------------------------------------------- preview -->
-    <section id="sec-preview">
-      <h2>Preview</h2>
+    <section id="sec-preview" class="hero">
+      <h2><svg class="ico" aria-hidden="true"><use href="#i-preview"/></svg>Preview</h2>
       <p class="note">A real check, run with your settings as they are right now. Change anything below and this updates.</p>
-      <div class="preview" id="preview" aria-live="polite"></div>
-      <p class="legend">
-        <span class="swatch spelling"></span>spelling
-        <span class="swatch grammar"></span>grammar
-        <span class="swatch punctuation"></span>punctuation
-        <span class="swatch style"></span>clarity
-        <span class="swatch ai"></span>AI
-      </p>
+      <div class="stage">
+        <div class="editor">
+          <div class="editor-bar">
+            <span class="lights" aria-hidden="true"><i></i><i></i><i></i></span>
+            <span class="editor-title">Sample text</span>
+            <span class="editor-count" id="preview-count"></span>
+          </div>
+          <div class="preview" id="preview" aria-live="polite"></div>
+          <p class="legend">
+            <span class="key"><span class="swatch spelling"></span>spelling</span>
+            <span class="key"><span class="swatch grammar"></span>grammar</span>
+            <span class="key"><span class="swatch punctuation"></span>punctuation</span>
+            <span class="key"><span class="swatch style"></span>clarity</span>
+            <span class="key"><span class="swatch ai"></span>AI</span>
+          </p>
+        </div>
+      </div>
     </section>
 
     <!-- ----------------------------------------------------------- checks -->
     <section id="sec-checks">
-      <h2>What to check</h2>
+      <h2><svg class="ico" aria-hidden="true"><use href="#i-checks"/></svg>What to check</h2>
       <div id="categories"></div>
 
       <div class="rule"></div>
@@ -80,7 +114,7 @@
         <span class="track" aria-hidden="true"></span>
       </label>
 
-      <div class="row stack" data-search="underline style straight wavy squiggly line">
+      <div class="row wrap" data-search="underline style straight wavy squiggly line">
         <span class="text"><b>Underline style</b><i>Straight is quieter and lines up with the text better.</i></span>
         <div class="seg" id="underlineStyle" role="radiogroup" aria-label="Underline style">
           <button type="button" role="radio" data-value="straight">Straight</button>
@@ -91,7 +125,7 @@
 
     <!-- ------------------------------------------------------ autocorrect -->
     <section id="sec-autocorrect">
-      <h2>Autocorrect <span class="tag">off by default</span></h2>
+      <h2><svg class="ico" aria-hidden="true"><use href="#i-auto"/></svg>Autocorrect <span class="tag">off by default</span></h2>
       <p class="note">
         Caret normally underlines a mistake and waits for you. With this on, the
         few mistakes that have exactly one right answer get fixed the moment you
@@ -110,7 +144,7 @@
 
     <!-- --------------------------------------------------------------- ai -->
     <section id="sec-ai">
-      <h2>AI proofreading <span class="tag">optional</span></h2>
+      <h2><svg class="ico" aria-hidden="true"><use href="#i-ai"/></svg>AI proofreading <span class="tag">optional</span></h2>
       <p class="note">
         The built-in checks are instant, offline and free. This one sends the
         contents of the field to <b id="ai-host">an AI provider</b> and adds what
@@ -156,7 +190,7 @@
             <i id="key-hint">Kept in this browser profile and sent only to the service it belongs to.</i>
           </span>
           <div class="inline">
-            <input type="password" id="aiKey" placeholder="sk-…" autocomplete="off" spellcheck="false">
+            <input type="password" id="aiKey" placeholder="sk-…" autocomplete="off" spellcheck="false" aria-labelledby="key-label">
             <button type="button" id="test">Test</button>
           </div>
           <p class="warn" id="key-warn" hidden></p>
@@ -164,12 +198,12 @@
 
         <div class="row stack" id="model-row" data-search="model gpt claude haiku cost">
           <span class="text"><b>Model</b><i id="model-hint">The cheapest one is plenty for proofreading.</i></span>
-          <select id="aiModel"></select>
+          <select id="aiModel" aria-label="Model"></select>
         </div>
 
         <div class="row stack" id="effort-row" data-search="effort thorough low medium high">
           <span class="text"><b>Effort</b><i>Anthropic models only. Low is quick and cheap.</i></span>
-          <select id="aiEffort">
+          <select id="aiEffort" aria-label="Effort">
             <option value="low">Low — quick and cheap</option>
             <option value="medium">Medium</option>
             <option value="high">High — most thorough</option>
@@ -183,12 +217,12 @@
 
         <div class="row" id="interval-row" data-search="interval minutes how often">
           <span class="text"><b>How often</b><i>Minutes between checks while you are typing in a field.</i></span>
-          <input type="text" id="aiIntervalMinutes" inputmode="numeric" size="3" class="num">
+          <input type="text" id="aiIntervalMinutes" inputmode="numeric" size="3" class="num" aria-label="Minutes between checks">
         </div>
 
         <div class="row" data-search="daily limit cap spend budget free rate limit 50">
           <span class="text"><b id="limit-label">Checks a day</b><i id="ai-budget"></i></span>
-          <input type="text" id="aiDailyLimit" inputmode="numeric" size="4" class="num">
+          <input type="text" id="aiDailyLimit" inputmode="numeric" size="4" class="num" aria-labelledby="limit-label">
         </div>
 
         <p class="result" id="ai-result"></p>
@@ -197,10 +231,10 @@
 
     <!-- ------------------------------------------------------------ words -->
     <section id="sec-words">
-      <h2>My dictionary <span class="count" id="words-count"></span></h2>
+      <h2><svg class="ico" aria-hidden="true"><use href="#i-words"/></svg>My dictionary <span class="count" id="words-count"></span></h2>
       <p class="note">Words Caret should always accept — surnames, street names, anything it keeps underlining that is not wrong.</p>
-      <div class="inline" data-search="add word dictionary custom">
-        <input type="text" id="new-word" placeholder="Kitson" spellcheck="false">
+      <div class="inline add" data-search="add word dictionary custom">
+        <input type="text" id="new-word" placeholder="Kitson" spellcheck="false" aria-label="A word to add to your dictionary">
         <button type="button" id="add-word" class="primary">Add</button>
       </div>
       <ul class="chips" id="words"></ul>
@@ -208,7 +242,7 @@
 
     <!-- ------------------------------------------------------------ sites -->
     <section id="sec-sites">
-      <h2>Turned off on <span class="count" id="sites-count"></span></h2>
+      <h2><svg class="ico" aria-hidden="true"><use href="#i-sites"/></svg>Turned off on <span class="count" id="sites-count"></span></h2>
       <ul class="chips" id="sites"></ul>
       <p class="hint" id="sites-empty">Right-click any page and choose <b>Turn off on this site</b> to add one.</p>
 
@@ -222,28 +256,40 @@
 
     <!-- --------------------------------------------------------- keyboard -->
     <section id="sec-keys">
-      <h2>Keyboard and buttons</h2>
+      <h2><svg class="ico" aria-hidden="true"><use href="#i-keys"/></svg>Keyboard and buttons</h2>
       <dl class="keys">
-        <dt><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>Space</kbd></dt>
-        <dd>Suggestions for the word the cursor is in</dd>
-        <dt><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>.</kbd></dt>
-        <dd>Proofread this field with AI</dd>
-        <dt><kbd>Esc</kbd></dt>
-        <dd>Close the suggestion card</dd>
-        <dt>Toolbar</dt>
-        <dd>The Caret button has a <b>Check with AI</b> button in it</dd>
-        <dt>Right-click</dt>
-        <dd><b>Proofread with AI</b>, right there in the menu — no shortcut to remember</dd>
-        <dt>Right-click</dt>
-        <dd>Also: add a word to your dictionary, or turn Caret off on this site</dd>
+        <div>
+          <dt data-command="show-suggestions"><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>Space</kbd></dt>
+          <dd>Suggestions for the word the cursor is in</dd>
+        </div>
+        <div>
+          <dt data-command="check-now"><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>.</kbd></dt>
+          <dd>Proofread this field with AI</dd>
+        </div>
+        <div>
+          <dt><kbd>Esc</kbd></dt>
+          <dd>Close the suggestion card</dd>
+        </div>
+        <div>
+          <dt><span class="where">Toolbar</span></dt>
+          <dd>The Caret button has a <b>Check with AI</b> button in it</dd>
+        </div>
+        <div>
+          <dt><span class="where">Right-click</span></dt>
+          <dd><b>Proofread with AI</b>, right there in the menu — no shortcut to remember</dd>
+        </div>
+        <div>
+          <dt><span class="where">Right-click</span></dt>
+          <dd>Also: add a word to your dictionary, or turn Caret off on this site</dd>
+        </div>
       </dl>
       <button type="button" id="shortcuts">Change the shortcuts</button>
     </section>
 
     <!-- ------------------------------------------------------------ about -->
     <section id="sec-about">
-      <h2>Numbers</h2>
-      <p class="stats" id="stats"></p>
+      <h2><svg class="ico" aria-hidden="true"><use href="#i-numbers"/></svg>Numbers</h2>
+      <div class="stats" id="stats"></div>
       <div class="rule"></div>
       <div class="row" data-search="reset defaults">
         <span class="text"><b>Reset everything to defaults</b><i>Your dictionary, your turned-off sites and your ignore list go too.</i></span>
@@ -252,7 +298,7 @@
     </section>
 
     <footer>
-      <p>Nothing you type leaves this computer unless you switch on AI proofreading.</p>
+      <p><svg class="ico" aria-hidden="true"><use href="#i-lock"/></svg>Nothing you type leaves this computer unless you switch on AI proofreading.</p>
     </footer>
   </main>
 

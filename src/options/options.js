@@ -255,6 +255,9 @@ function renderPreview(issues) {
   }
   host.append(PREVIEW_TEXT.slice(at));
 
+  const count = $('preview-count');
+  if (count) count.textContent = spans.length ? `${spans.length} found` : '';
+
   if (!spans.length) {
     const note = document.createElement('span');
     note.className = 'none';
@@ -518,6 +521,39 @@ for (const section of document.querySelectorAll('main > section')) spy.observe(s
 
 // ------------------------------------------------------------------ load
 
+// The keyboard section ships with the default shortcuts. The browser knows the
+// real ones - changed on the shortcuts page, or never assigned because another
+// extension took the key first - so show those instead.
+async function paintShortcuts() {
+  let commands = [];
+  try {
+    commands = await chrome.commands.getAll();
+  } catch (_) {
+    return;
+  }
+  const label = { Period: '.', Comma: ',' };
+  for (const node of document.querySelectorAll('[data-command]')) {
+    const command = commands.find((item) => item.name === node.dataset.command);
+    if (!command) continue;
+    node.textContent = '';
+    if (!command.shortcut) {
+      const unset = document.createElement('span');
+      unset.className = 'unset';
+      unset.textContent = 'not set';
+      node.appendChild(unset);
+      continue;
+    }
+    const parts = command.shortcut.includes('+')
+      ? command.shortcut.split('+')
+      : command.shortcut.match(/[⌃⌥⇧⌘]|[^⌃⌥⇧⌘]+/g) || [];
+    for (const part of parts.filter(Boolean)) {
+      const key = document.createElement('kbd');
+      key.textContent = label[part] || part;
+      node.appendChild(key);
+    }
+  }
+}
+
 async function load() {
   const manifest = chrome.runtime.getManifest();
   $('version').textContent = `version ${manifest.version}`;
@@ -528,3 +564,4 @@ async function load() {
 }
 
 load();
+paintShortcuts();
