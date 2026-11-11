@@ -410,6 +410,9 @@ test('"me and the principal" is only wrong when it is the subject', () => {
 // of them since 1.0.
 
 const RELEASE_CORRECT = [
+  // "i" that is not the pronoun
+  'Bring snacks, i.e. fruit or nuts.', 'Set x = i + 1 in the loop.',
+  'The variable i is unused.', 'Dot the i and cross the t.',
   // relative clauses: "that" stands for the noun before it
   "There are things that don't work.", "These are the ones that don't fit.",
   "I like shoes that don't pinch.", 'The things that are left go here.',

@@ -279,6 +279,32 @@
     lastFix = null;
   }
 
+  // What autocorrect needs to know about a field, worked out once per field.
+  const fieldFacts = new WeakMap();
+  const CODE_FONT = /mono|courier|consolas|menlo|monaco|source code|fira code|jetbrains|hack\b/i;
+  const CODE_EDITOR = '.CodeMirror, .cm-editor, .monaco-editor, .ace_editor, pre, code, [data-language]';
+
+  function factsFor(adapter) {
+    let facts = fieldFacts.get(adapter);
+    if (facts) return facts;
+    const el = adapter.element;
+    const langHolder = el.closest('[lang]:not([lang=""])');
+    const capHolder = el.closest('[autocapitalize]') || (el.form && el.form.hasAttribute('autocapitalize') ? el.form : null);
+    let code = !!el.closest(CODE_EDITOR);
+    if (!code) {
+      try { code = CODE_FONT.test(getComputedStyle(el).fontFamily || ''); } catch (_) { /* detached */ }
+    }
+    facts = {
+      kind: adapter.kind,
+      type: el.tagName === 'INPUT' ? (el.getAttribute('type') || 'text').toLowerCase() : '',
+      lang: (langHolder && langHolder.getAttribute('lang')) || '',
+      autocapitalize: ((capHolder && capHolder.getAttribute('autocapitalize')) || '').toLowerCase(),
+      code,
+    };
+    fieldFacts.set(adapter, facts);
+    return facts;
+  }
+
   function applyFixAt(adapter, start, end, fixed, caret) {
     const shift = fixed.length - (end - start);
     const ok = adapter.replaceRange(start, end, fixed, caret + shift);
@@ -308,10 +334,12 @@
     const lower = found.word.toLowerCase();
     if (refused.has(lower)) return;
 
+    const field = factsFor(adapter);
     const options = {
       autocorrect: settings.autocorrect,
       skip: refused,
       known: new Set(settings.customWords || []),
+      field,
     };
     const decision = NS.autocorrect.decide(found, text, options);
     if (decision) {
@@ -324,6 +352,9 @@
     // Documented typos live in the worker, with the dictionary. The round trip
     // is a few milliseconds, and the text is re-checked before anything moves.
     if (settings.autocorrect.commonTypos === false) return;
+    if (found.late || field.code || NS.autocorrect.looksLikeCode(text, found.start)) return;
+    if (/^(email|url|tel)$/.test(field.type)) return;
+    if (field.lang && !/^en\b/i.test(field.lang)) return;
     const snapshot = { start: found.start, end: found.end, word: found.word };
     send({ type: 'autocorrect-word', word: found.word }).then((reply) => {
       if (!reply || !reply.fix || !active || active.adapter !== adapter) return;

@@ -142,3 +142,100 @@ test('clean prose is not touched', () => {
     assert.equal(decide(found, prose, { autocorrect: ALL_ON }), null, `changed "${found.word}"`);
   }
 });
+
+// ------------------------------------------- places autocorrect stays out of
+
+// Types the whole string one character at a time, applying every fix, the
+// way the content script does. Returns the text as it ends up.
+const typeOut = (input, options = {}) => {
+  let text = '';
+  for (const ch of input) {
+    text += ch;
+    const found = wordBefore(text, text.length);
+    if (!found) continue;
+    const verdict = decide(found, text, { autocorrect: ALL_ON, ...options });
+    if (verdict) text = text.slice(0, found.start) + verdict.fixed + text.slice(found.end);
+  }
+  return text;
+};
+
+test('"i.e." is not turned into "I.e."', () => {
+  assert.equal(typeOut('Bring snacks, i.e. fruit. '), 'Bring snacks, i.e. fruit. ');
+  assert.equal(typeOut('bring snacks, i.e fruit '), 'Bring snacks, i.e fruit ');
+});
+
+test('a lone i before a full stop is still fixed, once the space shows it ended', () => {
+  assert.equal(typeOut('so do i. then we left. '), 'So do I. Then we left. ');
+  assert.equal(typeOut('ok i.\nbye '), 'Ok I.\nBye ');
+});
+
+test('street and unit abbreviations do not start a sentence', () => {
+  assert.equal(typeOut('Take Elm Ave. to the end. '), 'Take Elm Ave. to the end. ');
+  assert.equal(typeOut('Acme Inc. makes it. '), 'Acme Inc. makes it. ');
+  assert.equal(typeOut('It weighs 3 lbs. or so. '), 'It weighs 3 lbs. or so. ');
+});
+
+test('two dots is a typo for an ellipsis, not a full stop', () => {
+  assert.equal(typeOut('Wait.. then what? '), 'Wait.. then what? ');
+});
+
+test('i used as a name, a letter or in maths is not the pronoun', () => {
+  assert.equal(fixFor('the variable i '), null);
+  assert.equal(fixFor('for i '), null);
+  assert.equal(fixFor('x = i '), null);
+  assert.equal(fixFor('dot the i '), null);
+  // ...while the pronoun after ordinary words is still fixed.
+  assert.equal(fixFor('if i '), 'I');
+  assert.equal(fixFor('where i '), 'I');
+  assert.equal(fixFor('that i '), 'I');
+  assert.equal(fixFor('well - i '), 'I');
+});
+
+test('nothing is changed in text that is plainly code', () => {
+  const code = 'def run(items):\n    for i in items:\n        total = i + 1\n    if i == 0:\n        print(i)\n';
+  assert.equal(typeOut(code).slice(code.indexOf('\n')), code.slice(code.indexOf('\n')));
+  assert.equal(fixFor('const x = 1;\nim '), null);
+  assert.equal(fixFor('```\nif i '), null);
+  // ...and nothing at all in an editor drawn in a code font.
+  assert.equal(typeOut('for i in range(10): ', { field: { code: true } }), 'for i in range(10): ');
+});
+
+test('ordinary prose that happens to use code-ish words is still corrected', () => {
+  assert.equal(typeOut('For example: then i left. '), 'For example: then I left. ');
+  assert.equal(typeOut('Let me know if i can help. '), 'Let me know if I can help. ');
+  assert.equal(typeOut('From now on dont. '), "From now on don't. ");
+});
+
+test('single-line fields: no capital on the first word of a search or a name', () => {
+  assert.equal(fixFor('pizza ', { field: { kind: 'input', type: 'text' } }), null);
+  assert.equal(fixFor('pizza ', { field: { kind: 'input', type: 'search' } }), null);
+  assert.equal(fixFor('hi. how ', { field: { kind: 'input', type: 'search' } }), null);
+  // A sentence after a full stop in an ordinary input is still a sentence.
+  assert.equal(fixFor('hi. how ', { field: { kind: 'input', type: 'text' } }), 'How');
+  assert.equal(fixFor('pizza ', { field: { kind: 'textarea' } }), 'Pizza');
+});
+
+test('email, URL and phone fields are never touched', () => {
+  for (const type of ['email', 'url', 'tel']) {
+    assert.equal(fixFor('i ', { field: { kind: 'input', type } }), null, type);
+    assert.equal(fixFor('dont ', { field: { kind: 'input', type } }), null, type);
+  }
+});
+
+test('a page that says it is not English gets no English-only fixes', () => {
+  assert.equal(fixFor('pane i ', { field: { lang: 'it' } }), null);
+  assert.equal(fixFor('ich bin im ', { field: { lang: 'de-DE' } }), null);
+  assert.equal(fixFor('ich bin im ', { field: { lang: 'en-GB' } }), "I'm");
+});
+
+test('autocapitalize="off" turns sentence capitals off', () => {
+  assert.equal(fixFor('hello ', { field: { autocapitalize: 'off' } }), null);
+  assert.equal(fixFor('hello ', { field: { autocapitalize: 'none' } }), null);
+  // It is about capitals at the start of a sentence, not about "I".
+  assert.equal(fixFor('so i ', { field: { autocapitalize: 'off' } }), 'I');
+});
+
+test('a single letter at the start of a line is a label, except "a"', () => {
+  assert.equal(fixFor('x '), null);
+  assert.equal(fixFor('a '), 'A');
+});

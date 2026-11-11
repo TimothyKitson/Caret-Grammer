@@ -1329,12 +1329,21 @@ const FUNCTION_RULES = [
     short: 'Capitalization',
     run(doc) {
       const issues = [];
-      const re = /(^|[^\w'’])i(['’](?:m|ve|ll|d)\b|(?=[\s,.;:!?)"]|$))/g;
+      // Not "i.e.", and not "i" as a name: "the variable i", "x = i + 1".
+      const re = /(^|[^\w'’])i(['’](?:m|ve|ll|d)\b|(?!\.e\b)(?=[\s,.;:!?)"]|$))/g;
+      const asAName = /(?:^|[^A-Za-z])(?:the|a|an|each|every|variable|var|let|int|index|iterator|counter|letter|for|foreach|from|by|to)\s+$/i;
+      const operator = /[=+*/<>()[\]{}%^&|!~]\s*$/;
+      const operatorAfter = /^\s*(?:[=+*/<>%^&|]|-\s*\d|\+\+|--)/;
       let m;
       while ((m = re.exec(doc.text)) !== null) {
         const start = m.index + m[1].length;
         const end = start + 1 + (m[2] && m[2][0] !== '(' && m[2].length > 1 ? m[2].length : 0);
         if (inSkipRange(doc.skipRanges, start, end)) continue;
+        if (end === start + 1) {
+          const before = doc.text.slice(Math.max(0, start - 40), start);
+          if (asAName.test(before) || operator.test(before)) continue;
+          if (operatorAfter.test(doc.text.slice(end, end + 6))) continue;
+        }
         const word = doc.text.slice(start, end);
         issues.push({
           id: 'lowercase-i',
