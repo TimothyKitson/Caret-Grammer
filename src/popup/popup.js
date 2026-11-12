@@ -262,10 +262,11 @@ $('site-enabled').addEventListener('change', async () => {
 $('check-ai').addEventListener('click', async () => {
   const button = $('check-ai');
   button.disabled = true;
-  $('check-ai-sub').textContent = 'checking…';
+  $('check-ai-sub').textContent = 'checking… the box shows when it is done';
   try {
     await chrome.tabs.sendMessage(tab.id, { type: 'command', name: 'check-now' });
-    window.close();
+    // A moment to read that, then out of the way of the box it is checking.
+    setTimeout(() => window.close(), 900);
   } catch (_) {
     // No content script in this tab - a PDF viewer, or a page that loaded
     // before the extension did.

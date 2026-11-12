@@ -143,16 +143,46 @@
       display: flex; align-items: center; justify-content: center; gap: 3px;
     }
     .badge.has { color: #b42318; border-color: rgba(229,72,77,0.45); }
+    .badge.ai { color: #5b4bff; border-color: rgba(91,75,255,0.5); }
+    .badge.ai::before {
+      content: ""; width: 9px; height: 9px; border-radius: 50%;
+      border: 2px solid rgba(91,75,255,0.25); border-top-color: #5b4bff;
+      animation: gc-spin .8s linear infinite;
+    }
+    @keyframes gc-spin { to { transform: rotate(360deg); } }
+    .status {
+      position: absolute; z-index: 1; pointer-events: none;
+      display: flex; align-items: center; gap: 7px;
+      max-width: 300px; padding: 4px 10px 4px 8px; border-radius: 999px;
+      background: #ffffff; color: #2b2b2b; border: 1px solid rgba(0,0,0,0.12);
+      box-shadow: 0 4px 14px rgba(0,0,0,0.16);
+      font-size: 12px; font-weight: 600; line-height: 18px; white-space: nowrap;
+      overflow: hidden; text-overflow: ellipsis;
+      animation: gc-in 140ms ease-out;
+    }
+    .status .spin {
+      flex: 0 0 auto; width: 10px; height: 10px; border-radius: 50%;
+      border: 2px solid rgba(91,75,255,0.25); border-top-color: #5b4bff;
+      animation: gc-spin .8s linear infinite;
+    }
+    .status .dot { flex: 0 0 auto; width: 8px; height: 8px; border-radius: 50%; background: #0f9b8e; }
+    .status.warn .dot { background: #d97706; }
+    .status.bad .dot { background: #e5484d; }
+    .status.fading { opacity: 0; transition: opacity .4s ease; }
+    @media (prefers-reduced-motion: reduce) {
+      .badge.ai::before, .status .spin { animation-duration: 2.4s; }
+    }
     .badge.clean { color: #0f9b8e; }
     .badge.busy { color: #6b6b6b; }
     .badge:hover { box-shadow: 0 3px 12px rgba(0,0,0,0.22); }
     [hidden] { display: none !important; }
 
     @media (prefers-color-scheme: dark) {
-      .card, .panel, .badge {
+      .card, .panel, .badge, .status {
         background: #23262b; color: #ececec; border-color: rgba(255,255,255,0.12);
         box-shadow: 0 10px 30px rgba(0,0,0,0.5);
       }
+      .badge.ai { color: #a79fff; }
       .msg { color: #dcdcdc; }
       .src, button.link, .panel h4, .empty-state { color: #a8a8a8; }
       button { background: #32363d; color: #ececec; }
@@ -192,6 +222,7 @@
     let cardHovered = false;
     let badge = null;
     let panel = null;
+    let status = null;
 
     let attachedOnce = false;
     function attach() {
@@ -200,10 +231,11 @@
         // The page rewrote its document (document.open), which also stripped
         // the listeners off the badge, card and panel. Throw them away so the
         // next draw builds fresh ones that work.
-        for (const el of [card, badge, panel]) if (el) el.remove();
+        for (const el of [card, badge, panel, status]) if (el) el.remove();
         card = null;
         badge = null;
         panel = null;
+        status = null;
         cardIssue = null;
         cardSticky = false;
         cardHovered = false;
@@ -397,10 +429,12 @@
         badge.__onClick = handlers.onClick;
         badge.hidden = false;
         badge.className = `badge ${state}`;
-        badge.textContent = state === 'busy' ? '…' : (count > 0 ? String(count) : '✓');
+        badge.textContent = state === 'busy' ? '…' : state === 'ai' ? 'AI' : (count > 0 ? String(count) : '✓');
         badge.title = state === 'busy'
           ? 'Checking…'
-          : (count > 0 ? `${count} suggestion${count === 1 ? '' : 's'} - click to list them` : 'No suggestions');
+          : state === 'ai'
+            ? 'Checking with AI…'
+            : (count > 0 ? `${count} suggestion${count === 1 ? '' : 's'} - click to list them` : 'No suggestions');
         const size = 20;
         const left = Math.min(rect.right - size - 6, window.innerWidth - size - 8);
         const top = Math.min(rect.bottom - size - 6, window.innerHeight - size - 8);
@@ -410,6 +444,44 @@
 
       hideBadge() {
         if (badge) badge.hidden = true;
+      },
+
+      /**
+       * A short line beside the badge saying what the AI check is doing:
+       * working on it (busy), or how it went (tone: 'good', 'warn', 'bad').
+       * Shown whether or not the badge is.
+       */
+      showStatus({ rect, text, busy = false, tone = 'good' }) {
+        attach();
+        if (!status) {
+          status = document.createElement('div');
+          status.setAttribute('role', 'status');
+          stage.appendChild(status);
+        }
+        status.hidden = false;
+        status.className = `status ${tone}`;
+        status.textContent = '';
+        const mark = document.createElement('span');
+        mark.className = busy ? 'spin' : 'dot';
+        const label = document.createElement('span');
+        label.textContent = text;
+        status.append(mark, label);
+        // To the left of the badge, on its line, inside the viewport.
+        const width = status.offsetWidth;
+        const right = Math.min(rect.right - 32, window.innerWidth - 8);
+        const left = Math.max(8, right - width);
+        // Centred on the badge, which sits 6px in from the corner and is 20px tall.
+        const top = Math.min(rect.bottom - 16 - status.offsetHeight / 2, window.innerHeight - status.offsetHeight - 8);
+        status.style.left = `${Math.round(left)}px`;
+        status.style.top = `${Math.round(Math.max(4, top))}px`;
+      },
+
+      fadeStatus() {
+        if (status && !status.hidden) status.classList.add('fading');
+      },
+
+      hideStatus() {
+        if (status) status.hidden = true;
       },
 
       badgeRect() {

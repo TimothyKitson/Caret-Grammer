@@ -312,7 +312,18 @@ async function runQuickCheck(sentence) {
  * to their dictionary are dropped.
  */
 function quickIssuesFor(text, list, settings) {
-  if (!settings.quickAiEnabled || !Array.isArray(list)) return [];
+  if (!settings.quickAiEnabled) return [];
+  return pageAiIssues(text, list, settings, 'quick');
+}
+
+/** Full-check findings the page kept from an earlier run, made safe the same way. */
+function fullIssuesFor(text, list, settings) {
+  if (!settings.aiEnabled) return [];
+  return pageAiIssues(text, list, settings, 'full');
+}
+
+function pageAiIssues(text, list, settings, kind) {
+  if (!Array.isArray(list)) return [];
   const mine = new Set((settings.customWords || []).map((w) => String(w).toLowerCase()));
   const out = [];
   for (const issue of list.slice(0, 200)) {
@@ -335,6 +346,7 @@ function quickIssuesFor(text, list, settings) {
       replacements,
       confidence: 'high',
       source: 'ai',
+      aiKind: kind,
     });
   }
   return out;
@@ -363,12 +375,17 @@ function leaveAloneList(settings) {
 }
 
 /** @returns {{issues: object[], ran: boolean}} ran=false means try again later. */
+const AI_TIMEOUT_MS = 45000;
+
+/** Full-check findings carry where they came from, so the page can keep them. */
+const asFull = (issues) => issues.map((issue) => ({ ...issue, aiKind: 'full' }));
+
 async function aiIssuesFor(text, settings) {
-  if (aiCache.has(text)) return { issues: aiCache.get(text), ran: true };
+  if (aiCache.has(text)) return { issues: aiCache.get(text), ran: true, cached: true };
   const now = Date.now();
   aiRecent = aiRecent.filter((t) => now - t < 60000);
   if (now - aiLastCall < AI_MIN_GAP_MS || aiRecent.length >= AI_MAX_PER_MINUTE) {
-    return { issues: [], ran: false };
+    return { issues: [], ran: false, busy: true };
   }
   if (budgetLeft(settings) <= 0) {
     const ceiling = dailyCeiling(aiCredentials(settings).provider);
@@ -395,7 +412,11 @@ async function aiIssuesFor(text, settings) {
       model,
       effort: settings.aiEffort,
       leaveAlone: leaveAloneList(settings),
+      // A check that has not answered in this long is not going to; say so
+      // rather than leave the page waiting forever.
+      signal: globalThis.AbortSignal.timeout(AI_TIMEOUT_MS),
     });
+    result.issues = asFull(result.issues);
     if (aiCache.size >= AI_CACHE_MAX) aiCache.clear();
     // An answer that could not be read is not this text's result: asking
     // again should really ask again.
@@ -413,11 +434,14 @@ async function aiIssuesFor(text, settings) {
       // Nothing ran, so it does not count against the person.
       await refundBudget();
       await patchSettings({ lastAiError: '' });
-      return { issues: [], ran: false };
+      return { issues: [], ran: false, quiet: true, message: error.message };
     }
     bumpStats({ aiErrors: 1 });       // a failed call still counted: it was a request
-    await patchSettings({ lastAiError: `${new Date().toISOString().slice(0, 16).replace('T', ' ')} — ${error.message}` });
-    return { issues: [], ran: false };
+    const message = error.name === 'TimeoutError' || error.name === 'AbortError'
+      ? 'The AI took too long to answer. Try again in a minute.'
+      : error.message;
+    await patchSettings({ lastAiError: `${new Date().toISOString().slice(0, 16).replace('T', ' ')} — ${message}` });
+    return { issues: [], ran: false, error: message };
   }
 }
 
@@ -456,12 +480,32 @@ async function handleCheck(message, sender) {
 
   let extra = [];
   let aiRan = false;
+  let ai = null;        // what happened to a full check that was asked for
+  let aiFull = null;    // a fresh set of full-check findings, for the page to keep
+  // What the page kept from the last full check, moved along with any edits.
+  const kept = fullIssuesFor(text, message.aiIssues, settings);
   if (message.wantAi && settings.aiEnabled && aiCredentials(settings).key) {
     const outcome = await aiIssuesFor(text, settings);
-    extra = outcome.issues;
     aiRan = outcome.ran;
+    if (outcome.ran) {
+      extra = outcome.issues;
+      aiFull = outcome.issues;
+    } else {
+      extra = kept;      // nothing new: keep showing what was found before
+    }
+    ai = {
+      ran: outcome.ran,
+      found: outcome.ran ? outcome.issues.length : 0,
+      capped: !!outcome.capped,
+      quiet: !!outcome.quiet,
+      busy: !!outcome.busy,
+      error: outcome.error || '',
+    };
+  } else if (Array.isArray(message.aiIssues)) {
+    extra = kept;
   } else if (settings.aiEnabled && aiCredentials(settings).key && aiCache.has(text)) {
     extra = aiCache.get(text);
+    aiFull = extra;
   }
   extra = extra.concat(quickIssuesFor(text, message.quickIssues, settings));
 
@@ -473,7 +517,14 @@ async function handleCheck(message, sender) {
 
   bumpStats({ checks: 1, issues: result.issues.length });
   await setTabBadge(sender, result.issues.length);
-  return { issues: result.issues, stats: result.stats, aiRan, aiLeft: aiLeftFor(await getSettings()) };
+  return {
+    issues: result.issues,
+    stats: result.stats,
+    aiRan,
+    ai,
+    aiFull,
+    aiLeft: aiLeftFor(await getSettings()),
+  };
 }
 
 // ------------------------------------------------------------------ messages

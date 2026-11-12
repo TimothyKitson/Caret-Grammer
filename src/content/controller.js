@@ -47,6 +47,9 @@
   let quickSuppress = 0;        // > 0 while Caret itself is editing the field
   let checkKeys = '';           // the "Proofread with AI" shortcut, as the browser has it
   let aiLeftToday = null;       // full AI checks left today; null = no limit or not known
+  let aiRunning = 0;            // full AI checks in flight
+  let statusShown = null;       // {text, busy, tone} while the AI status line is up
+  let statusTimer = null;
 
   // ---------------------------------------------------------------- plumbing
 
@@ -75,6 +78,8 @@
     overlay.hideCard();
     overlay.hideBadge();
     overlay.hidePanel();
+    overlay.hideStatus();
+    statusShown = null;
     active = null;
     lastFix = null;
   }
@@ -122,7 +127,7 @@
 
   // ------------------------------------------------------------------ checks
 
-  function scheduleCheck({ immediate = false, ai = false, localOnly = false } = {}) {
+  function scheduleCheck({ immediate = false, ai = false, localOnly = false, manual = false } = {}) {
     if (!enabled() || !active) return;
     clearTimeout(localTimer);
     localTimer = setTimeout(runCheck, immediate ? 0 : LOCAL_DELAY);
@@ -137,7 +142,7 @@
     //   interval  at most once every aiIntervalMinutes in this field.
     //   auto      after every pause in typing.
     if (!settings.aiEnabled) return;
-    if (ai) { aiTimer = setTimeout(() => runCheck({ ai: true }), 0); return; }
+    if (ai) { aiTimer = setTimeout(() => runCheck({ ai: true, manual }), 0); return; }
     if (settings.aiTrigger === 'auto') {
       aiTimer = setTimeout(() => runCheck({ ai: true }), AI_DELAY);
       return;
@@ -149,7 +154,7 @@
     }
   }
 
-  async function runCheck({ ai = false } = {}) {
+  async function runCheck({ ai = false, manual = false } = {}) {
     if (!enabled() || !active) return;
     const adapter = active.adapter;
     if (!adapter.element.isConnected) { teardown(); return; }
@@ -162,15 +167,31 @@
     if (wantAi && lastAiText === text && active.issues) return;
 
     const mine = (version += 1);
-    if (settings.showBadge) drawBadge('busy');
-    const response = await send({
-      type: 'check',
-      text,
-      hrefs: frameHrefs(),
-      wantAi,
-      kind: adapter.kind,
-      quickIssues: quickIssuesIn(adapter, text),
-    });
+    if (wantAi) {
+      aiRunning += 1;
+      // A check someone asked for gets a running commentary; one that runs
+      // by itself after a pause only turns the badge.
+      if (manual) aiStatus('Checking with AI…', { busy: true });
+    }
+    if (settings.showBadge) drawBadge(aiRunning ? 'ai' : 'busy');
+    let response;
+    try {
+      response = await send({
+        type: 'check',
+        text,
+        hrefs: frameHrefs(),
+        wantAi,
+        kind: adapter.kind,
+        quickIssues: quickIssuesIn(adapter, text),
+        aiIssues: aiIssuesIn(adapter, text),
+      });
+    } finally {
+      if (wantAi) aiRunning = Math.max(0, aiRunning - 1);
+    }
+    // Keep a fresh set of full-check findings, against the text they were
+    // found in; later checks move them along with whatever is edited.
+    if (response && Array.isArray(response.aiFull)) keepAiFindings(adapter, text, response.aiFull);
+    if (response && wantAi && response.ai) aiOutcome(response, manual);
     if (!response || !active || active.adapter !== adapter) return;
     if (mine !== version) {
       // Something newer started while this was out - often just a redraw for
@@ -220,8 +241,9 @@
     }
     overlay.drawUnderlines(entries);
     active.entries = entries;
-    if (settings.showBadge) drawBadge((issues || []).length ? 'has' : 'clean');
+    if (settings.showBadge) drawBadge(aiRunning ? 'ai' : (issues || []).length ? 'has' : 'clean');
     else overlay.hideBadge();
+    if (statusShown) placeStatus();
 
     // A pinned card follows its issue; if the issue is gone, so is the card.
     const pinned = overlay.cardIssueRef();
@@ -657,6 +679,108 @@
     onSettings: () => send({ type: 'open-options' }),
   };
 
+  // ------------------------------------------------------------ AI findings
+  //
+  // A full AI check answers for the text it was given. Rather than lose every
+  // finding the moment that text changes - a suggestion accepted, a word
+  // typed somewhere else - they are kept per field and moved along with each
+  // edit. One is dropped only when the edit touches it or what is right
+  // around it.
+
+  const aiKept = new WeakMap();       // adapter -> {base, issues}
+
+  function textDiff(before, after) {
+    let from = 0;
+    const max = Math.min(before.length, after.length);
+    while (from < max && before[from] === after[from]) from += 1;
+    let oldTo = before.length;
+    let newTo = after.length;
+    while (oldTo > from && newTo > from && before[oldTo - 1] === after[newTo - 1]) {
+      oldTo -= 1;
+      newTo -= 1;
+    }
+    return { from, oldTo, newTo };
+  }
+
+  function keepAiFindings(adapter, base, issues) {
+    aiKept.set(adapter, {
+      base,
+      issues: issues.map((issue) => ({
+        ...issue,
+        edgeBefore: base[issue.start - 1] || '',
+        edgeAfter: base[issue.end] || '',
+      })),
+    });
+  }
+
+  /** The kept findings, placed in the text as it is now. */
+  function aiIssuesIn(adapter, text) {
+    const kept = aiKept.get(adapter);
+    if (!kept || !kept.issues.length) return [];
+    if (kept.base !== text) {
+      const { from, oldTo, newTo } = textDiff(kept.base, text);
+      const delta = newTo - oldTo;
+      kept.issues = kept.issues
+        .filter((issue) => issue.end <= from || issue.start >= oldTo)
+        .map((issue) => (issue.start >= oldTo
+          ? { ...issue, start: issue.start + delta, end: issue.end + delta }
+          : issue))
+        // Typing right against it ("teh" -> "tehx") changes the word.
+        .filter((issue) => text.slice(issue.start, issue.end) === issue.text
+          && (text[issue.start - 1] || '') === issue.edgeBefore
+          && (text[issue.end] || '') === issue.edgeAfter);
+      kept.base = text;
+    }
+    return kept.issues;
+  }
+
+  // -------------------------------------------------------- AI status line
+
+  function placeStatus() {
+    if (!statusShown || !active) return;
+    const el = active.adapter.element;
+    if (!el.isConnected || !active.adapter.isVisible()) { overlay.hideStatus(); return; }
+    overlay.showStatus({ rect: el.getBoundingClientRect(), ...statusShown });
+  }
+
+  function aiStatus(text, { busy = false, tone = 'good' } = {}) {
+    clearTimeout(statusTimer);
+    statusShown = { text, busy, tone };
+    placeStatus();
+    if (!busy) {
+      // Long enough to read, then out of the way.
+      statusTimer = setTimeout(() => {
+        overlay.fadeStatus();
+        statusTimer = setTimeout(() => { statusShown = null; overlay.hideStatus(); }, 450);
+      }, tone === 'good' ? 4000 : 6500);
+    }
+  }
+
+  function clearStatus() {
+    clearTimeout(statusTimer);
+    statusShown = null;
+    overlay.hideStatus();
+  }
+
+  /** Say how a full AI check went. */
+  function aiOutcome(response, manual) {
+    const ai = response.ai;
+    if (ai.ran) {
+      if (!manual) { if (statusShown && statusShown.busy) clearStatus(); return; }
+      const found = (response.issues || []).filter((i) => i.aiKind === 'full').length;
+      aiStatus(found
+        ? `AI: ${found} suggestion${found === 1 ? '' : 's'}`
+        : 'AI: no other mistakes found');
+      return;
+    }
+    if (!manual) return;
+    if (ai.capped) aiStatus('No full AI checks left today', { tone: 'warn' });
+    else if (ai.quiet) aiStatus('The free AI is used up for today. Try again tomorrow.', { tone: 'warn' });
+    else if (ai.busy) aiStatus('Give it a moment, then try again', { tone: 'warn' });
+    else if (ai.error) aiStatus(`AI check failed: ${ai.error}`.slice(0, 90), { tone: 'bad' });
+    else aiStatus('The AI check did not run', { tone: 'warn' });
+  }
+
   /** Why the AI pass cannot run on this field right now, or '' if it can. */
   function aiBlockedReason() {
     if (aiLeftToday === 0) return 'No full AI checks left today';
@@ -670,9 +794,15 @@
   /** The AI pass, because someone asked for it. */
   function runAiNow() {
     if (!active) return;
+    if (!settings.aiEnabled) {
+      aiStatus('AI proofreading is off. Switch it on in Caret settings.', { tone: 'warn' });
+      return;
+    }
+    const reason = aiBlockedReason();
+    if (reason) { aiStatus(reason, { tone: 'warn' }); return; }
     lastAiText = null;
     active.userEdited = true;      // asking for it is intent enough
-    scheduleCheck({ immediate: true, ai: true });
+    scheduleCheck({ immediate: true, ai: true, manual: true });
   }
 
   function openPanel(keepPosition = false) {
@@ -686,7 +816,9 @@
       rect,
       fixableCount: issues.filter((i) => i.source !== 'ai'
         && i.replacements && i.replacements.length && i.confidence !== 'low').length,
-      aiCheck: settings.aiEnabled ? { keys: checkKeys, reason: aiBlockedReason() } : null,
+      aiCheck: settings.aiEnabled
+        ? { keys: checkKeys, reason: aiRunning ? '' : aiBlockedReason(), busy: aiRunning > 0 }
+        : null,
       handlers: {
         onApply: (issue, replacement) => { overlay.hidePanel(); applyFix(issue, replacement); },
         onFixAll: fixAll,
