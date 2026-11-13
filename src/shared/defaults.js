@@ -40,6 +40,13 @@ export function clampQuickLimit(value) {
   return Math.min(QUICK_MAX_DAILY, n);
 }
 
+// Learning how someone writes: this long after a full AI check, the
+// suggestions they took and the ones they ignored go to the AI with what they
+// have written since, and it writes a few lines of notes on their style. At
+// most this many times a day, whatever happens.
+export const LEARN_DELAY_MS = 5 * 60 * 1000;
+export const LEARN_DAILY = 10;
+
 export const DEFAULT_SETTINGS = {
   enabled: true,
   categories: {
@@ -84,6 +91,18 @@ export const DEFAULT_SETTINGS = {
   // provider": the free ceiling on a free option, no limit on a paid key.
   aiDailyLimit: 0,
   aiUsage: { day: '', count: 0 },
+  // The full check also points out problems with whole sentences - run-ons,
+  // fragments, missing words - and highlights the stretch, not one word.
+  aiSentences: false,
+  // Learn how this person writes from what they accept and ignore (see
+  // LEARN_DELAY_MS), and send what was learned with every full check.
+  aiLearn: true,
+  // The notes so far: a few lines starting "- ", written by the AI. Kept on
+  // this computer only, and sent with full checks.
+  aiNotes: '',
+  aiNotesAt: 0,
+  aiLearnUsage: { day: '', count: 0 },
+  lastLearnError: '',
   // The quick check after each sentence. Off until someone turns it on: it
   // sends each finished sentence to Caret's server.
   quickAiEnabled: false,
@@ -105,10 +124,10 @@ export const DEFAULT_SETTINGS = {
 };
 
 export const AUTOCORRECT_INFO = [
-  { key: 'capitalizeI', label: 'Capitalize “I”', hint: '“i” and “ive” become “I” and “I’ve”. Never “ill” or “id” — those are words.' },
-  { key: 'sentenceCaps', label: 'Capitalize the first word of a sentence', hint: 'After a full stop, a question mark or a new line. Not after “Dr.” or an ellipsis.' },
-  { key: 'apostrophes', label: 'Add missing apostrophes', hint: 'dont → don’t, wouldnt → wouldn’t, youre → you’re. Only where the word is not something else.' },
-  { key: 'commonTypos', label: 'Fix well-known typos', hint: 'teh → the, recieve → receive. Only typos with a single documented correction.' },
+  { key: 'capitalizeI', label: 'Capitalize “I”', hint: 'i becomes I, and ive becomes I’ve.' },
+  { key: 'sentenceCaps', label: 'Capitalize the first word of a sentence', hint: 'After a period, a question mark, or a new line.' },
+  { key: 'apostrophes', label: 'Add missing apostrophes', hint: 'dont becomes don’t, and youre becomes you’re.' },
+  { key: 'commonTypos', label: 'Fix common typos', hint: 'teh becomes the, and recieve becomes receive.' },
 ];
 
 export const AI_PROVIDER_INFO = [
@@ -116,32 +135,28 @@ export const AI_PROVIDER_INFO = [
     value: 'caret',
     label: 'Caret',
     tag: 'free',
-    hint: 'Free, and there is nothing to sign up for. It runs on a small shared '
-      + 'allowance, so there is a limit on how many checks a day you get — and if '
-      + 'everyone uses it up, it goes quiet until midnight UTC and the built-in '
-      + 'checks carry on as normal. Needs a key starting caret_, unless this copy '
-      + 'already has one.',
+    // {time} is filled in by the settings page: how long until midnight on
+    // this computer, when the day's checks come back.
+    hint: "It is 100% free. If we didn't cap you, it wouldn't be free, sorry. "
+      + 'But the cap refreshes in {time}.',
   },
   {
     value: 'gemini',
     label: 'Google Gemini',
     tag: 'free tier',
-    hint: 'Your own key from aistudio.google.com/apikey. No card and no credits, '
-      + 'with a cap per minute and per day that proofreading one field at a time '
-      + 'does not come near. Keys start AIza.',
+    hint: 'Get a free key at aistudio.google.com/apikey. No card needed. Keys start with AIza.',
   },
   {
     value: 'openai',
     label: 'OpenAI',
     tag: 'paid',
-    hint: 'Your own key. Pay as you go — you have to buy credits before it does '
-      + 'anything, and there is no free allowance. Keys start sk-.',
+    hint: 'You pay for this one. You have to buy credits first. Keys start with sk-.',
   },
   {
     value: 'anthropic',
     label: 'Anthropic',
     tag: 'paid',
-    hint: 'Your own key, also pay as you go. Keys start sk-ant-.',
+    hint: 'You pay for this one too. Keys start with sk-ant-.',
   },
 ];
 
@@ -149,26 +164,26 @@ export const AI_TRIGGER_INFO = [
   {
     value: 'manual',
     label: 'Only when I ask',
-    hint: 'Right-click and choose “Proofread with AI”, press Ctrl+Shift+. , or use the Caret button. Nothing is sent until you do.',
+    hint: 'Right-click and pick Proofread with AI, press Ctrl+Shift+. , or use the Caret button.',
   },
   {
     value: 'interval',
-    label: 'Every minute while I am typing',
-    hint: 'One check a minute at most, and only in a field you are actually working in. Stops as soon as you leave it.',
+    label: 'Every minute while I type',
+    hint: 'Checks once a minute, only in the box you’re typing in.',
   },
   {
     value: 'auto',
-    label: 'After every pause in typing',
-    hint: 'The most thorough and by far the most expensive. Watch the daily limit.',
+    label: 'After every pause',
+    hint: 'Checks the most, but uses up your checks really fast.',
   },
 ];
 
 export const CATEGORY_INFO = [
-  { key: 'spelling', label: 'Spelling', hint: 'Misspelled and unknown words.' },
-  { key: 'grammar', label: 'Grammar', hint: 'Confused words, verb forms, agreement, articles, capitals.' },
-  { key: 'punctuation', label: 'Punctuation', hint: 'Apostrophes, spacing, repeated marks.' },
-  { key: 'style', label: 'Clarity', hint: 'Wordy or redundant phrases.' },
-  { key: 'advanced', label: 'Extra picky', hint: 'Passive voice, filler words, missing commas. Noisier.' },
+  { key: 'spelling', label: 'Spelling', hint: 'Words that are spelled wrong.' },
+  { key: 'grammar', label: 'Grammar', hint: 'Words used wrong, like their and there.' },
+  { key: 'punctuation', label: 'Punctuation', hint: 'Missing apostrophes, extra spaces, and stuff like that.' },
+  { key: 'style', label: 'Clarity', hint: 'When you use way more words than you need.' },
+  { key: 'advanced', label: 'Extra picky', hint: 'Catches even more stuff, but it flags a lot more too.' },
 ];
 
 export function mergeSettings(stored) {
@@ -179,6 +194,11 @@ export function mergeSettings(stored) {
   merged.quickAiUsage = { ...DEFAULT_SETTINGS.quickAiUsage, ...((stored && stored.quickAiUsage) || {}) };
   merged.quickAiDailyLimit = clampQuickLimit(merged.quickAiDailyLimit);
   merged.quickAiEnabled = merged.quickAiEnabled === true;
+  merged.aiSentences = merged.aiSentences === true;
+  merged.aiLearn = merged.aiLearn !== false;
+  merged.aiNotes = typeof merged.aiNotes === 'string' ? merged.aiNotes.slice(0, 1000) : '';
+  merged.aiNotesAt = Number(merged.aiNotesAt) || 0;
+  merged.aiLearnUsage = { ...DEFAULT_SETTINGS.aiLearnUsage, ...((stored && stored.aiLearnUsage) || {}) };
   merged.autocorrect = { ...DEFAULT_SETTINGS.autocorrect, ...((stored && stored.autocorrect) || {}) };
   merged.disabledSites = Array.isArray(merged.disabledSites) ? merged.disabledSites : [];
   merged.customWords = Array.isArray(merged.customWords) ? merged.customWords : [];

@@ -45,6 +45,8 @@
   --grammar: #2f6fd0;
   --punctuation: #8b5cf6;
   --clarity: #0f9b8e;
+  --sentence: #d97706;
+  --sentence-soft: rgba(245, 158, 11, .14);
   --shadow: 0 1px 2px rgba(21, 21, 28, .04), 0 12px 30px -18px rgba(21, 21, 28, .22);
   --glow: 0 0 0 1px rgba(91, 75, 255, .25), 0 14px 34px -18px rgba(91, 75, 255, .55);
   --aurora-a: rgba(91, 75, 255, .10);
@@ -76,6 +78,8 @@
     --grammar: #5b9cf6;
     --punctuation: #a585ff;
     --clarity: #2fc6b6;
+    --sentence: #f5a524;
+    --sentence-soft: rgba(245, 165, 36, .16);
     --shadow: 0 1px 2px rgba(0, 0, 0, .35), 0 16px 36px -20px rgba(0, 0, 0, .8);
     --glow: 0 0 0 1px rgba(143, 132, 255, .35), 0 18px 40px -20px rgba(95, 79, 255, .7);
     --aurora-a: rgba(95, 79, 255, .22);
@@ -436,6 +440,22 @@ h2 .ico {
 .swatch.punctuation { background: var(--punctuation); }
 .swatch.style { background: var(--clarity); }
 .swatch.ai { background: var(--iris); }
+/* A sentence problem is a band behind the words, not a line under them. */
+.swatch.sentence {
+  width: 22px; height: 11px; vertical-align: -1px; border-radius: 3px;
+  background: var(--sentence-soft); border-bottom: 2px dotted var(--sentence);
+}
+
+/* What "Learn how I write" has picked up: the AI's own notes, as written. */
+.notes {
+  margin: 0; padding: 10px 14px 10px 30px;
+  border: 1px solid var(--line); border-radius: 10px;
+  background: var(--field);
+  font-size: 13px; color: var(--fg);
+}
+.notes[hidden] { display: none; }
+.notes li { margin: 2px 0; }
+.notes li::marker { color: var(--iris); }
 
 /* ------------------------------------------------------------------- rows */
 

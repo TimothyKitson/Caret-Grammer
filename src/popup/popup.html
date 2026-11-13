@@ -53,10 +53,14 @@
     </span>
     <span class="combo" data-command="check-now" aria-hidden="true"><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>.</kbd></span>
   </button>
-  <p class="ai-meta" id="ai-meta" hidden></p>
-  <p class="ai-meta quick-meta" id="quick-meta" hidden></p>
+  <!-- How many checks are left today, for each AI that is on: a line each,
+       with a meter when there is a limit to measure against. -->
+  <div class="card usage" id="usage" hidden>
+    <div class="meter-row" id="ai-meta" hidden></div>
+    <div class="meter-row quick-meta" id="quick-meta" hidden></div>
+  </div>
 
-  <ul class="keys">
+  <ul class="card keys">
     <li>
       <span>Suggestions at the cursor</span>
       <span class="combo" data-command="show-suggestions"><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>Space</kbd></span>

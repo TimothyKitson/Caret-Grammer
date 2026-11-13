@@ -48,7 +48,8 @@
 // written down are counters.
 
 import {
-  SYSTEM_PROMPT, QUICK_SYSTEM_PROMPT, SCHEMA, userPrompt, parseCorrections, leaveAloneNote,
+  SYSTEM_PROMPT, QUICK_SYSTEM_PROMPT, SENTENCE_NOTE, SCHEMA, userPrompt, parseCorrections, leaveAloneNote,
+  LEARN_PROMPT, LEARN_SCHEMA, learnUserPrompt, parseNotes, cleanNotes, cleanChanges, styleNote,
 } from '../../src/shared/proofread.js';
 
 // Models get retired, and when one does every request fails with a 5028 until
@@ -86,6 +87,31 @@ const QUICK_MODELS = [
   '@cf/google/gemma-4-26b-a4b-it',
 ];
 
+// Learning: a few minutes after a full check, the extension sends the
+// suggestions the writer accepted and ignored, with what they have written
+// since, and gets back a few lines of notes on how they write. Writing eight
+// short lines is easy work, so it goes to the cheap models: on Gemma an
+// essay-length request is about 20 neurons, 30 at the very most. It is on the
+// full checks' meter. Set LEARN_MODEL in the dashboard to force one to the
+// front.
+const LEARN_MODELS = [
+  '@cf/google/gemma-4-26b-a4b-it',
+  '@cf/zai-org/glm-4.7-flash',
+  '@cf/ibm-granite/granite-4.0-h-micro',
+];
+
+// Eight short lines of notes, in JSON, with room over.
+const LEARN_MAX_TOKENS = 320;
+
+// Learns a day per key. Each person's copy of Caret learns at most 10 times a
+// day, so on the key everybody shares this is room for twenty people's worth.
+// It is here for a script holding the shared key: without it, only the meter
+// would stop one, and every learn writes the meter once - a loop of tiny
+// learns could spend the whole account's 1,000 KV writes for the day. Counted
+// the same way as quick checks, ten at a time one time in ten. Set
+// "learnDaily" on a key, or LEARN_DAILY in the dashboard, to change it.
+const DEFAULT_LEARN_DAILY = 200;
+
 // What each model charges, in neurons per million tokens: [read, written].
 // From Workers AI's pricing page. Only used to estimate what a full check
 // cost, for the meter below. A model not listed here - one forced with MODEL,
@@ -120,6 +146,10 @@ const QUICK_MAX_CHARS = 800;
 // check costs: at 1,200 one check could reach about 320 neurons, and at 800
 // it stops at about 240.
 const FULL_MAX_TOKENS = 800;
+
+// With "Check sentences" on, each sentence problem copies a whole stretch of
+// the text, so the answer gets more room. The meter still holds the day.
+const SENTENCES_MAX_TOKENS = 1200;
 
 // One sentence's corrections fit in 256 tokens with room over. The cap is
 // there so a small model that starts rambling stops after a few neurons
@@ -273,6 +303,12 @@ async function spendKey(env, key, mode) {
   if (meter !== null && meter >= fullBudget(env)) {
     return { ok: false, status: 429, error: FULL_SHARE_USED };
   }
+  // Learning is not a check: it is on the meter, and on a count of its own,
+  // never on the key's count of checks.
+  if (mode === 'learn') {
+    const gate = await countLearn(env, key, record);
+    return gate.ok ? { ...gate, meter } : gate;
+  }
   const gate = await countFull(env, key, record);
   return gate.ok ? { ...gate, meter } : gate;
 }
@@ -366,6 +402,26 @@ async function countQuick(env, key, record) {
   };
 }
 
+/** Learning's own count per key: always capped, counted by chance like countQuick. */
+async function countLearn(env, key, record) {
+  const everyone = Number(env.LEARN_DAILY) > 0 ? Number(env.LEARN_DAILY) : DEFAULT_LEARN_DAILY;
+  const limit = Number(record.learnDaily) > 0 ? Number(record.learnDaily) : everyone;
+  const counter = `learn:${key}:${today()}`;
+  let used = 0;
+  try {
+    used = Number(await env.KEYS.get(counter)) || 0;
+  } catch (_) { /* count unknown: carry on */ }
+  if (used >= limit) {
+    return { ok: false, status: 429, error: 'Learning is used up on this key for today. It comes back at midnight UTC.' };
+  }
+  if (Math.random() < 1 / QUICK_COUNT_STEP) {
+    try {
+      await env.KEYS.put(counter, String(used + QUICK_COUNT_STEP), { expirationTtl: COUNTER_TTL });
+    } catch (_) { /* over the write quota: carry on uncounted */ }
+  }
+  return { ok: true, name: record.name || 'someone', left: null };
+}
+
 export default {
   async fetch(request, env) {
     // A preflight still gets an answer, just one that allows nothing: see json.
@@ -376,6 +432,7 @@ export default {
     // The configured model first, then the rest of its list.
     const models = ordered(env.MODEL, MODELS);
     const quickModels = ordered(env.QUICK_MODEL, QUICK_MODELS);
+    const learnModels = ordered(env.LEARN_MODEL, LEARN_MODELS);
 
     // A liveness check that says nothing about any key.
     if (request.method === 'GET' && url.pathname === '/health') {
@@ -385,6 +442,11 @@ export default {
         fallbacks: models.length,
         quickModel: quickModels[0],
         quickFallbacks: quickModels.length,
+        // The extension looks for this before it asks to learn, so a copy of
+        // this Worker from before learning is never sent a request it would
+        // answer with an expensive full check instead.
+        learn: true,
+        learnModel: learnModels[0],
       });
     }
 
@@ -400,15 +462,18 @@ export default {
     }
     if (!body || typeof body !== 'object') return json({ error: 'Body must be a JSON object.' }, 400);
 
-    // "quick" is one finished sentence, for the small model. Anything else,
-    // including no mode at all - which is what every copy of Caret from before
-    // the quick check sends - is the full check, exactly as it always was.
-    const mode = body.mode === 'quick' ? 'quick' : 'full';
+    // "quick" is one finished sentence, for the small model. "learn" brings the
+    // notes on how someone writes up to date. Anything else, including no mode
+    // at all - which is what every copy of Caret from before the quick check
+    // sends - is the full check, exactly as it always was.
+    const mode = body.mode === 'quick' ? 'quick' : body.mode === 'learn' ? 'learn' : 'full';
     const quick = mode === 'quick';
+    const learn = mode === 'learn';
 
     const text = typeof body.text === 'string'
       ? body.text.slice(0, quick ? QUICK_MAX_CHARS : MAX_CHARS)
       : '';
+    if (learn && !text.trim()) return json({ notes: cleanNotes(body.notes), model: '', mode });
     if (!text.trim()) return json({ corrections: [] });
 
     // Words the writer has told their own copy of Caret to leave alone. Taken
@@ -429,10 +494,30 @@ export default {
     const gate = await spendKey(env, request.headers.get('x-caret-key') || body.key, mode);
     if (!gate.ok) return json({ error: gate.error }, gate.status);
 
-    // A quick check only ever walks the quick list: see QUICK_MODELS.
-    const candidates = quick ? quickModels : models;
-    const system = (quick ? QUICK_SYSTEM_PROMPT : SYSTEM_PROMPT) + leaveAloneNote(leaveAlone);
-    const user = userPrompt(text);
+    // A quick check only ever walks the quick list: see QUICK_MODELS. Learning
+    // walks its own.
+    const candidates = quick ? quickModels : learn ? learnModels : models;
+    // "Check sentences" in the extension: the full check also points out run-ons,
+    // fragments and confusing wording. Never on a quick check - that model is
+    // too small to judge a sentence's shape, and it would cost more per sentence.
+    const sentences = mode === 'full' && body.sentences === true;
+    // What has been learned about how this writer writes. Only on a full
+    // check, and only as clean, short notes: see cleanNotes().
+    const style = mode === 'full' ? cleanNotes(body.style) : '';
+    const system = learn
+      ? LEARN_PROMPT
+      : (quick ? QUICK_SYSTEM_PROMPT : SYSTEM_PROMPT)
+        + (sentences ? SENTENCE_NOTE : '')
+        + styleNote(style)
+        + leaveAloneNote(leaveAlone);
+    const user = learn
+      ? learnUserPrompt({
+        notes: cleanNotes(body.notes),
+        accepted: cleanChanges(body.accepted),
+        ignored: cleanChanges(body.ignored),
+        text,
+      })
+      : userPrompt(text);
 
     const ask = (model, withSchema) => env.AI.run(model, {
       messages: [
@@ -443,8 +528,11 @@ export default {
       // schema is met, and fewer models support it than not. parseCorrections
       // picks up the pieces either way, so a model that rejects the parameter
       // outright is retried without it rather than written off.
-      ...(withSchema ? { response_format: { type: 'json_schema', json_schema: SCHEMA } } : {}),
-      max_tokens: quick ? QUICK_MAX_TOKENS : FULL_MAX_TOKENS,
+      ...(withSchema
+        ? { response_format: { type: 'json_schema', json_schema: learn ? LEARN_SCHEMA : SCHEMA } }
+        : {}),
+      max_tokens: quick ? QUICK_MAX_TOKENS : learn ? LEARN_MAX_TOKENS
+        : sentences ? SENTENCES_MAX_TOKENS : FULL_MAX_TOKENS,
       temperature: 0,
     });
 
@@ -484,8 +572,13 @@ export default {
     // A full check goes on the meter once a model has actually answered,
     // whether or not the answer turns out to be usable: it cost the same
     // either way. Calls that failed outright are not counted - nothing came
-    // back to count.
+    // back to count. Learning goes on it the same way.
     if (!quick) await addToMeter(env, gate.meter, neuronsUsed(model, reply, system + user, answer));
+
+    if (learn) {
+      const notes = parseNotes(answer);
+      return json({ notes, ...(notes === null ? { unparsed: true } : {}), model, mode });
+    }
 
     const corrections = parseCorrections(answer);
     if (!corrections) return json({ corrections: [], unparsed: true, model, left: gate.left, mode });

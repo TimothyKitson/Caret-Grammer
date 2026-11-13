@@ -6,6 +6,11 @@
 [build]
   publish = "site"
   command = ""
+  # Only rebuild when the site itself changed. Most pushes are to the
+  # extension or the Worker, and those must not publish anything here. Exit
+  # code 0 means "nothing changed under site/, skip this build". A deploy can
+  # still be started by hand from the Netlify dashboard.
+  ignore = "git diff --quiet $CACHED_COMMIT_REF $COMMIT_REF -- site/"
 
 [build.processing]
   skip_processing = false

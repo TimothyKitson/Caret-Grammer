@@ -29,8 +29,25 @@ function mergeReplacements(target, extra) {
   }
 }
 
+// A sentence problem covers a stretch of words, and the word-level mistakes
+// inside it still need their own underlines. So sentence problems are kept
+// on a layer of their own: they only compete with each other.
+const MAX_SENTENCE_ISSUES = 12;
+
 /** Resolve overlaps and identical spans. Returns issues sorted by position. */
 export function reconcile(issues, maxIssues = DEFAULT_MAX_ISSUES) {
+  const sentences = [];
+  for (const issue of issues) {
+    if (issue.category !== 'sentence') continue;
+    if (sentences.some((s) => issue.start < s.end && s.start < issue.end)) continue;
+    sentences.push(issue);
+    if (sentences.length >= MAX_SENTENCE_ISSUES) break;
+  }
+  const words = reconcileWords(issues.filter((issue) => issue.category !== 'sentence'), maxIssues);
+  return [...words, ...sentences].sort((a, b) => a.start - b.start || a.end - b.end);
+}
+
+function reconcileWords(issues, maxIssues) {
   const ordered = [...issues].sort((a, b) => {
     const p = priorityOf(a) - priorityOf(b);
     if (p !== 0) return p;

@@ -40,7 +40,7 @@ Acosta
 Acrux
 Actaeon
 Acton
-Acts
+?Acts
 Acuff
 Ada
 Adam
@@ -516,7 +516,7 @@ Arden
 Arduino
 Arecibo
 Arequipa
-Ares
+?Ares
 Argentina
 Argentine
 Argentinean
@@ -753,7 +753,7 @@ Baden
 Baedeker
 Baez
 Baffin
-Baggies
+?Baggies
 Baghdad
 Baguio
 Bahama
@@ -774,7 +774,7 @@ Bakunin
 Balanchine
 Balaton
 ?Balboa
-Balder
+?Balder
 Baldwin
 Balearic
 Balfour
@@ -803,7 +803,7 @@ Bangor
 Bangui
 Banjarmasin
 Banjul
-Banks
+?Banks
 Banneker
 Bannister
 Banting
@@ -871,7 +871,7 @@ Basseterre
 Bastille
 Basutoland
 Bataan
-Bates
+?Bates
 Bathsheba
 Batista
 ?Batman
@@ -1092,7 +1092,7 @@ Bilbao
 Bilbo
 ?Bill
 Billie
-Billings
+?Billings
 ?Billy
 Bimini
 Binghamton
@@ -1157,7 +1157,7 @@ Bluetooth
 ?Blvd
 Blythe
 Boadicea
-Boas
+?Boas
 ?Bob
 Bobbi
 Bobbie
@@ -1247,7 +1247,7 @@ Bovary
 Bowditch
 Bowell
 Bowen
-Bowers
+?Bowers
 Bowery
 Bowie
 ?Bowman
@@ -1298,7 +1298,7 @@ Brazilian
 Brazos
 Brazzaville
 Breakspear
-Breathalyzer
+?Breathalyzer
 Brecht
 Breckenridge
 Bremen
@@ -1324,7 +1324,7 @@ Brice
 Bridalveil
 Bridgeport
 Bridger
-Bridges
+?Bridges
 Bridget
 Bridgetown
 Bridgett
@@ -1369,13 +1369,13 @@ Bronte
 Bronx
 Brooke
 Brooklyn
-Brooks
-Bros
+?Brooks
+?Bros
 ?Brown
 Browne
 Brownian
 ?Brownie
-Browning
+?Browning
 Brownshirt
 Brownsville
 Brubeck
@@ -1458,7 +1458,7 @@ Burlington
 Burma
 Burmese
 Burnett
-Burns
+?Burns
 Burnside
 ?Burr
 Burris
@@ -1521,7 +1521,7 @@ Caligula
 Callaghan
 Callahan
 Callao
-Callas
+?Callas
 Callie
 ?Calliope
 Callisto
@@ -1563,7 +1563,7 @@ Canada
 Canadian
 Canadianism
 Canaletto
-Canaries
+?Canaries
 Canaveral
 Canberra
 ?Cancer
@@ -1672,7 +1672,7 @@ Casablanca
 Casals
 Casandra
 Casanova
-Cascades
+?Cascades
 ?Case
 Casey
 ?Cash
@@ -1770,7 +1770,7 @@ Chaldean
 ?Challenger
 Chalmers
 ?Chamberlain
-Chambers
+?Chambers
 Chambersburg
 Champaign
 Champlain
@@ -1803,7 +1803,7 @@ Charlene
 Charles
 Charleston
 Charley
-?Charlie
+Charlie
 Charlotte
 Charlottesville
 Charlottetown
@@ -1908,7 +1908,7 @@ Christchurch
 Christendom
 Christensen
 Christi
-?Christian
+Christian
 Christianity
 Christianize
 Christie
@@ -1922,7 +1922,7 @@ Christoper
 Christopher
 Chromebook
 ChromeOS
-Chronicles
+?Chronicles
 Chrysler
 Chrysostom
 Chrystal
@@ -2056,7 +2056,7 @@ Columbia
 Columbus
 ?Com
 Comanche
-Combs
+?Combs
 Comcast
 Comdr
 Comintern
@@ -2139,7 +2139,7 @@ Coppola
 Coptic
 Cora
 Cordelia
-Cordilleras
+?Cordilleras
 Cordoba
 Corey
 Corfu
@@ -2158,7 +2158,7 @@ Corneille
 Cornelia
 Cornelius
 Cornell
-Corning
+?Corning
 Cornish
 Cornwall
 Cornwallis
@@ -2414,7 +2414,7 @@ Debora
 Deborah
 Debouillet
 Debra
-Debs
+?Debs
 Debussy
 Dec
 Decalogue
@@ -2428,7 +2428,7 @@ Dee
 Deena
 Deere
 Defoe
-Degas
+?Degas
 DeGeneres
 Deidre
 Deimos
@@ -2527,7 +2527,7 @@ Dias
 ?Diaspora
 DiCaprio
 ?Dick
-Dickens
+?Dickens
 Dickensian
 Dickerson
 Dickinson
@@ -2651,7 +2651,7 @@ Douglass
 Douro
 Dover
 Dow
-Downs
+?Downs
 ?Downy
 Doyle
 Draco
@@ -3092,7 +3092,7 @@ Farrell
 Farsi
 Fassbinder
 Fatah
-Fates
+?Fates
 ?Father
 Fatima
 Fatimid
@@ -3114,7 +3114,7 @@ February
 ?Federalist
 Federico
 FedEx
-Feds
+?Feds
 Felecia
 Felice
 Felicia
@@ -3146,7 +3146,7 @@ Fichte
 Fidel
 Fido
 ?Fielding
-Fields
+?Fields
 Figaro
 Figueroa
 Fiji
@@ -3200,7 +3200,7 @@ Florine
 Florsheim
 Flory
 Flossie
-Flowers
+?Flowers
 Floyd
 Flynn
 Foch
@@ -3256,7 +3256,7 @@ Frankfurt
 Frankie
 Frankish
 Franklin
-Franks
+?Franks
 Franny
 Franz
 Fraser
@@ -3333,7 +3333,7 @@ Fullerton
 Fulton
 Funafuti
 Fundy
-Furies
+?Furies
 Furman
 Furtwangler
 Fushun
@@ -3422,7 +3422,7 @@ Gascony
 Gasser
 Gastonia
 Gastroenterology
-Gates
+?Gates
 Gatling
 Gatorade
 Gatsby
@@ -3448,7 +3448,7 @@ Geiger
 Gelbvieh
 Geller
 Gemini
-Gen
+?Gen
 Gena
 Genaro
 ?Gene
@@ -3490,7 +3490,7 @@ Gettysburg
 Gewurztraminer
 Ghana
 Ghanaian
-Ghats
+?Ghats
 Ghazvanid
 Ghent
 Ghibelline
@@ -3634,7 +3634,7 @@ Gorgonzola
 Gorky
 ?Gospel
 Goteborg
-Goth
+?Goth
 Gotham
 Gothic
 ?Goths
@@ -3660,7 +3660,7 @@ Grampians
 Granada
 ?Grant
 ?Grass
-Graves
+?Graves
 ?Gray
 Grayslake
 Grecian
@@ -3693,11 +3693,11 @@ Greta
 Gretchen
 Gretel
 Gretzky
-Grey
+?Grey
 Grieg
 ?Griffin
 Griffith
-Grimes
+?Grimes
 Grimm
 Grinch
 Gris
@@ -3840,7 +3840,7 @@ Haney
 Hanford
 Hangul
 Hangzhou
-?Hank
+Hank
 Hanna
 Hannah
 Hannibal
@@ -3880,7 +3880,7 @@ Harrisburg
 Harrison
 Harrisonburg
 Harrods
-?Harry
+Harry
 ?Hart
 Harte
 Hartford
@@ -3908,9 +3908,9 @@ Havoline
 ?Haw
 Hawaii
 Hawaiian
-Hawking
+?Hawking
 Hawkins
-Hawks
+?Hawks
 Hawthorne
 ?Hay
 Hayden
@@ -3918,7 +3918,7 @@ Haydn
 Hayek
 Hayes
 Haynes
-Hays
+?Hays
 Hayward
 Haywood
 Hayworth
@@ -4062,12 +4062,12 @@ Hibernian
 Hickman
 Hickok
 ?Hickory
-Hicks
+?Hicks
 Hieronymus
 Higashiosaka
 Higgins
 ?Highlander
-Highlands
+?Highlands
 ?Highness
 Hightstown
 Hilario
@@ -4164,14 +4164,14 @@ Honeywell
 Hong
 Honiara
 Honolulu
-Honorable
+?Honorable
 Honshu
 ?Hood
 Hooke
 ?Hooker
 Hooper
 Hoosier
-Hooters
+?Hooters
 ?Hoover
 ?Hope
 Hopewell
@@ -4320,14 +4320,14 @@ Inca
 Inchon
 ?Incorporated
 ?Ind
-Independence
+?Independence
 India
 Indian
 Indiana
 Indianan
 Indianapolis
 Indianian
-Indies
+?Indies
 Indio
 Indira
 Indochina
@@ -4517,7 +4517,7 @@ Jansenist
 January
 Janus
 Jap
-?Japan
+Japan
 Japanese
 Japura
 Jared
@@ -4571,7 +4571,7 @@ Jenner
 Jennie
 Jennifer
 Jennings
-?Jenny
+Jenny
 Jensen
 Jephthah
 Jerald
@@ -4613,7 +4613,7 @@ Jillian
 Jim
 Jimenez
 Jimmie
-?Jimmy
+Jimmy
 Jinan
 Jinnah
 Jinny
@@ -4624,7 +4624,7 @@ Joanna
 Joanne
 Joaquin
 ?Job
-Jobs
+?Jobs
 Jocasta
 Jocelyn
 ?Jock
@@ -4640,13 +4640,13 @@ Johann
 Johanna
 Johannes
 Johannesburg
-?John
+John
 Johnathan
 Johnathon
 Johnie
 Johnnie
-?Johnny
-Johns
+Johnny
+?Johns
 Johnson
 Johnston
 Johnstown
@@ -4675,7 +4675,7 @@ Josephine
 Josephs
 Josephson
 Josephus
-?Josh
+Josh
 Joshua
 Josiah
 Josie
@@ -4702,7 +4702,7 @@ Judas
 Judd
 Jude
 Judea
-Judges
+?Judges
 Judith
 Judson
 Judy
@@ -5108,7 +5108,7 @@ Lamaze
 Lambert
 Lamborghini
 Lambrusco
-Lamentations
+?Lamentations
 Lamont
 Lana
 ?Lanai
@@ -5213,7 +5213,7 @@ Lebesgue
 Leblanc
 Leda
 Lederberg
-?Lee
+Lee
 Leeds
 Leesburg
 Leeuwenhoek
@@ -5476,7 +5476,7 @@ Lowe
 Lowell
 Lowenbrau
 Lowery
-Lowlands
+?Lowlands
 Loyang
 Loyd
 Loyola
@@ -5779,7 +5779,7 @@ Margret
 Margrethe
 Marguerite
 Mari
-?Maria
+Maria
 MariaDB
 Marian
 Mariana
@@ -5810,7 +5810,7 @@ Marjory
 Markab
 Markham
 Markov
-Marks
+?Marks
 Marla
 Marlboro
 Marlborough
@@ -5830,7 +5830,7 @@ Marquez
 Marquita
 Marrakesh
 Marriott
-Mars
+?Mars
 Marsala
 Marseillaise
 Marseilles
@@ -5842,7 +5842,7 @@ Martel
 Martha
 ?Martial
 ?Martian
-?Martin
+Martin
 Martina
 Martinez
 Martinique
@@ -5880,7 +5880,7 @@ Massenet
 Massey
 ?Master
 MasterCard
-Masters
+?Masters
 Mather
 Matheson
 Mathew
@@ -5996,7 +5996,7 @@ McQueen
 McVeigh
 ?Mead
 Meade
-Meadows
+?Meadows
 Meagan
 ?Meany
 ?Mecca
@@ -6163,14 +6163,14 @@ Midwest
 Midwestern
 MiG
 Miguel
-?Mike
+Mike
 Mikhail
 Mikoyan
 Milagros
 Milan
 Milanese
 Mildred
-Miles
+?Miles
 Milford
 Milken
 ?Mill
@@ -6181,7 +6181,7 @@ Millay
 Millicent
 Millie
 Millikan
-Mills
+?Mills
 Milne
 Milo
 Milosevic
@@ -6238,7 +6238,7 @@ Missouri
 Missourian
 Missy
 Mistassini
-Mister
+?Mister
 ?Mistress
 ?Misty
 Mitch
@@ -6287,7 +6287,7 @@ Moliere
 Molina
 ?Moll
 Mollie
-?Molly
+Molly
 Molnar
 Moloch
 Molokai
@@ -6751,7 +6751,7 @@ Noyes
 Nubia
 Nubian
 Nukualofa
-Numbers
+?Numbers
 Nunavut
 Nunez
 Nunki
@@ -6987,7 +6987,7 @@ Palestinian
 Palestrina
 Paley
 Palikir
-Palisades
+?Palisades
 Palladio
 Palmdale
 Palmer
@@ -6998,7 +6998,7 @@ Palomar
 Pam
 Pamela
 Pamirs
-Pampers
+?Pampers
 ?Pan
 ?Panama
 Panamanian
@@ -7031,7 +7031,7 @@ Parkersburg
 Parkinson
 Parkinsonism
 Parkman
-Parks
+?Parks
 ?Parliament
 Parmenides
 Parmesan
@@ -7040,7 +7040,7 @@ Parnell
 Parr
 Parrish
 Parsifal
-Parsons
+?Parsons
 Parthenon
 Parthia
 Pasadena
@@ -7163,7 +7163,7 @@ Petain
 Petaluma
 Pete
 ?Peter
-Peters
+?Peters
 Petersen
 Peterson
 Petra
@@ -7360,7 +7360,7 @@ Poussin
 Powell
 PowerPC
 PowerPoint
-Powers
+?Powers
 Powhatan
 Poznan
 Prada
@@ -7406,7 +7406,7 @@ Procyon
 Prokofiev
 Promethean
 Prometheus
-Prophets
+?Prophets
 Proserpina
 Proserpine
 Protagoras
@@ -7418,7 +7418,7 @@ Proudhon
 Proust
 Provencal
 Provence
-Proverbs
+?Proverbs
 ?Providence
 Provo
 Prozac
@@ -7429,7 +7429,7 @@ Prussia
 Prussian
 Prut
 Pryor
-Psalms
+?Psalms
 Psalter
 ?Psyche
 Ptah
@@ -7502,7 +7502,7 @@ Quebec
 Quebecois
 Quechua
 ?Queen
-Queens
+?Queens
 Queensland
 Quentin
 Quetzalcoatl
@@ -7533,9 +7533,9 @@ Radcliff
 Radcliffe
 Rae
 Rafael
-Raffles
+?Raffles
 Ragnarok
-Rainier
+?Rainier
 Raleigh
 Ralph
 Rama
@@ -7595,7 +7595,7 @@ Realtor
 Reba
 Rebekah
 Recife
-Reconstruction
+?Reconstruction
 Redding
 Reddit
 ?Redeemer
@@ -7605,10 +7605,10 @@ Redis
 Redmond
 Redshift
 Reebok
-Reed
+?Reed
 Reese
-Reeves
-Reformation
+?Reeves
+?Reformation
 Refugio
 Reggie
 Regina
@@ -7637,20 +7637,20 @@ Reno
 Renoir
 ?Rep
 ?Representative
-Republican
+?Republican
 ?Republicanism
 ?Requiem
 ?Resistance
 ?Restoration
 ?Resurrection
 Reuben
-Reunion
+?Reunion
 Reuters
 Reuther
 ?Rev
 Reva
 ?Revelation
-Revelations
+?Revelations
 ?Revere
 ?Reverend
 Revlon
@@ -7686,7 +7686,7 @@ Richie
 Richmond
 Richter
 Richthofen
-?Rick
+Rick
 Rickenbacker
 Rickey
 Rickie
@@ -7719,7 +7719,7 @@ Ritalin
 Ritz
 Rivas
 Rivera
-Rivers
+?Rivers
 ?Riverside
 ?Riviera
 Riyadh
@@ -7775,7 +7775,7 @@ Roeg
 ?Roentgen
 Rogelio
 ?Roger
-Rogers
+?Rogers
 Roget
 Rojas
 Roku
@@ -7961,7 +7961,7 @@ Saks
 Sal
 Saladin
 Salado
-Salamis
+?Salamis
 Salas
 Salazar
 Salem
@@ -7974,7 +7974,7 @@ Salish
 Salk
 Sallie
 Sallust
-?Sally
+Sally
 Salome
 Salonika
 Salton
@@ -8009,7 +8009,7 @@ Sanchez
 Sancho
 ?Sand
 Sandburg
-Sanders
+?Sanders
 Sandinista
 Sandoval
 Sandra
@@ -8123,7 +8123,7 @@ Schwinn
 Scientologist
 Scientology
 Scipio
-Scopes
+?Scopes
 Scorpio
 Scorpius
 Scorsese
@@ -8158,7 +8158,7 @@ Scythian
 Seaborg
 Seagram
 Sean
-Sears
+?Sears
 ?Seaside
 Seattle
 Sebastian
@@ -8188,7 +8188,7 @@ Seleucus
 Selim
 Seljuk
 Selkirk
-Sellers
+?Sellers
 Selma
 Selznick
 Semarang
@@ -8317,7 +8317,7 @@ Shetland
 Shetlands
 Shevardnadze
 Shevat
-Shields
+?Shields
 Shiite
 Shijiazhuang
 Shikoku
@@ -8356,7 +8356,7 @@ Sidney
 Siegfried
 Siemens
 Sierpinski
-Sierras
+?Sierras
 Sigismund
 Sigmund
 Sigurd
@@ -8380,7 +8380,7 @@ Simone
 Simpson
 Simpsons
 Simpsonville
-Sims
+?Sims
 Sinai
 Sinatra
 Sinbad
@@ -8437,15 +8437,15 @@ Smithsonian
 ?Smokey
 Smolensk
 Smollett
-Smuts
+?Smuts
 Smyrna
 ?Snake
 Snapchat
 Snapple
 Snead
 Snell
-Snickers
-Snider
+?Snickers
+?Snider
 ?Snoopy
 ?Snow
 Snowbelt
@@ -8514,12 +8514,12 @@ Spain
 Spanglish
 Spaniard
 Spanish
-Sparks
+?Sparks
 Sparta
 Spartacus
 ?Spartan
 Spartanburg
-Spears
+?Spears
 Speer
 Spence
 Spencer
@@ -8572,13 +8572,13 @@ Stanford
 Stanislavsky
 Stanley
 Stanton
-Staples
+?Staples
 Starbucks
 ?Stark
 Starkey
 Starr
 Staten
-States
+?States
 Staubach
 Staunton
 Ste
@@ -8623,7 +8623,7 @@ Stockholm
 Stockton
 ?Stoic
 ?Stoicism
-Stokes
+?Stokes
 Stolichnaya
 Stolypin
 ?Stone
@@ -8679,7 +8679,7 @@ Sumatran
 Sumeria
 Sumerian
 ?Summer
-Summers
+?Summers
 Sumner
 Sumter
 ?Sun
@@ -8815,7 +8815,7 @@ Tamworth
 Tancred
 Taney
 Tanganyika
-Tangier
+?Tangier
 Tangshan
 Tania
 Tanisha
@@ -8858,7 +8858,7 @@ Tchaikovsky
 Teasdale
 ?Technicolor
 Tecumseh
-?Ted
+Ted
 ?Teddy
 Teflon
 Tegucigalpa
@@ -9049,7 +9049,7 @@ Tolkien
 Tolstoy
 Toltec
 Tolyatti
-?Tom
+Tom
 Tomas
 Tombaugh
 Tomlin
@@ -9062,7 +9062,7 @@ Tongan
 Toni
 Tonia
 Tonto
-?Tony
+Tony
 Tonya
 Topeka
 Topsy
@@ -9405,7 +9405,7 @@ Vijayawada
 Vila
 ?Villa
 Villarreal
-Villas
+?Villas
 Villon
 Vilma
 Vilnius
@@ -9491,7 +9491,7 @@ Wallenstein
 Waller
 Wallis
 Walloon
-Walls
+?Walls
 Walmart
 Walpole
 Walpurgisnacht
@@ -9528,7 +9528,7 @@ Watson
 Watsonville
 ?Watt
 Watteau
-Watts
+?Watts
 Watusi
 Waugh
 Wausau
@@ -9545,7 +9545,7 @@ Webster
 Weddell
 Wedgwood
 Wednesday
-Weeks
+?Weeks
 Wehrmacht
 Wei
 Weierstrass
@@ -9560,7 +9560,7 @@ Welland
 Weller
 Welles
 ?Wellington
-Wells
+?Wells
 ?Welsh
 Welshman
 Welshmen
@@ -9586,8 +9586,8 @@ Wharton
 WhatsApp
 Wheaties
 Wheatstone
-Wheeler
-Wheeling
+?Wheeler
+?Wheeling
 Whig
 Whipple
 ?Whirlpool
@@ -9624,8 +9624,8 @@ Wilburn
 Wilcox
 Wilda
 Wilde
-Wilder
-Wiles
+?Wilder
+?Wiles
 Wiley
 Wilford
 Wilfred
@@ -9662,7 +9662,7 @@ Winchester
 ?Windbreaker
 Windex
 Windhoek
-Windows
+?Windows
 Windsor
 ?Windward
 Winesap
@@ -9674,7 +9674,7 @@ Winnebago
 Winnie
 Winnipeg
 Winston
-Winters
+?Winters
 Winthrop
 Wis
 Wisc
@@ -9716,7 +9716,7 @@ Worcestershire
 WordPress
 Wordsworth
 ?Workman
-Worms
+?Worms
 Wotan
 Wovoka
 Wozniak
@@ -9866,7 +9866,7 @@ Zeffirelli
 Zeke
 Zelig
 Zelma
-Zen
+?Zen
 Zenger
 Zeno
 Zephaniah

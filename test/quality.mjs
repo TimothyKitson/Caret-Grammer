@@ -167,10 +167,27 @@ The weather was perfect for a hike, so we went to the mountains.
 Please RSVP by March 3rd so we can get a head count.
 World War I is a big topic in history class.
 You and I are on the same team this time.
+Our reunion with God is joyful, not shameful.
+I applied for three jobs last week.
+The flowers in the fields were pretty.
+She opened the gates and walked past the banks of the river.
+He got good marks on the test.
+The fire burns slowly in the hearth.
+I need to pat the dog before we go.
+She moved with grace and kindness.
+Our team was the victor in the final match.
+The trail began to peter out near the river.
+She held her hair back with a bobby pin.
+The sky is grey today.
+We have a FREE app that you can use.
+He was an FBI agent for ten years.
 `.trim().split('\n').map((s) => s.trim()).filter(Boolean);
 
 // Real mistakes. Each should be caught, and the right fix offered.
 const MISTAKES = [
+  ['She was born in wales.', 'wales', 'Wales'],
+  ['We skied in the alps last winter.', 'alps', 'Alps'],
+  ['It was a FBI agent.', 'a', 'an'],
   ['I recieved your letter.', 'recieved', 'received'],
   ['It was definately the best one.', 'definately', 'definitely'],
   ['They seperated the piles.', 'seperated', 'separated'],
@@ -204,6 +221,9 @@ const MISTAKES = [
   ['My mom and I is going.', 'is', 'are'],
   ['I is happy.', 'is', 'am'],
   ['My dad and I has a plan.', 'has', 'have'],
+  ['Like john would be John.', 'john', 'John'],
+  ['We met jason at the park.', 'jason', 'Jason'],
+  ['I talked to sam yesterday.', 'sam', 'Sam'],
 ];
 
 // ------------------------------------------------------------------- scoring

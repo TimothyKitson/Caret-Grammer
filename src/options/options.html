@@ -54,14 +54,14 @@
       <a href="#sec-preview"><svg class="ico" aria-hidden="true"><use href="#i-preview"/></svg>Preview</a>
       <a href="#sec-checks"><svg class="ico" aria-hidden="true"><use href="#i-checks"/></svg>What to check</a>
       <a href="#sec-autocorrect"><svg class="ico" aria-hidden="true"><use href="#i-auto"/></svg>Autocorrect</a>
-      <a href="#sec-ai"><svg class="ico" aria-hidden="true"><use href="#i-ai"/></svg>AI proofreading</a>
+      <a href="#sec-ai"><svg class="ico" aria-hidden="true"><use href="#i-ai"/></svg>AI</a>
       <a href="#sec-words"><svg class="ico" aria-hidden="true"><use href="#i-words"/></svg>My dictionary</a>
       <a href="#sec-sites"><svg class="ico" aria-hidden="true"><use href="#i-sites"/></svg>Sites</a>
-      <a href="#sec-keys"><svg class="ico" aria-hidden="true"><use href="#i-keys"/></svg>Keyboard</a>
-      <a href="#sec-about"><svg class="ico" aria-hidden="true"><use href="#i-numbers"/></svg>Numbers</a>
+      <a href="#sec-keys"><svg class="ico" aria-hidden="true"><use href="#i-keys"/></svg>Shortcuts</a>
+      <a href="#sec-about"><svg class="ico" aria-hidden="true"><use href="#i-numbers"/></svg>Stats</a>
     </nav>
 
-    <p class="side-note">Writing that catches itself.</p>
+    <p class="side-note">The Best Free Grammar Checker</p>
   </aside>
 
   <main>
@@ -70,7 +70,7 @@
     <!-- ---------------------------------------------------------- preview -->
     <section id="sec-preview" class="hero">
       <h2><svg class="ico" aria-hidden="true"><use href="#i-preview"/></svg>Preview</h2>
-      <p class="note">A real check, run with your settings as they are right now. Change anything below and this updates.</p>
+      <p class="note">This shows what Caret will catch with your settings.</p>
       <div class="stage">
         <div class="editor">
           <div class="editor-bar">
@@ -98,25 +98,25 @@
       <div class="rule"></div>
 
       <label class="row" data-search="names capitalized unknown false alarms">
-        <span class="text"><b>Flag names and unusual words</b><i>Off means a capitalized word we do not recognize is left alone — fewer false alarms on names and jargon.</i></span>
+        <span class="text"><b>Flag names and weird words</b><i>If this is off, Caret won't flag capital words it doesn't know, like names.</i></span>
         <input type="checkbox" id="checkNames" class="sw">
         <span class="track" aria-hidden="true"></span>
       </label>
 
       <label class="row" data-search="spellcheck browser squiggles red underline other site duplicate">
-        <span class="text"><b>Turn off the browser's own spell check</b><i>Edge underlines in red too, and two sets of underlines disagreeing with each other is worse than either alone. This silences Edge in the fields Caret is checking, and puts it back when you move on. A site that ships its own checker — Google Docs, say — cannot be switched off from here.</i></span>
+        <span class="text"><b>Turn off other spell checkers</b><i>Most websites have their own spell checkers. This turns them off so that you don't get confused.</i></span>
         <input type="checkbox" id="quietOthers" class="sw">
         <span class="track" aria-hidden="true"></span>
       </label>
 
       <label class="row" data-search="badge count corner list fix all">
-        <span class="text"><b>Show the count badge in the corner of the field</b><i>Click it for a list of everything found, with a “fix all” button.</i></span>
+        <span class="text"><b>Show the mistake counter</b><i>Shows how many mistakes are in the box. Click it to see all of them and fix them all at once.</i></span>
         <input type="checkbox" id="showBadge" class="sw">
         <span class="track" aria-hidden="true"></span>
       </label>
 
       <div class="row wrap" data-search="underline style straight wavy squiggly line">
-        <span class="text"><b>Underline style</b><i>Straight is quieter and lines up with the text better.</i></span>
+        <span class="text"><b>Underline style</b><i>Pick straight or wavy lines.</i></span>
         <div class="seg" id="underlineStyle" role="radiogroup" aria-label="Underline style">
           <button type="button" role="radio" data-value="straight">Straight</button>
           <button type="button" role="radio" data-value="wavy">Wavy</button>
@@ -127,15 +127,10 @@
     <!-- ------------------------------------------------------ autocorrect -->
     <section id="sec-autocorrect">
       <h2><svg class="ico" aria-hidden="true"><use href="#i-auto"/></svg>Autocorrect <span class="tag">off by default</span></h2>
-      <p class="note">
-        Caret normally underlines a mistake and waits for you. With this on, the
-        few mistakes that have exactly one right answer get fixed the moment you
-        finish the word — no click, no card. Anything with a judgement call in it
-        (their/there, your/you’re) is still only underlined.
-      </p>
+      <p class="note">Caret usually just underlines mistakes. Turn this on and it fixes the easy ones for you as you type. Stuff like their and there still gets underlined so you can pick.</p>
 
       <label class="row lead" data-search="autocorrect as i type automatic fix">
-        <span class="text"><b>Correct the obvious things as I type</b><i>Every correction is an ordinary edit, so Ctrl+Z undoes it — and a word you undo is left alone from then on.</i></span>
+        <span class="text"><b>Fix the easy stuff as I type</b><i>Ctrl+Z undoes it, and Caret won't fix that word again.</i></span>
         <input type="checkbox" id="autocorrectEnabled" class="sw">
         <span class="track" aria-hidden="true"></span>
       </label>
@@ -145,34 +140,13 @@
 
     <!-- --------------------------------------------------------------- ai -->
     <section id="sec-ai">
-      <h2><svg class="ico" aria-hidden="true"><use href="#i-ai"/></svg>AI proofreading <span class="tag">optional</span></h2>
-      <p class="note">
-        The built-in checks are instant, offline and free. This one sends the
-        contents of the field to <b id="ai-host">an AI provider</b> and adds what
-        it finds to the underlines. It never rewrites anything: it may swap a
-        word or a short phrase, it is told to keep your vocabulary plain rather
-        than make it sound fancier, and nothing changes until you click the
-        suggestion. Password fields are never read, and card numbers, passwords
-        and anything that looks like a key are blanked out before the text is
-        sent.
-      </p>
-      <p class="note">
-        <b>It learns what to leave alone.</b> Every word you add to your
-        dictionary, and every suggestion you dismiss with <b>Ignore</b>, is sent
-        with the request as a list of things not to touch. So the AI stops
-        re-proposing a change you have already turned down, and stops correcting
-        the way you write on purpose. Nothing is guessed from your writing — only
-        the choices you made yourself.
-      </p>
-      <p class="note">
-        <b>You do not need this.</b> The built-in checks handle spelling,
-        confused words, apostrophes, agreement and capitals on their own, for
-        free, with no account. This is for the sentence-level things a rule
-        cannot see.
-      </p>
+      <h2><svg class="ico" aria-hidden="true"><use href="#i-ai"/></svg>AI <span class="tag">optional</span></h2>
+      <p class="note">The AI is really good at finding spelling and grammar mistakes. It won't change anything for you. You have to do that. None of your personal information, like passwords, credit cards, or API keys, goes outside of the text box.</p>
+      <p class="note">It learns what you don't want fixed. Words in your dictionary and stuff you clicked <b>Ignore</b> on get sent too, so the AI leaves them alone.</p>
+      <p class="note">You don't need this. Caret already catches a lot without it. This is just for the stuff it can't catch on its own.</p>
 
       <label class="row lead" data-search="ai claude chatgpt openai proofread enable">
-        <span class="text"><b>Also proofread with AI</b><i id="ai-state">No key yet.</i></span>
+        <span class="text"><b>Use AI</b><i id="ai-state">No key yet.</i></span>
         <input type="checkbox" id="aiEnabled" class="sw">
         <span class="track" aria-hidden="true"></span>
       </label>
@@ -181,7 +155,7 @@
         <div class="row stack" data-search="which ai provider caret google gemini openai chatgpt anthropic claude choose pick">
           <span class="text">
             <b>Which AI</b>
-            <i>Pick one. Caret's own is free; the others use a key of your own.</i>
+            <i>Caret's AI is free. The others need your own key.</i>
           </span>
           <div id="aiProvider" class="choices" role="radiogroup" aria-label="Which AI to use"></div>
         </div>
@@ -213,7 +187,7 @@
         </div>
 
         <div class="row stack" data-search="when to run trigger every minute pause manual keybind button">
-          <span class="text"><b>When to run it</b><i id="trigger-hint">Each run costs money, so this is the setting that decides your bill.</i></span>
+          <span class="text"><b>When should the AI check?</b><i id="trigger-hint">Each run costs money, so this is the setting that decides your bill.</i></span>
           <div id="aiTrigger" class="choices" role="radiogroup" aria-label="When to run AI proofreading"></div>
           <p class="hint" id="trigger-note" hidden></p>
         </div>
@@ -224,8 +198,42 @@
         </div>
 
         <div class="row" data-search="daily limit cap spend budget free rate limit full checks a day">
-          <span class="text"><b id="limit-label">Full checks a day</b><i id="ai-budget"></i></span>
+          <span class="text"><b id="limit-label">Checks a day</b><i id="ai-budget"></i></span>
           <input type="text" id="aiDailyLimit" inputmode="numeric" size="4" class="num" aria-labelledby="limit-label">
+        </div>
+
+        <label class="row" data-search="check sentences run-on fragment comma splice missing word structure format highlight stretch">
+          <span class="text">
+            <b>Check sentences too</b>
+            <i>The AI checks full sentences, not just words. It highlights run-on
+            sentences <span class="swatch sentence" aria-hidden="true"></span> and
+            missing words. Small fixes get a button, and bigger ones you fix
+            yourself.</i>
+          </span>
+          <input type="checkbox" id="aiSentences" class="sw">
+          <span class="track" aria-hidden="true"></span>
+        </label>
+
+        <label class="row" data-search="learn how i write style accepted ignored notes remember teach">
+          <span class="text">
+            <b>Learn how I write</b>
+            <i>After checking your spelling with AI, it will see what changes you
+            accepted. Then later on, it won't recommend stuff you don't accept.</i>
+          </span>
+          <input type="checkbox" id="aiLearn" class="sw">
+          <span class="track" aria-hidden="true"></span>
+        </label>
+
+        <div class="row stack" id="notes-row" data-search="learned notes style forget clear what caret knows about me">
+          <span class="text">
+            <b>What Caret has learned</b>
+            <i id="notes-when">Nothing yet.</i>
+          </span>
+          <ul class="notes" id="aiNotes" hidden></ul>
+          <div class="inline">
+            <button type="button" id="forget-notes">Forget it all</button>
+          </div>
+          <p class="warn" id="learn-error" hidden></p>
         </div>
 
         <p class="result" id="ai-result"></p>
@@ -236,23 +244,12 @@
       <!-- The quick check stands on its own: it has its own switch, its own
            daily number, and it runs whether the full check above is on or not. -->
       <div class="quick" id="quick-block">
-        <h3 class="sub-head"><svg class="ico" aria-hidden="true"><use href="#i-sentence"/></svg>Quick check after each sentence <span class="tag free">free</span></h3>
-        <p class="note">
-          Caret's small AI reads each sentence once you finish it and move on,
-          and underlines anything it finds. A sentence is checked once, and only
-          checked again if you change it. This is separate from the full check
-          above: have either one on, or both.
-        </p>
-        <p class="note">
-          <b>Free, with a daily number.</b> New installs get
-          <span id="quick-default">30</span> quick checks a day, and you can raise
-          that to <span id="quick-max">100</span>. Each finished sentence is sent
-          to Caret's server on Cloudflare, which keeps nothing, with card numbers,
-          passwords and anything that looks like a key blanked out first.
-        </p>
+        <h3 class="sub-head"><svg class="ico" aria-hidden="true"><use href="#i-sentence"/></svg>Quick check <span class="tag free">free</span></h3>
+        <p class="note">A small AI checks each sentence when you finish it. It only checks it again if you change it. It works with or without the AI above.</p>
+        <p class="note">The cap is set to <span id="quick-default">30</span>, but you can raise it to <span id="quick-max">80</span>.</p>
 
         <label class="row lead" data-search="quick check sentence small ai free as you type each sentence finish">
-          <span class="text"><b>Check each sentence as I finish it</b><i id="quick-state"></i></span>
+          <span class="text"><b>Check each sentence when I finish it</b><i id="quick-state"></i></span>
           <input type="checkbox" id="quickAiEnabled" class="sw">
           <span class="track" aria-hidden="true"></span>
         </label>
@@ -261,10 +258,10 @@
           <div class="row" data-search="quick checks a day daily limit sentence small free">
             <span class="text">
               <b id="quick-limit-label">Quick checks a day</b>
-              <i id="quick-hint">Anything from 1 to 100. When they run out, the built-in checks carry on as normal.</i>
+              <i id="quick-hint">Pick 1 to 80. When they run out, the normal checks still work.</i>
               <i class="left" id="quick-left" hidden></i>
             </span>
-            <input type="number" id="quickAiDailyLimit" min="1" max="100" step="1" inputmode="numeric" class="num" aria-labelledby="quick-limit-label" aria-describedby="quick-hint">
+            <input type="number" id="quickAiDailyLimit" min="1" max="80" step="1" inputmode="numeric" class="num" aria-labelledby="quick-limit-label" aria-describedby="quick-hint">
           </div>
           <p class="warn" id="quick-error" hidden></p>
         </div>
@@ -274,9 +271,9 @@
     <!-- ------------------------------------------------------------ words -->
     <section id="sec-words">
       <h2><svg class="ico" aria-hidden="true"><use href="#i-words"/></svg>My dictionary <span class="count" id="words-count"></span></h2>
-      <p class="note">Words Caret should always accept — surnames, street names, anything it keeps underlining that is not wrong. Type a name the way it is spelled, capitals and all (<b>Ignitia</b>, <b>McDonald</b>), and Caret will also point out when it is written without them.</p>
+      <p class="note">Words Caret should never flag, like names. Type it how it's spelled, with capitals, and Caret will tell you if you forget them.</p>
       <div class="inline add" data-search="add word dictionary custom">
-        <input type="text" id="new-word" placeholder="Kitson" spellcheck="false" aria-label="A word to add to your dictionary">
+        <input type="text" id="new-word" placeholder="Type a word" spellcheck="false" aria-label="A word to add to your dictionary">
         <button type="button" id="add-word" class="primary">Add</button>
       </div>
       <ul class="chips" id="words"></ul>
@@ -284,70 +281,70 @@
 
     <!-- ------------------------------------------------------------ sites -->
     <section id="sec-sites">
-      <h2><svg class="ico" aria-hidden="true"><use href="#i-sites"/></svg>Turned off on <span class="count" id="sites-count"></span></h2>
-      <p class="note">Paste a web address or a site name and Caret stays off there — on every page of it, and on its subdomains too, so <b>ignitiaschools.com</b> also covers <b>englewoodfl.ignitiaschools.com</b>.</p>
+      <h2><svg class="ico" aria-hidden="true"><use href="#i-sites"/></svg>Sites Caret is off on <span class="count" id="sites-count"></span></h2>
+      <p class="note">Caret will stop working on any website that is pasted into here. This includes subdomains.</p>
       <div class="inline add" data-search="sites turn off block disable website paste address url domain">
-        <input type="text" id="new-site" placeholder="Paste an address, like docs.google.com" spellcheck="false" autocomplete="off" aria-label="A website to turn Caret off on" aria-describedby="site-msg">
+        <input type="text" id="new-site" placeholder="Paste a website, like docs.google.com" spellcheck="false" autocomplete="off" aria-label="A website to turn Caret off on" aria-describedby="site-msg">
         <button type="button" id="add-site" class="primary">Turn off</button>
       </div>
       <p class="hint" id="site-msg" role="status" hidden></p>
       <ul class="chips" id="sites"></ul>
-      <p class="hint" id="sites-empty">Nothing here yet — or right-click any page and choose <b>Turn checking on or off for this site</b>.</p>
+      <p class="hint" id="sites-empty">You can also right-click any page and pick <b>Turn checking on or off for this site</b>.</p>
 
       <div class="rule"></div>
 
       <div class="row" data-search="ignored suggestions clear">
-        <span class="text"><b>Ignored suggestions <span class="count" id="ignored-count"></span></b><i>Every time you press <b>Ignore</b> on a card, that exact suggestion for that exact word stops appearing — and the AI pass, if you use it, is told to leave that word alone too.</i></span>
+        <span class="text"><b>Ignored <span class="count" id="ignored-count"></span></b><i>Stuff you clicked <b>Ignore</b> on. Caret and the AI won't flag it again.</i></span>
         <button type="button" id="clear-ignored">Clear</button>
       </div>
     </section>
 
     <!-- --------------------------------------------------------- keyboard -->
     <section id="sec-keys">
-      <h2><svg class="ico" aria-hidden="true"><use href="#i-keys"/></svg>Keyboard and buttons</h2>
+      <h2><svg class="ico" aria-hidden="true"><use href="#i-keys"/></svg>Shortcuts</h2>
       <dl class="keys">
         <div>
           <dt data-command="show-suggestions"><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>Space</kbd></dt>
-          <dd>Suggestions for the word the cursor is in</dd>
+          <dd>Show fixes for the word you're on</dd>
         </div>
         <div>
           <dt data-command="check-now"><kbd>Ctrl</kbd><kbd>Shift</kbd><kbd>.</kbd></dt>
-          <dd>Proofread this field with AI</dd>
+          <dd>Check this box with AI</dd>
         </div>
         <div>
           <dt><kbd>Esc</kbd></dt>
-          <dd>Close the suggestion card</dd>
+          <dd>Close the card</dd>
         </div>
         <div>
           <dt><span class="where">Toolbar</span></dt>
-          <dd>The Caret button has a <b>Check with AI</b> button in it</dd>
+          <dd>Click the Caret button to check with AI.</dd>
         </div>
         <div>
           <dt><span class="where">Right-click</span></dt>
-          <dd><b>Proofread with AI</b>, right there in the menu — no shortcut to remember</dd>
+          <dd>Right-click and pick <b>Proofread with AI</b>. No shortcut needed.</dd>
         </div>
         <div>
           <dt><span class="where">Right-click</span></dt>
-          <dd>Also: <b>Turn checking on or off for this site</b>. To add a word to your dictionary, hover its underline and press <b>Add to dictionary</b> on the card.</dd>
+          <dd>You can also turn Caret on or off for a site. To add a word to your dictionary, hover it and click <b>Add to dictionary</b>.</dd>
         </div>
       </dl>
-      <button type="button" id="shortcuts">Change the shortcuts</button>
+      <button type="button" id="shortcuts">Change shortcuts</button>
     </section>
 
     <!-- ------------------------------------------------------------ about -->
     <section id="sec-about">
-      <h2><svg class="ico" aria-hidden="true"><use href="#i-numbers"/></svg>Numbers</h2>
+      <h2><svg class="ico" aria-hidden="true"><use href="#i-numbers"/></svg>Stats</h2>
       <div class="stats" id="stats"></div>
       <div class="rule"></div>
       <div class="row" data-search="reset defaults">
-        <span class="text"><b>Reset everything to defaults</b><i>Your dictionary, your turned-off sites and your ignore list go too.</i></span>
+        <span class="text"><b>Reset everything</b><i>This clears every setting you've chosen. It does not refresh your cap.</i></span>
         <button type="button" id="reset" class="danger">Reset</button>
       </div>
     </section>
 
     <footer>
-      <p><svg class="ico" aria-hidden="true"><use href="#i-lock"/></svg>The built-in checks never send anything anywhere. Only AI proofreading does, and only when it is on.</p>
-      <p class="credits">Word lists from SCOWL/Hunspell, dwyl, FrequencyWords and Wikipedia (CC BY-SA 4.0). <a href="../../data/CREDITS.txt" target="_blank" rel="noopener">Credits and licences</a></p>
+      <p><svg class="ico" aria-hidden="true"><use href="#i-lock"/></svg>Nothing leaves the text box except if you use the AI.</p>
+      <p class="credits">Word lists from SCOWL/Hunspell, dwyl, FrequencyWords and Wikipedia (CC BY-SA 4.0). <a href="../../data/CREDITS.txt" target="_blank" rel="noopener">Credits and licenses</a></p>
     </footer>
   </main>
 

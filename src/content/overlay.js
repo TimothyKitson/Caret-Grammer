@@ -15,6 +15,9 @@
     punctuation: '#8b5cf6',
     style: '#0f9b8e',
     advanced: '#0f9b8e',
+    // Amber, and drawn as a band rather than a line: a sentence problem covers
+    // a stretch of words, and the word mistakes inside it keep their own lines.
+    sentence: '#d97706',
   };
 
   const LABELS = {
@@ -23,6 +26,7 @@
     punctuation: 'Punctuation',
     style: 'Clarity',
     advanced: 'Clarity',
+    sentence: 'Sentence',
   };
 
   function squiggle(color) {
@@ -60,6 +64,16 @@
     .u.active.grammar { background-color: rgba(47, 111, 208, 0.13); }
     .u.active.punctuation { background-color: rgba(139, 92, 246, 0.13); }
     .u.active.style, .u.active.advanced { background-color: rgba(15, 155, 142, 0.13); }
+    /* Word underlines sit above a sentence band, so both stay readable. */
+    .u { z-index: 1; }
+    .u.sentence {
+      z-index: 0;
+      background-color: rgba(245, 158, 11, 0.12);
+      border-bottom: 2px dotted ${COLORS.sentence};
+      border-radius: 3px;
+    }
+    .layer.wavy .u.sentence { border-bottom-color: ${COLORS.sentence}; background-image: none; }
+    .u.active.sentence { background-color: rgba(245, 158, 11, 0.24); }
 
     .card, .panel {
       position: absolute;
@@ -88,6 +102,7 @@
     .chip.grammar { background: ${COLORS.grammar}; }
     .chip.punctuation { background: ${COLORS.punctuation}; }
     .chip.style, .chip.advanced { background: ${COLORS.style}; }
+    .chip.sentence { background: #b45309; }
     .src { font-size: 10.5px; color: #6b6b6b; margin-left: auto; white-space: nowrap; }
     .msg { margin: 0 0 9px; color: #2b2b2b; }
     .msg .was { text-decoration: line-through; text-decoration-color: #e5484d; }
@@ -101,6 +116,9 @@
     button.fix.alt { background: #eef2f8; color: #1d4ea3; }
     button.fix.alt:hover { background: #e2e9f4; }
     button.fix.empty { font-style: italic; }
+    /* A sentence's fix is the whole stretch, mended: let it wrap, and read as text. */
+    button.fix.long { text-align: left; font-weight: 500; line-height: 1.4; max-width: 100%; }
+    .hint { margin: -3px 0 9px; font-size: 11.5px; color: #6b6b6b; }
     .foot { display: flex; align-items: center; gap: 4px; border-top: 1px solid rgba(0,0,0,0.07);
             padding-top: 7px; margin-top: 2px; }
     button.link {
@@ -119,6 +137,7 @@
     .row .dot.grammar { background: ${COLORS.grammar}; }
     .row .dot.punctuation { background: ${COLORS.punctuation}; }
     .row .dot.style, .row .dot.advanced { background: ${COLORS.style}; }
+    .row .dot.sentence { background: ${COLORS.sentence}; border-radius: 2px; }
     .row .what { flex: 1 1 auto; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
     .row .what b { font-weight: 600; }
     .row button { padding: 3px 9px; font-size: 12px; }
@@ -184,7 +203,8 @@
       }
       .badge.ai { color: #a79fff; }
       .msg { color: #dcdcdc; }
-      .src, button.link, .panel h4, .empty-state { color: #a8a8a8; }
+      .src, button.link, .panel h4, .empty-state, .hint { color: #a8a8a8; }
+      .chip.sentence { background: #c2620a; }
       button { background: #32363d; color: #ececec; }
       button.link:hover { color: #fff; background: #3a3f47; }
       button.fix.alt { background: #2c3a52; color: #cfe0ff; }
@@ -317,7 +337,10 @@
           const r = item.rect;
           if (x >= r.left - slack && x <= r.left + r.width + slack
               && y >= r.top - slack && y <= r.top + r.height + slack) {
-            if (!best || (r.width * r.height) < (best.rect.width * best.rect.height)) best = item;
+            const area = r.width * r.height;
+            const bestArea = best ? best.rect.width * best.rect.height : Infinity;
+            // A word wins a tie with the sentence band around it.
+            if (area < bestArea || (area === bestArea && best.issue.category === 'sentence')) best = item;
           }
         }
         return best;
@@ -330,6 +353,10 @@
       },
 
       isCardOpen() { return !!card && !card.hidden; },
+
+      cardContains(node) {
+        return !!card && !card.hidden && !!node && (node === card || card.contains(node));
+      },
       isCardSticky() { return cardSticky; },
       isCardHovered() { return cardHovered; },
       cardIssueRef() { return cardIssue; },
@@ -373,13 +400,21 @@
           fixes.className = 'fixes';
           issue.replacements.slice(0, 5).forEach((replacement, i) => {
             const button = document.createElement('button');
-            button.className = `fix${i ? ' alt' : ''}${replacement === '' ? ' empty' : ''}`;
+            button.className = `fix${i ? ' alt' : ''}${replacement === '' ? ' empty' : ''}`
+              + `${replacement.length > 32 ? ' long' : ''}`;
             button.textContent = replacement === '' ? 'remove' : replacement;
             button.title = replacement === '' ? 'Delete the highlighted text' : `Replace with “${replacement}”`;
             button.addEventListener('click', () => handlers.onApply && handlers.onApply(issue, replacement));
             fixes.appendChild(button);
           });
           card.appendChild(fixes);
+        } else if (issue.category === 'sentence') {
+          // Too big a change to make for you: say so, rather than leave the
+          // card looking like it is missing its button.
+          const hint = document.createElement('p');
+          hint.className = 'hint';
+          hint.textContent = 'Fix this one in your own words.';
+          card.appendChild(hint);
         }
 
         const foot = document.createElement('div');
@@ -532,7 +567,7 @@
           if (issue.replacements && issue.replacements.length) {
             const fix = document.createElement('button');
             const first = issue.replacements[0];
-            fix.textContent = first === '' ? 'remove' : first;
+            fix.textContent = first === '' ? 'remove' : first.length > 24 ? 'Fix' : first;
             fix.title = `Replace with “${first}”`;
             fix.addEventListener('click', () => handlers.onApply && handlers.onApply(issue, first));
             row.appendChild(fix);

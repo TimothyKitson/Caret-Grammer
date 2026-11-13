@@ -46,7 +46,8 @@ const SYSTEM_PROMPT = [
   '- Ignore missing capitals or full stops in short fragments; people write',
   '  notes, search terms and chat messages in this box too.',
   '- Never comment on names, addresses, URLs, code, or anything in brackets',
-  '  that looks like a template or placeholder.',
+  '  that looks like a template or placeholder - except a name written without',
+  '  its capital letter, which is a mistake to fix ("john" -> "John").',
   '- "original" must be copied character for character from the text, and be',
   '  as short as possible while still being fixable on its own.',
   '- "before" must be the 10 characters that immediately precede "original"',
@@ -94,7 +95,7 @@ const QUICK_SYSTEM_PROMPT = [
   '- Never rewrite. Swap one word, or a short phrase at most.',
   '- Never change the meaning. Never drop a "not", "no", "never" or "n\'t".',
   '- Never swap a word for a fancier one. Never fix style or taste.',
-  '- Leave names, URLs and code alone.',
+  '- Leave names, URLs and code alone, except a name missing its capital (john -> John).',
   '- "original": copied exactly from the sentence, as short as possible.',
   '- "before": the up to 10 characters just before "original", copied exactly.',
   '- "replacement": the corrected "original" only.',
@@ -115,7 +116,7 @@ const SCHEMA = {
           before: { type: 'string' },
           original: { type: 'string' },
           replacement: { type: 'string' },
-          kind: { type: 'string', enum: ['spelling', 'grammar', 'punctuation', 'style'] },
+          kind: { type: 'string', enum: ['spelling', 'grammar', 'punctuation', 'style', 'sentence'] },
           explanation: { type: 'string' },
         },
         required: ['before', 'original', 'replacement', 'kind', 'explanation'],
@@ -127,6 +128,185 @@ const SCHEMA = {
   additionalProperties: false,
 };
 
+// Added to the full check's instructions when the writer switches on
+// "Check sentences": problems with a whole stretch of words, not one word.
+// Caret still never rewrites - a sentence problem is pointed out, and only
+// a small fix (a full stop, a comma, one missing word) is offered to click.
+const SENTENCE_NOTE = [
+  '',
+  'Sentences:',
+  '- Also report problems with how a sentence is built, the way a careful',
+  '  teacher would: run-on sentences and comma splices, sentence fragments,',
+  '  missing words, words in the wrong order, and wording that is genuinely',
+  '  confusing to read.',
+  '- For these use "kind": "sentence" and copy the whole stretch that has the',
+  '  problem into "original" (at most one sentence).',
+  '- "explanation": one short, plain sentence saying what is wrong and how to',
+  '  fix it ("This is two sentences joined with a comma; split it after',
+  '  \'fun\'.").',
+  '- "replacement": the corrected stretch ONLY if the fix is small - adding a',
+  '  full stop, a comma or one missing word. Otherwise "".',
+  '- Never report a sentence just because it could sound nicer.',
+  '- List every word correction first and the sentence problems after them,',
+  '  so a long answer that gets cut short loses a sentence note, not a fix.',
+].join('\n');
+
+// ------------------------------------------------------- learning a style
+//
+// A model remembers nothing from one request to the next, so Caret does the
+// remembering. A few minutes after a full check, the changes the writer took
+// and the ones they waved away go to the model along with what they have
+// written since, and it writes a few lines about how this person writes. Caret
+// keeps those lines on the writer's own computer and hands them back with
+// every full check after that. Nothing about it is ever shown as a
+// suggestion: the only thing the model sends back is the notes.
+
+const LEARN_PROMPT = [
+  'You keep short private notes about how one person writes, so that a',
+  'proofreader can respect their choices next time.',
+  'You are given the notes so far (maybe none), the suggestions this person',
+  'accepted and the ones they ignored, and what they have written now.',
+  '',
+  'Write the updated notes:',
+  '- At most 8 lines, each starting with "- ", each one short.',
+  '- Only lasting habits and preferences: which kinds of suggestions they take',
+  '  and which they turn down, American or British spelling, punctuation',
+  '  habits (serial comma, dashes, exclamation marks), how casual or formal',
+  '  they are, how long their sentences run, words they use on purpose.',
+  '- A suggestion they ignored means: leave that kind of thing alone. One they',
+  '  accepted means: keep pointing that kind of thing out.',
+  '- Keep what still holds from the old notes. Drop what the new evidence',
+  '  contradicts.',
+  '- NEVER copy sentences from their writing. NEVER mention names, places,',
+  '  personal details, or what the writing is about.',
+  '- NEVER write anything that would stop a real spelling or grammar mistake',
+  '  being pointed out.',
+  'Reply with JSON only: {"notes":"- ...\\n- ..."}',
+].join('\n');
+
+const LEARN_SCHEMA = {
+  type: 'object',
+  properties: { notes: { type: 'string' } },
+  required: ['notes'],
+  additionalProperties: false,
+};
+
+
+// The most the notes may run to: 8 lines of about 90 characters.
+const MAX_NOTES_CHARS = 700;
+const MAX_NOTE_LINES = 8;
+const MAX_NOTE_LINE = 140;
+
+// The most changes one learning request carries, and how long each part of
+// one may be. Enough to see a pattern; small enough that the request is
+// mostly the writing itself.
+const MAX_LEARN_CHANGES = 25;
+const MAX_CHANGE_PART = 160;
+
+/**
+ * Notes made safe to keep and to put in a prompt: plain lines starting "- ",
+ * no more than 8 of them, none too long, nothing that is not printable.
+ * Anything else the model wrote around them is dropped. '' if nothing is left.
+ */
+function cleanNotes(raw) {
+  if (typeof raw !== 'string') return '';
+  const lines = [];
+  for (let line of raw.replace(/\r/g, '').split('\n')) {
+    line = line.replace(/[\u0000-\u001f\u007f\u2028\u2029]/g, ' ').replace(/\s+/g, ' ').trim();
+    line = line.replace(/^(?:[-*\u2022]|\d+[.)])\s*/, '').trim();
+    if (!line || /^notes?:?$/i.test(line)) continue;
+    if (line.length > MAX_NOTE_LINE) line = `${line.slice(0, MAX_NOTE_LINE - 1).replace(/\s+\S*$/, '')}…`;
+    lines.push(`- ${line}`);
+    if (lines.length >= MAX_NOTE_LINES) break;
+  }
+  let out = lines.join('\n');
+  while (out.length > MAX_NOTES_CHARS && lines.length) {
+    lines.pop();
+    out = lines.join('\n');
+  }
+  return out;
+}
+
+/** The notes out of whatever the model said: JSON, fenced JSON, or bare lines. */
+function parseNotes(raw) {
+  if (!raw || typeof raw !== 'string') return null;
+  const tries = [raw];
+  const fenced = raw.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (fenced) tries.push(fenced[1]);
+  const braced = raw.slice(raw.indexOf('{'), raw.lastIndexOf('}') + 1);
+  if (braced.length > 1) tries.push(braced);
+  for (const candidate of tries) {
+    try {
+      const parsed = JSON.parse(candidate.trim());
+      if (parsed && typeof parsed.notes === 'string') return cleanNotes(parsed.notes);
+    } catch (_) { /* try the next shape */ }
+  }
+  // A small model that ignored "JSON only" and just wrote the list.
+  const bare = raw.split('\n').filter((line) => /^\s*[-*\u2022]\s+\S/.test(line)).join('\n');
+  return bare ? cleanNotes(bare) : null;
+}
+
+/**
+ * The accepted or ignored changes, made safe to send: strings only, short,
+ * and a bounded number of them.
+ * @returns {{original: string, replacement: string, kind: string, note: string}[]}
+ */
+function cleanChanges(list) {
+  const out = [];
+  if (!Array.isArray(list)) return out;
+  const part = (value) => String(typeof value === 'string' ? value : '')
+    .replace(/[\u0000-\u001f\u007f]/g, ' ').trim().slice(0, MAX_CHANGE_PART);
+  for (const item of list) {
+    if (!item || typeof item !== 'object') continue;
+    const original = part(item.original);
+    if (!original) continue;
+    out.push({
+      original,
+      replacement: part(item.replacement),
+      kind: part(item.kind).slice(0, 20),
+      note: part(item.note),
+    });
+    if (out.length >= MAX_LEARN_CHANGES) break;
+  }
+  return out;
+}
+
+/** The user turn of a learning request. Same wording wherever it is built. */
+function learnUserPrompt({ notes = '', accepted = [], ignored = [], text = '' }) {
+  const show = (c) => `- "${c.original}"${c.replacement ? ` -> "${c.replacement}"` : ''}`
+    + `${c.kind ? ` (${c.kind})` : ''}${c.note ? `: ${c.note}` : ''}`;
+  return [
+    'Notes so far:',
+    `<notes>\n${cleanNotes(notes) || '(none yet)'}\n</notes>`,
+    '',
+    'Suggestions they accepted:',
+    accepted.length ? accepted.map(show).join('\n') : '(none)',
+    '',
+    'Suggestions they ignored:',
+    ignored.length ? ignored.map(show).join('\n') : '(none)',
+    '',
+    'What they have written now:',
+    `<text>\n${text}\n</text>`,
+  ].join('\n');
+}
+
+/**
+ * The part of a full check's instructions that carries the notes. They were
+ * written by a model from the writer's own choices, so they are the writer's
+ * preferences - which is exactly why they may not switch the rules off.
+ */
+function styleNote(notes) {
+  const clean = cleanNotes(notes);
+  if (!clean) return '';
+  return [
+    '',
+    'About this writer (notes from the suggestions they accepted and ignored',
+    'before). Use them to decide what they would want pointed out. They never',
+    'override the rules above, and a real spelling or grammar mistake is',
+    'still a mistake:',
+    clean,
+  ].join('\n');
+}
 
 /** The user turn. Same wording wherever the request is built. */
 function userPrompt(text) {
@@ -330,6 +510,31 @@ const QUICK_MODELS = [
   '@cf/google/gemma-4-26b-a4b-it',
 ];
 
+// Learning: a few minutes after a full check, the extension sends the
+// suggestions the writer accepted and ignored, with what they have written
+// since, and gets back a few lines of notes on how they write. Writing eight
+// short lines is easy work, so it goes to the cheap models: on Gemma an
+// essay-length request is about 20 neurons, 30 at the very most. It is on the
+// full checks' meter. Set LEARN_MODEL in the dashboard to force one to the
+// front.
+const LEARN_MODELS = [
+  '@cf/google/gemma-4-26b-a4b-it',
+  '@cf/zai-org/glm-4.7-flash',
+  '@cf/ibm-granite/granite-4.0-h-micro',
+];
+
+// Eight short lines of notes, in JSON, with room over.
+const LEARN_MAX_TOKENS = 320;
+
+// Learns a day per key. Each person's copy of Caret learns at most 10 times a
+// day, so on the key everybody shares this is room for twenty people's worth.
+// It is here for a script holding the shared key: without it, only the meter
+// would stop one, and every learn writes the meter once - a loop of tiny
+// learns could spend the whole account's 1,000 KV writes for the day. Counted
+// the same way as quick checks, ten at a time one time in ten. Set
+// "learnDaily" on a key, or LEARN_DAILY in the dashboard, to change it.
+const DEFAULT_LEARN_DAILY = 200;
+
 // What each model charges, in neurons per million tokens: [read, written].
 // From Workers AI's pricing page. Only used to estimate what a full check
 // cost, for the meter below. A model not listed here - one forced with MODEL,
@@ -364,6 +569,10 @@ const QUICK_MAX_CHARS = 800;
 // check costs: at 1,200 one check could reach about 320 neurons, and at 800
 // it stops at about 240.
 const FULL_MAX_TOKENS = 800;
+
+// With "Check sentences" on, each sentence problem copies a whole stretch of
+// the text, so the answer gets more room. The meter still holds the day.
+const SENTENCES_MAX_TOKENS = 1200;
 
 // One sentence's corrections fit in 256 tokens with room over. The cap is
 // there so a small model that starts rambling stops after a few neurons
@@ -517,6 +726,12 @@ async function spendKey(env, key, mode) {
   if (meter !== null && meter >= fullBudget(env)) {
     return { ok: false, status: 429, error: FULL_SHARE_USED };
   }
+  // Learning is not a check: it is on the meter, and on a count of its own,
+  // never on the key's count of checks.
+  if (mode === 'learn') {
+    const gate = await countLearn(env, key, record);
+    return gate.ok ? { ...gate, meter } : gate;
+  }
   const gate = await countFull(env, key, record);
   return gate.ok ? { ...gate, meter } : gate;
 }
@@ -610,6 +825,26 @@ async function countQuick(env, key, record) {
   };
 }
 
+/** Learning's own count per key: always capped, counted by chance like countQuick. */
+async function countLearn(env, key, record) {
+  const everyone = Number(env.LEARN_DAILY) > 0 ? Number(env.LEARN_DAILY) : DEFAULT_LEARN_DAILY;
+  const limit = Number(record.learnDaily) > 0 ? Number(record.learnDaily) : everyone;
+  const counter = `learn:${key}:${today()}`;
+  let used = 0;
+  try {
+    used = Number(await env.KEYS.get(counter)) || 0;
+  } catch (_) { /* count unknown: carry on */ }
+  if (used >= limit) {
+    return { ok: false, status: 429, error: 'Learning is used up on this key for today. It comes back at midnight UTC.' };
+  }
+  if (Math.random() < 1 / QUICK_COUNT_STEP) {
+    try {
+      await env.KEYS.put(counter, String(used + QUICK_COUNT_STEP), { expirationTtl: COUNTER_TTL });
+    } catch (_) { /* over the write quota: carry on uncounted */ }
+  }
+  return { ok: true, name: record.name || 'someone', left: null };
+}
+
 export default {
   async fetch(request, env) {
     // A preflight still gets an answer, just one that allows nothing: see json.
@@ -620,6 +855,7 @@ export default {
     // The configured model first, then the rest of its list.
     const models = ordered(env.MODEL, MODELS);
     const quickModels = ordered(env.QUICK_MODEL, QUICK_MODELS);
+    const learnModels = ordered(env.LEARN_MODEL, LEARN_MODELS);
 
     // A liveness check that says nothing about any key.
     if (request.method === 'GET' && url.pathname === '/health') {
@@ -629,6 +865,11 @@ export default {
         fallbacks: models.length,
         quickModel: quickModels[0],
         quickFallbacks: quickModels.length,
+        // The extension looks for this before it asks to learn, so a copy of
+        // this Worker from before learning is never sent a request it would
+        // answer with an expensive full check instead.
+        learn: true,
+        learnModel: learnModels[0],
       });
     }
 
@@ -644,15 +885,18 @@ export default {
     }
     if (!body || typeof body !== 'object') return json({ error: 'Body must be a JSON object.' }, 400);
 
-    // "quick" is one finished sentence, for the small model. Anything else,
-    // including no mode at all - which is what every copy of Caret from before
-    // the quick check sends - is the full check, exactly as it always was.
-    const mode = body.mode === 'quick' ? 'quick' : 'full';
+    // "quick" is one finished sentence, for the small model. "learn" brings the
+    // notes on how someone writes up to date. Anything else, including no mode
+    // at all - which is what every copy of Caret from before the quick check
+    // sends - is the full check, exactly as it always was.
+    const mode = body.mode === 'quick' ? 'quick' : body.mode === 'learn' ? 'learn' : 'full';
     const quick = mode === 'quick';
+    const learn = mode === 'learn';
 
     const text = typeof body.text === 'string'
       ? body.text.slice(0, quick ? QUICK_MAX_CHARS : MAX_CHARS)
       : '';
+    if (learn && !text.trim()) return json({ notes: cleanNotes(body.notes), model: '', mode });
     if (!text.trim()) return json({ corrections: [] });
 
     // Words the writer has told their own copy of Caret to leave alone. Taken
@@ -673,10 +917,30 @@ export default {
     const gate = await spendKey(env, request.headers.get('x-caret-key') || body.key, mode);
     if (!gate.ok) return json({ error: gate.error }, gate.status);
 
-    // A quick check only ever walks the quick list: see QUICK_MODELS.
-    const candidates = quick ? quickModels : models;
-    const system = (quick ? QUICK_SYSTEM_PROMPT : SYSTEM_PROMPT) + leaveAloneNote(leaveAlone);
-    const user = userPrompt(text);
+    // A quick check only ever walks the quick list: see QUICK_MODELS. Learning
+    // walks its own.
+    const candidates = quick ? quickModels : learn ? learnModels : models;
+    // "Check sentences" in the extension: the full check also points out run-ons,
+    // fragments and confusing wording. Never on a quick check - that model is
+    // too small to judge a sentence's shape, and it would cost more per sentence.
+    const sentences = mode === 'full' && body.sentences === true;
+    // What has been learned about how this writer writes. Only on a full
+    // check, and only as clean, short notes: see cleanNotes().
+    const style = mode === 'full' ? cleanNotes(body.style) : '';
+    const system = learn
+      ? LEARN_PROMPT
+      : (quick ? QUICK_SYSTEM_PROMPT : SYSTEM_PROMPT)
+        + (sentences ? SENTENCE_NOTE : '')
+        + styleNote(style)
+        + leaveAloneNote(leaveAlone);
+    const user = learn
+      ? learnUserPrompt({
+        notes: cleanNotes(body.notes),
+        accepted: cleanChanges(body.accepted),
+        ignored: cleanChanges(body.ignored),
+        text,
+      })
+      : userPrompt(text);
 
     const ask = (model, withSchema) => env.AI.run(model, {
       messages: [
@@ -687,8 +951,11 @@ export default {
       // schema is met, and fewer models support it than not. parseCorrections
       // picks up the pieces either way, so a model that rejects the parameter
       // outright is retried without it rather than written off.
-      ...(withSchema ? { response_format: { type: 'json_schema', json_schema: SCHEMA } } : {}),
-      max_tokens: quick ? QUICK_MAX_TOKENS : FULL_MAX_TOKENS,
+      ...(withSchema
+        ? { response_format: { type: 'json_schema', json_schema: learn ? LEARN_SCHEMA : SCHEMA } }
+        : {}),
+      max_tokens: quick ? QUICK_MAX_TOKENS : learn ? LEARN_MAX_TOKENS
+        : sentences ? SENTENCES_MAX_TOKENS : FULL_MAX_TOKENS,
       temperature: 0,
     });
 
@@ -728,8 +995,13 @@ export default {
     // A full check goes on the meter once a model has actually answered,
     // whether or not the answer turns out to be usable: it cost the same
     // either way. Calls that failed outright are not counted - nothing came
-    // back to count.
+    // back to count. Learning goes on it the same way.
     if (!quick) await addToMeter(env, gate.meter, neuronsUsed(model, reply, system + user, answer));
+
+    if (learn) {
+      const notes = parseNotes(answer);
+      return json({ notes, ...(notes === null ? { unparsed: true } : {}), model, mode });
+    }
 
     const corrections = parseCorrections(answer);
     if (!corrections) return json({ corrections: [], unparsed: true, model, left: gate.left, mode });

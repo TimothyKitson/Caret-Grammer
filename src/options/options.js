@@ -160,6 +160,21 @@ function paintAutocorrect() {
   }
 }
 
+/**
+ * How long until the day's checks come back: midnight on this computer, which
+ * is when Caret starts counting a new day. "3 hours and 10 mins".
+ */
+function untilReset(now = new Date()) {
+  const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+  const mins = Math.max(1, Math.ceil((midnight - now) / 60000));
+  const h = Math.floor(mins / 60);
+  const m = mins % 60;
+  const hours = `${h} hour${h === 1 ? '' : 's'}`;
+  const minutes = `${m} min${m === 1 ? '' : 's'}`;
+  if (h && m) return `${hours} and ${minutes}`;
+  return h ? hours : minutes;
+}
+
 function paintProviders() {
   const host = $('aiProvider');
   host.textContent = '';
@@ -191,7 +206,15 @@ function paintProviders() {
     tag.textContent = option.tag;
     strong.appendChild(tag);
     const hint = document.createElement('i');
-    hint.textContent = option.hint;
+    // "{time}" in a hint is how long until today's checks come back.
+    const [beforeTime, afterTime] = option.hint.split('{time}');
+    hint.append(beforeTime);
+    if (afterTime !== undefined) {
+      const when = document.createElement('span');
+      when.className = 'reset-in';
+      when.textContent = untilReset();
+      hint.append(when, afterTime);
+    }
     text.append(strong, hint);
 
     label.append(input, text);
@@ -264,10 +287,9 @@ function paintQuick() {
   // always be turned off.
   box.disabled = !available && !on;
   $('quick-state').textContent = available
-    ? 'Works with the full check above on or off. It always uses Caret’s own '
-      + 'server, whichever AI you picked there.'
-    : 'This copy has no Caret key, so the quick check cannot run. If someone '
-      + 'gave you one, switch on AI proofreading above, pick Caret and paste it there.';
+    ? 'Works with the AI above on or off.'
+    : "This copy has no Caret key, so the quick check can't work. If someone gave "
+      + 'you one, turn on AI above, pick Caret, and paste it there.';
 
   const live = on && available;
   $('quick-body').classList.toggle('dim', !live);
@@ -362,6 +384,8 @@ function paint() {
   $('quietOthers').checked = settings.quietOthers !== false;
   $('showBadge').checked = settings.showBadge !== false;
   $('aiEnabled').checked = !!settings.aiEnabled;
+  $('aiSentences').checked = !!settings.aiSentences;
+  $('aiLearn').checked = settings.aiLearn !== false;
   $('aiKey').value = settings.aiKey || '';
   $('aiEffort').value = settings.aiEffort || 'low';
   $('aiIntervalMinutes').value = String(settings.aiIntervalMinutes ?? 1);
@@ -380,6 +404,7 @@ function paint() {
     field.disabled = !on;
   }
   const picked = settings.aiProvider || aiInfo.provider || '';
+  paintNotes();
 
   // Nothing to paste when this copy already carries a Caret key.
   $('ai-key-row').hidden = picked === 'caret' && aiInfo.baked;
@@ -408,15 +433,11 @@ function paint() {
   const PROVIDER_NAME = {
     caret: 'Caret', gemini: 'Google', openai: 'OpenAI', anthropic: 'Anthropic',
   };
-  $('ai-host').textContent = aiInfo.provider === 'caret'
-    ? 'the Caret server, which runs on Cloudflare and uses Cloudflare’s AI'
-    : aiInfo.provider ? `the ${PROVIDER_NAME[aiInfo.provider]} API` : 'an AI provider';
-
   $('ai-state').textContent = aiInfo.baked
-    ? 'Key is built into this copy — nothing to paste.'
+    ? 'The key is already built in. Nothing to paste.'
     : aiInfo.hasKey
       ? `Using your ${PROVIDER_NAME[aiInfo.provider] || ''} key.`.replace(/\s+/g, ' ')
-      : 'Needs an API key, below.';
+      : 'Needs an API key. Paste it below.';
 
   // A free allowance belongs to somebody else, so Caret holds each person to a
   // number. A paid key is the user's own money, so it does not.
@@ -425,36 +446,36 @@ function paint() {
   limitBox.value = ceiling > 0
     ? String(Math.min(Number(settings.aiDailyLimit) || ceiling, ceiling))
     : String(Number(settings.aiDailyLimit) || 0);
-  $('limit-label').textContent = ceiling > 0 ? 'Full checks a day' : 'Full checks a day (optional)';
+  $('limit-label').textContent = ceiling > 0 ? 'Checks a day' : 'Checks a day (optional)';
   $('ai-budget').textContent = ceiling > 0
-    ? `Free, with a limit: at most ${ceiling} full AI checks a day on this computer, `
-      + `and you can set it lower. ${settings.aiEnabled ? `${aiLeftToday} left today. ` : ''}`
-      + 'When it runs out the built-in checks carry on as normal.'
-    : 'Your own key, so Caret does not limit it. Set a number to stop a runaway '
-      + 'from costing you, or 0 for no limit at all.';
+    ? `You get up to ${ceiling} free checks a day. You can set it lower. `
+      + `${settings.aiEnabled ? `${aiLeftToday} left today. ` : ''}`
+      + 'When they run out, the normal checks still work.'
+    : "It's your own key, so there's no cap. You can still set one so you don't "
+      + 'spend too much. 0 means no cap.';
 
   // On a free option a run costs a check, not money. Caret's own allows so few
   // full checks a day that the two automatic choices get a warning of their own.
   $('trigger-hint').textContent = ceiling > 0
-    ? 'Each run uses one of the day’s checks, so this decides how long they last.'
-    : 'Each run costs money, so this is the setting that decides your bill.';
+    ? 'Every check uses one of your checks for the day.'
+    : 'Every check costs you money, so pick carefully.';
   $('trigger-note').hidden = picked !== 'caret';
-  $('trigger-note').textContent = `Caret gives you ${dailyCeiling('caret')} full checks a day — `
-    + '“every minute” or “after every pause” will use them up quickly.';
+  $('trigger-note').textContent = `You get ${dailyCeiling('caret')} checks a day with Caret. `
+    + 'The last two will use them up fast.';
 
   paintQuick();
 
   $('master-dot').classList.toggle('off', !settings.enabled);
-  $('master-text').textContent = settings.enabled ? 'Checking' : 'Switched off';
+  $('master-text').textContent = settings.enabled ? 'Checking' : 'Off';
 
   chipList($('words'), settings.customWords, (word) => {
     save({ customWords: settings.customWords.filter((w) => w !== word) });
-  }, 'Nothing added yet.');
+  }, 'No words yet.');
   $('words-count').textContent = `${settings.customWords.length}`;
 
   chipList($('sites'), settings.disabledSites, (site) => {
     save({ disabledSites: settings.disabledSites.filter((s) => s !== site) });
-  }, 'No sites — checking everywhere.');
+  }, 'No sites yet. Caret works everywhere.');
   $('sites-count').textContent = `${settings.disabledSites.length}`;
   $('sites-empty').hidden = settings.disabledSites.length > 0;
 
@@ -463,14 +484,48 @@ function paint() {
 
   const stats = settings.stats || {};
   $('stats').textContent = [
-    `${(stats.checks || 0).toLocaleString()} checks run`,
-    `${(stats.issues || 0).toLocaleString()} things found`,
-    `${(stats.aiCalls || 0).toLocaleString()} AI calls`,
+    `${(stats.checks || 0).toLocaleString()} checks`,
+    `${(stats.issues || 0).toLocaleString()} mistakes found`,
+    `${(stats.aiCalls || 0).toLocaleString()} AI checks`,
     `${(stats.aiErrors || 0).toLocaleString()} AI errors`,
     `${(stats.quickCalls || 0).toLocaleString()} quick checks`,
   ].join(' · ');
 
   schedulePreview();
+}
+
+/** "What Caret has learned": the notes as the AI wrote them, and when. */
+function paintNotes() {
+  const notes = String(settings.aiNotes || '')
+    .split('\n')
+    .map((line) => line.replace(/^\s*-\s*/, '').trim())
+    .filter(Boolean);
+  const list = $('aiNotes');
+  list.textContent = '';
+  for (const line of notes) {
+    const item = document.createElement('li');
+    item.textContent = line;
+    list.appendChild(item);
+  }
+  list.hidden = notes.length === 0;
+  const learning = settings.aiLearn !== false;
+  let when;
+  if (notes.length) {
+    const at = Number(settings.aiNotesAt) || 0;
+    const day = at ? new Date(at).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : '';
+    when = `${day ? `Last updated ${day}. ` : ''}Only saved on this computer.`;
+    if (!learning) when = 'Not being used while Learn how I write is off.';
+  } else {
+    when = learning
+      ? 'Nothing yet. It starts 5 minutes after your first AI check.'
+      : 'Nothing yet. Learn how I write is off.';
+  }
+  $('notes-when').textContent = when;
+  // Forgetting is always allowed, AI on or off.
+  $('forget-notes').disabled = notes.length === 0;
+  const error = $('learn-error');
+  error.hidden = !(settings.lastLearnError && learning && settings.aiEnabled);
+  error.textContent = settings.lastLearnError ? `The last try didn't work: ${settings.lastLearnError}` : '';
 }
 
 // ---------------------------------------------------------------- wiring
@@ -482,6 +537,15 @@ $('checkNames').addEventListener('change', (e) => save({ checkNames: e.target.ch
 $('quietOthers').addEventListener('change', (e) => save({ quietOthers: e.target.checked }));
 $('showBadge').addEventListener('change', (e) => save({ showBadge: e.target.checked }));
 $('aiEnabled').addEventListener('change', (e) => save({ aiEnabled: e.target.checked }));
+$('aiSentences').addEventListener('change', (e) => save({ aiSentences: e.target.checked }));
+$('aiLearn').addEventListener('change', (e) => save({ aiLearn: e.target.checked }));
+$('forget-notes').addEventListener('click', async () => {
+  const response = await ask({ type: 'forget-notes' });
+  if (response && response.settings) settings = response.settings;
+  else settings = { ...settings, aiNotes: '', aiNotesAt: 0 };
+  toast('Forgotten');
+  paint();
+});
 $('aiModel').addEventListener('change', (e) => save({ aiModel: e.target.value }));
 $('aiEffort').addEventListener('change', (e) => save({ aiEffort: e.target.value }));
 $('aiKey').addEventListener('change', (e) => {
@@ -705,13 +769,17 @@ async function paintShortcuts() {
 
 async function load() {
   const manifest = chrome.runtime.getManifest();
-  $('version').textContent = `version ${manifest.version}`;
+  $('version').textContent = `Version ${manifest.version}`;
   // The quick check's numbers come from one place, so the words cannot drift.
   $('quick-default').textContent = String(QUICK_DEFAULT_DAILY);
   $('quick-max').textContent = String(QUICK_MAX_DAILY);
   $('quickAiDailyLimit').max = String(QUICK_MAX_DAILY);
-  $('quick-hint').textContent = `Anything from 1 to ${QUICK_MAX_DAILY}. When they run out, `
-    + 'the built-in checks carry on as normal.';
+  $('quick-hint').textContent = `Pick 1 to ${QUICK_MAX_DAILY}. When they run out, `
+    + 'the normal checks still work.';
+  // The countdown to tomorrow's checks keeps itself current.
+  setInterval(() => {
+    for (const node of document.querySelectorAll('.reset-in')) node.textContent = untilReset();
+  }, 30000);
   const state = await ask({ type: 'get-settings' });
   if (state && state.settings) settings = state.settings;
   await readAiStatus();

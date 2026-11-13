@@ -476,17 +476,17 @@ await step('the AI section asks for a key and offers the free provider', async (
   assert.equal(caret.placeholder, 'caret_…');
   assert.equal(caret.model, true, 'the Caret server picks its own model');
   assert.equal(caret.limit, String(FREE_CEILINGS.caret), "Caret's own full check has its own, smaller cap");
-  assert.match(caret.budget, /Free, with a limit/);
-  assert.ok(caret.budget.includes(`at most ${FREE_CEILINGS.caret} full AI checks a day`), caret.budget);
+  assert.match(caret.budget, /free checks a day/);
+  assert.ok(caret.budget.includes(`up to ${FREE_CEILINGS.caret} free checks a day`), caret.budget);
   if (FREE_CEILINGS.caret !== FREE_CEILINGS.gemini) {
     assert.ok(!caret.budget.includes(String(FREE_CEILINGS.gemini)), "Caret's budget must not show Google's number");
   }
   assert.equal(caret.noteHidden, false, 'on Caret the automatic triggers get a warning');
-  assert.ok(caret.note.includes(`${FREE_CEILINGS.caret} full checks a day`), caret.note);
+  assert.ok(caret.note.includes(`${FREE_CEILINGS.caret} checks a day`), caret.note);
 
   assert.equal(paid.placeholder, 'sk-ant-…');
   assert.equal(paid.effort, false, 'effort is an Anthropic setting');
-  assert.match(paid.budget, /does not limit it/);
+  assert.match(paid.budget, /no cap/);
   assert.equal(paid.limit, '0', "a paid key must not inherit Caret's free cap");
   assert.equal(paid.noteHidden, true, "the Caret warning is only for Caret");
 });

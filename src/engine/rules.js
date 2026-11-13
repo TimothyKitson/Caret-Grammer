@@ -1306,7 +1306,7 @@ const FUNCTION_RULES = [
     id: 'article-agreement',
     category: 'grammar',
     short: 'Article',
-    run(doc) {
+    run(doc, options = {}) {
       const issues = [];
       const re = /\b(an?)(\s+)([A-Za-z][\w'-]*)/g;
       let m;
@@ -1321,7 +1321,13 @@ const FUNCTION_RULES = [
         let wantsAn;
         if (startsWithVowel) wantsAn = !CONSONANT_SOUND.test(word);
         else if (VOWEL_SOUND.test(word)) wantsAn = true;
-        else if (word === word.toUpperCase() && word.length > 1) wantsAn = VOWEL_LETTERS.test(word);
+        // Capitals are usually said letter by letter ("an FBI agent"), unless
+        // they spell an ordinary word in capitals for emphasis: "a FREE app".
+        else if (word === word.toUpperCase() && word.length > 1
+          && !(word.length >= 3 && /[aeiou]/i.test(word.slice(1, -1))
+            && options.dict && options.dict.isKnown(word.toLowerCase()))) {
+          wantsAn = VOWEL_LETTERS.test(word);
+        }
         else wantsAn = false;
         if (wantsAn === isAn) continue;
         issues.push({

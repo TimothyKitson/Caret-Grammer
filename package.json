@@ -1,6 +1,6 @@
 {
   "name": "caret",
-  "version": "1.9.3",
+  "version": "1.9.4",
   "private": true,
   "description": "Edge/Chrome extension that underlines spelling and grammar mistakes as you type.",
   "type": "module",

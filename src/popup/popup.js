@@ -1,4 +1,6 @@
-import { siteKey, AI_PROVIDER_INFO } from '../shared/defaults.js';
+import {
+  siteKey, AI_PROVIDER_INFO, dailyCeiling, clampQuickLimit,
+} from '../shared/defaults.js';
 
 const $ = (id) => document.getElementById(id);
 
@@ -104,34 +106,100 @@ function paintStatus(text, errors, found) {
   }
 }
 
+const SVG = 'http://www.w3.org/2000/svg';
+const ICONS = {
+  // The four-point star of the AI button, small.
+  ai: 'M10 2.2c.8 4.6 2.4 6.2 7.2 7.2-4.8.9-6.4 2.5-7.2 7.2-.8-4.7-2.4-6.3-7.2-7.2 4.8-1 6.4-2.6 7.2-7.2z',
+  // A line of text with a full stop at the end of it.
+  quick: 'M3.5 8h9M3.5 12h6.5M15.6 12h.1',
+};
+
+/**
+ * One usage line: an icon, what it is, how many are left, and a meter when
+ * there is a limit to measure against. `sub` and `count` may be empty.
+ */
+function meterRow(row, { kind, label, chip = '', sub = '', count = '', left = null, limit = 0, warn = false }) {
+  row.textContent = '';
+  row.className = `meter-row${kind === 'quick' ? ' quick-meta' : ''}${warn ? ' warn' : ''}`;
+
+  const ico = document.createElement('span');
+  ico.className = `m-ico k-${kind}`;
+  const svg = document.createElementNS(SVG, 'svg');
+  svg.setAttribute('viewBox', '0 0 20 20');
+  svg.setAttribute('width', '15');
+  svg.setAttribute('height', '15');
+  svg.setAttribute('aria-hidden', 'true');
+  const path = document.createElementNS(SVG, 'path');
+  path.setAttribute('d', ICONS[kind]);
+  if (kind === 'ai') path.setAttribute('class', 'fill');
+  svg.appendChild(path);
+  ico.appendChild(svg);
+
+  const text = document.createElement('span');
+  text.className = 'm-text';
+  const strong = document.createElement('b');
+  strong.textContent = label;
+  text.appendChild(strong);
+  if (chip) {
+    const on = document.createElement('span');
+    on.className = 'm-chip';
+    on.textContent = chip;
+    text.appendChild(on);
+  }
+  if (sub) {
+    const small = document.createElement('span');
+    small.className = 'm-sub';
+    small.textContent = sub;
+    text.appendChild(small);
+  }
+  row.append(ico, text);
+
+  if (count) {
+    const number = document.createElement('span');
+    number.className = 'm-count';
+    number.textContent = count;
+    row.appendChild(number);
+  }
+  if (typeof left === 'number' && limit > 0) {
+    const bar = document.createElement('span');
+    bar.className = 'bar';
+    bar.setAttribute('role', 'presentation');
+    const fill = document.createElement('i');
+    fill.style.setProperty('--fill', `${Math.max(0, Math.min(100, (left / limit) * 100))}%`);
+    bar.appendChild(fill);
+    row.appendChild(bar);
+    row.classList.add('metered');
+  }
+  row.hidden = false;
+}
+
 /** Which AI the button will use and how many checks are left, when known. */
 function paintAiMeta(answer, canAi) {
-  const meta = $('ai-meta');
-  meta.textContent = '';
-  meta.className = 'ai-meta';
+  const row = $('ai-meta');
+  row.hidden = true;
+  if (!canAi) return;
   const ai = (answer && answer.ai) || {};
-  if (canAi && !ai.hasKey) {
-    meta.classList.add('warn');
-    meta.textContent = 'No key yet — add one in Settings.';
-  } else if (canAi) {
-    const provider = AI_PROVIDER_INFO.find((option) => option.value === ai.provider);
-    if (provider) {
-      const strong = document.createElement('b');
-      strong.textContent = provider.label;
-      meta.append('via ', strong);
-    }
-    // No number means no limit: a paid key is not capped.
-    if (typeof answer.aiLeftToday === 'number') {
-      if (meta.childNodes.length) {
-        const dot = document.createElement('span');
-        dot.className = 'sep';
-        dot.textContent = '·';
-        meta.appendChild(dot);
-      }
-      meta.append(`${answer.aiLeftToday} left today`);
-    }
+  if (!ai.hasKey) {
+    meterRow(row, { kind: 'ai', label: 'AI checks', sub: 'No key yet — add one in Settings.', warn: true });
+    return;
   }
-  meta.hidden = !meta.childNodes.length;
+  const provider = AI_PROVIDER_INFO.find((option) => option.value === ai.provider);
+  const left = typeof answer.aiLeftToday === 'number' ? answer.aiLeftToday : null;
+  // The meter measures against the same limit the background holds them to:
+  // the free ceiling, or a lower number they set. A paid key has none.
+  const ceiling = dailyCeiling(ai.provider);
+  const own = Number(settings.aiDailyLimit) || 0;
+  const limit = ceiling > 0 ? (own > 0 ? Math.min(own, ceiling) : ceiling) : own;
+  meterRow(row, {
+    kind: 'ai',
+    label: 'AI checks',
+    sub: provider ? `via ${provider.label}` : '',
+    // No number means no limit: a paid key is not capped.
+    count: left === null ? '' : left === 0 ? 'none left today' : `${left} left today`,
+    left,
+    limit,
+    warn: left === 0,
+  });
 }
 
 /**
@@ -141,29 +209,24 @@ function paintAiMeta(answer, canAi) {
  * Caret is working on this page.
  */
 function paintQuickMeta(answer, canQuick) {
-  const meta = $('quick-meta');
-  meta.textContent = '';
-  meta.className = 'ai-meta quick-meta';
-  meta.hidden = !canQuick;
+  const row = $('quick-meta');
+  row.hidden = true;
   if (!canQuick) return;
-  const strong = document.createElement('b');
-  strong.textContent = 'Quick check';
   if (answer.quick && answer.quick.available === false) {
-    meta.classList.add('warn');
-    meta.append(strong, ' is on, but this copy has no Caret key');
+    meterRow(row, { kind: 'quick', label: 'Quick check', chip: 'on', sub: 'but this copy has no Caret key', warn: true });
     return;
   }
-  meta.append(strong, ' on');
   // No number means an extension that does not say; just show that it is on.
-  if (typeof answer.quickLeftToday === 'number') {
-    const dot = document.createElement('span');
-    dot.className = 'sep';
-    dot.textContent = '·';
-    if (answer.quickLeftToday === 0) meta.classList.add('warn');
-    meta.append(dot, answer.quickLeftToday === 0
-      ? 'none left today'
-      : `${answer.quickLeftToday} left today`);
-  }
+  const left = typeof answer.quickLeftToday === 'number' ? answer.quickLeftToday : null;
+  meterRow(row, {
+    kind: 'quick',
+    label: 'Quick check',
+    chip: 'on',
+    count: left === null ? '' : left === 0 ? 'none left today' : `${left} left today`,
+    left,
+    limit: clampQuickLimit(settings.quickAiDailyLimit),
+    warn: left === 0,
+  });
 }
 
 // ------------------------------------------------------------------- load
@@ -228,6 +291,7 @@ async function load() {
   ], found);
   paintAiMeta(answer, canAi);
   paintQuickMeta(answer, canQuick);
+  $('usage').hidden = $('ai-meta').hidden && $('quick-meta').hidden;
 
   // The count, as a figure, underlined the way this person has Caret underline.
   const figure = $('found');

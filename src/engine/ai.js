@@ -12,7 +12,8 @@
 // script would be attributed to the page's own origin.
 
 import {
-  SYSTEM_PROMPT, SCHEMA, userPrompt, parseCorrections, leaveAloneNote,
+  SYSTEM_PROMPT, SENTENCE_NOTE, SCHEMA, userPrompt, parseCorrections, leaveAloneNote, MAX_LEAVE_ALONE,
+  LEARN_PROMPT, LEARN_SCHEMA, learnUserPrompt, parseNotes, cleanNotes, cleanChanges, styleNote,
 } from '../shared/proofread.js';
 import { CARET_ENDPOINT } from '../shared/apikey.js';
 
@@ -96,6 +97,12 @@ const MAX_ORIGINAL_WORDS = 6;
 
 
 /** Turn one model correction into an issue with real offsets, or null. */
+const WORD_CHAR = /[\p{L}\p{N}]/u;
+// Scripts written without spaces between words. There a letter sits on both
+// sides of nearly every word, so "whole words only" would refuse every fix.
+const NO_SPACES = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Thai}\p{Script=Lao}\p{Script=Khmer}\p{Script=Myanmar}]/u;
+const joined = (a, b) => WORD_CHAR.test(a) && WORD_CHAR.test(b) && !NO_SPACES.test(a) && !NO_SPACES.test(b);
+
 function locate(text, correction, taken) {
   const { original, before } = correction;
   if (!original) return null;
@@ -124,6 +131,9 @@ function locate(text, correction, taken) {
 
   for (const start of candidates) {
     const end = start + original.length;
+    // Whole words only: "went" is not the end of "havwent".
+    if (joined(original[0], text[start - 1] || '')) continue;
+    if (joined(original[original.length - 1], text[end] || '')) continue;
     if (taken.some(([s, e]) => start < e && s < end)) continue;
     taken.push([start, end]);
     return { start, end };
@@ -209,11 +219,82 @@ export function maskSecrets(text) {
 
 const isSecret = (s) => maskSecrets(s) !== s;
 
-export function toIssues(text, corrections) {
+// "password:", "api_key=", "token:" and the like, with whatever follows. The
+// page refuses to send a field with one of these in it; so does everything
+// else that sends text anywhere.
+const SECRET_LABEL = /\b(?:sk|pk|api[_-]?key|password|secret|token)[-_ ]?[:=]/i;
+
+/** Would Caret refuse to send this? A secret, or something labelled as one. */
+export function looksSensitive(text) {
+  const s = String(text || '');
+  return isSecret(s) || SECRET_LABEL.test(s);
+}
+
+// A sentence problem covers a stretch of words, up to a long sentence.
+const MAX_SENTENCE_CHARS = 400;
+
+const sentenceWords = (text) => (String(text).toLowerCase().replace(/[‘’]/g, "'")
+  .match(/[\p{L}\p{N}']+/gu) || []);
+
+/**
+ * Is this a fix that can be offered for a sentence problem? Only a small one:
+ * the same words in the same order, with punctuation and capitals changed
+ * and at most one word added - a full stop, a comma, a missing "and". A
+ * negative can never be the word added. Anything else is left as a pointer,
+ * with no button, because a same-length rewrite ("yes" -> "no", "able" ->
+ * "unable") reads like a fix and says the opposite.
+ */
+function isSmallSentenceFix(original, replacement) {
+  if (typeof replacement !== 'string' || !replacement.trim()) return false;
+  if (/\n/.test(replacement)) return false;
+  if (Math.abs(replacement.length - original.length) > 24) return false;
+  const before = sentenceWords(original);
+  const after = sentenceWords(replacement);
+  if (after.length < before.length || after.length > before.length + 1) return false;
+  let i = 0;
+  let added = null;
+  for (const word of after) {
+    if (i < before.length && word === before[i]) {
+      i += 1;
+    } else if (added === null) {
+      added = word;
+    } else {
+      return false;
+    }
+  }
+  if (i !== before.length) return false;
+  return added === null || countNegations(added) === 0;
+}
+
+export function toIssues(text, corrections, { sentences = false } = {}) {
   const taken = [];
   const issues = [];
   for (const correction of corrections || []) {
     if (typeof correction.original !== 'string') continue;
+    // Only when sentences were asked about. Otherwise a "sentence" answer is
+    // held to the same word-swap rules as any other correction.
+    if (correction.kind === 'sentence' && sentences) {
+      const original = correction.original;
+      if (!original.trim() || original.length > MAX_SENTENCE_CHARS || /\n/.test(original)) continue;
+      const at = locate(text, correction, []);
+      if (!at) continue;
+      const fix = isSmallSentenceFix(original, correction.replacement) && correction.replacement !== original
+        ? [String(correction.replacement)]
+        : [];
+      issues.push({
+        id: 'ai-sentence',
+        category: 'sentence',
+        short: 'Sentence',
+        start: at.start,
+        end: at.end,
+        text: text.slice(at.start, at.end),
+        message: String(correction.explanation || 'This sentence needs another look.').slice(0, 300),
+        replacements: fix,
+        confidence: 'high',
+        source: 'ai',
+      });
+      continue;
+    }
     if (correction.replacement === correction.original) continue;
     if (!isWordSwap(correction.original, correction.replacement)) continue;
     // Never let one suggestion swallow the whole field.
@@ -246,7 +327,9 @@ export function toIssues(text, corrections) {
 const REASONING_OPENAI = /^(?:gpt-(?:[5-9]|\d{2,})|o\d)/;
 
 /** Ask OpenAI. Returns the raw JSON string the model produced. */
-async function callOpenAi(text, { apiKey, model, system, fetchImpl, signal }) {
+async function callOpenAi(text, {
+  apiKey, model, system, user, schema = SCHEMA, schemaName = 'corrections', fetchImpl, signal,
+}) {
   const response = await fetchImpl(OPENAI_ENDPOINT, {
     method: 'POST',
     headers: { 'content-type': 'application/json', authorization: `Bearer ${apiKey}` },
@@ -258,11 +341,11 @@ async function callOpenAi(text, { apiKey, model, system, fetchImpl, signal }) {
       ...(REASONING_OPENAI.test(model) ? { reasoning_effort: 'none' } : { temperature: 0 }),
       messages: [
         { role: 'system', content: system },
-        { role: 'user', content: userPrompt(text) },
+        { role: 'user', content: user ?? userPrompt(text) },
       ],
       response_format: {
         type: 'json_schema',
-        json_schema: { name: 'corrections', strict: true, schema: SCHEMA },
+        json_schema: { name: schemaName, strict: true, schema },
       },
     }),
     signal,
@@ -295,7 +378,9 @@ async function callOpenAi(text, { apiKey, model, system, fetchImpl, signal }) {
 }
 
 /** Ask Anthropic. Returns the raw JSON string the model produced. */
-async function callAnthropic(text, { apiKey, model, effort, system, fetchImpl, signal }) {
+async function callAnthropic(text, {
+  apiKey, model, effort, system, user, schema = SCHEMA, fetchImpl, signal,
+}) {
   const supportsEffort = !NO_EFFORT_MODELS.has(model);
   const response = await fetchImpl(ANTHROPIC_ENDPOINT, {
     method: 'POST',
@@ -313,11 +398,11 @@ async function callAnthropic(text, { apiKey, model, effort, system, fetchImpl, s
       system,
       output_config: {
         ...(supportsEffort ? { effort } : {}),
-        format: { type: 'json_schema', schema: SCHEMA },
+        format: { type: 'json_schema', schema },
       },
       messages: [{
         role: 'user',
-        content: userPrompt(text),
+        content: user ?? userPrompt(text),
       }],
     }),
     signal,
@@ -355,7 +440,9 @@ async function callAnthropic(text, { apiKey, model, effort, system, fetchImpl, s
  * The allowance behind it is small and shared, so a refusal here is normal and
  * has to read like an ordinary pause rather than a fault.
  */
-async function callCaret(text, { apiKey, leaveAlone, mode, fetchImpl, signal }) {
+async function callCaret(text, {
+  apiKey, leaveAlone, mode, sentences, notes, fetchImpl, signal,
+}) {
   if (!CARET_ENDPOINT) {
     throw Object.assign(
       new Error('This build has no Caret server set, so a caret_ key has nothing to talk to.'),
@@ -368,6 +455,8 @@ async function callCaret(text, { apiKey, leaveAlone, mode, fetchImpl, signal }) 
     body: JSON.stringify({
       text,
       ...(mode === 'quick' ? { mode } : {}),
+      ...(sentences && mode !== 'quick' ? { sentences: true } : {}),
+      ...(notes && mode !== 'quick' ? { style: notes } : {}),
       ...(leaveAlone && leaveAlone.length ? { leaveAlone } : {}),
     }),
     signal,
@@ -400,18 +489,20 @@ async function callCaret(text, { apiKey, leaveAlone, mode, fetchImpl, signal }) 
 }
 
 /** Ask Google. Returns the raw JSON string the model produced. */
-async function callGemini(text, { apiKey, model, system, fetchImpl, signal }) {
+async function callGemini(text, {
+  apiKey, model, system, user, schema = SCHEMA, fetchImpl, signal,
+}) {
   // The key goes in a header, not the query string: a URL can end up in logs.
   const response = await fetchImpl(`${GEMINI_ENDPOINT}/${encodeURIComponent(model)}:generateContent`, {
     method: 'POST',
     headers: { 'content-type': 'application/json', 'x-goog-api-key': apiKey },
     body: JSON.stringify({
       systemInstruction: { parts: [{ text: system }] },
-      contents: [{ role: 'user', parts: [{ text: userPrompt(text) }] }],
+      contents: [{ role: 'user', parts: [{ text: user ?? userPrompt(text) }] }],
       generationConfig: {
         temperature: 0,
         responseMimeType: 'application/json',
-        responseSchema: geminiSchema(SCHEMA),
+        responseSchema: geminiSchema(schema),
       },
     }),
     signal,
@@ -460,6 +551,11 @@ export async function checkWithAi(text, {
   // Words this writer has already said to leave alone: their own dictionary,
   // and the corrections they have dismissed.
   leaveAlone = [],
+  // Also point out problems with whole sentences (run-ons, fragments,
+  // confusing wording), highlighting the stretch rather than one word.
+  sentences = false,
+  // What has been learned about how this person writes: see learnStyle().
+  notes = '',
   fetchImpl = fetch,
   signal,
 } = {}) {
@@ -472,8 +568,13 @@ export async function checkWithAi(text, {
   }
   const truncated = text.length > MAX_CHARS;
   const body = maskSecrets(truncated ? text.slice(0, MAX_CHARS) : text);
-  // A word pressed Ignore on can itself be a key that got underlined.
-  leaveAlone = leaveAlone.filter((word) => !isSecret(String(word)));
+  // A word pressed Ignore on can itself be a key that got underlined. And
+  // only words and short phrases: an ignored sentence problem is a whole
+  // sentence, which is not a word to leave alone and is not sent anywhere.
+  leaveAlone = leaveAlone
+    .filter((word) => { const w = String(word); return w.trim() && w.length <= 40 && !isSecret(w); })
+    .slice(0, MAX_LEAVE_ALONE);
+  const style = cleanNotes(maskSecrets(String(notes || '')));
   const call = {
     caret: callCaret, openai: callOpenAi, gemini: callGemini, anthropic: callAnthropic,
   }[provider];
@@ -481,8 +582,11 @@ export async function checkWithAi(text, {
     apiKey,
     model: resolveModel(provider, model),
     effort,
-    system: SYSTEM_PROMPT + leaveAloneNote(leaveAlone),
+    // The same order the Caret server puts them in: see worker/src/index.js.
+    system: SYSTEM_PROMPT + (sentences ? SENTENCE_NOTE : '') + styleNote(style) + leaveAloneNote(leaveAlone),
     leaveAlone,
+    sentences,
+    notes: style,
     fetchImpl,
     signal,
   });
@@ -493,12 +597,94 @@ export async function checkWithAi(text, {
   if (!corrections) return { issues: [], truncated, usage: result.usage, unparsed: true };
 
   return {
-    issues: toIssues(text, corrections),
+    issues: toIssues(text, corrections, { sentences }),
     truncated,
     usage: result.usage,
     model: result.model,
     unparsed: !!result.unparsed,
   };
+}
+
+// ------------------------------------------------------------- learning
+
+/**
+ * Ask for the notes on how this person writes to be brought up to date: the
+ * old notes, the suggestions they accepted and ignored since, and what they
+ * have written now go in; a few lines of notes come out. Nothing comes back
+ * that is shown as a suggestion.
+ *
+ * @returns {Promise<{notes: string|null, model: string}>} notes null when the
+ *   answer could not be read
+ * @throws {Error} .code 'quiet' when the shared allowance is used up,
+ *   'old-server' when Caret's server does not know how to learn yet
+ */
+export async function learnStyle(text, {
+  apiKey,
+  provider,
+  model,
+  effort = 'low',
+  notes = '',
+  accepted = [],
+  ignored = [],
+  fetchImpl = fetch,
+  signal,
+} = {}) {
+  if (!apiKey) throw Object.assign(new Error('No API key set.'), { code: 'no-key' });
+  const body = maskSecrets(String(text || '').slice(0, MAX_CHARS));
+  const safe = (list) => cleanChanges(list).map((c) => ({
+    original: maskSecrets(c.original),
+    replacement: maskSecrets(c.replacement),
+    kind: c.kind,
+    note: maskSecrets(c.note),
+  }));
+  const request = {
+    notes: cleanNotes(maskSecrets(String(notes || ''))),
+    accepted: safe(accepted),
+    ignored: safe(ignored),
+    text: body,
+  };
+
+  if (provider === 'caret') {
+    if (!CARET_ENDPOINT) {
+      throw Object.assign(new Error('This build has no Caret server set.'), { code: 'no-endpoint' });
+    }
+    const response = await fetchImpl(`${CARET_ENDPOINT.replace(/\/$/, '')}/check`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-caret-key': apiKey },
+      body: JSON.stringify({ mode: 'learn', ...request }),
+      signal,
+    });
+    let payload = null;
+    try {
+      payload = await response.json();
+    } catch (_) { /* handled below */ }
+    if (!response.ok) {
+      const error = new Error((payload && payload.error) || `error ${response.status}`);
+      error.status = response.status;
+      if (response.status === 429) error.code = 'quiet';
+      throw error;
+    }
+    // A server from before learning answers with a full check instead.
+    if (!payload || payload.mode !== 'learn') {
+      throw Object.assign(new Error("Caret's server has not been updated for learning yet."), { code: 'old-server' });
+    }
+    return { notes: typeof payload.notes === 'string' ? cleanNotes(payload.notes) : null, model: payload.model || 'caret' };
+  }
+
+  const call = { openai: callOpenAi, gemini: callGemini, anthropic: callAnthropic }[provider];
+  if (!call) throw Object.assign(new Error('No AI to learn with.'), { code: 'bad-key' });
+  const result = await call(body, {
+    apiKey,
+    model: resolveModel(provider, model),
+    effort,
+    system: LEARN_PROMPT,
+    user: learnUserPrompt(request),
+    schema: LEARN_SCHEMA,
+    schemaName: 'notes',
+    fetchImpl,
+    signal,
+  });
+  return { notes: parseNotes(result.json), model: result.model };
 }
 
 // ------------------------------------------------------------- quick check
@@ -520,7 +706,7 @@ export function leaveAloneFor(sentence, leaveAlone = []) {
     const raw = String(word || '').trim();
     const w = raw.toLowerCase();
     // Judged as written: some key shapes (AKIA...) are capital letters only.
-    return w && lower.includes(w) && !isSecret(raw);
+    return w && raw.length <= 40 && lower.includes(w) && !isSecret(raw);
   });
 }
 

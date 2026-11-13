@@ -28,6 +28,20 @@
 
   const overlay = NS.createOverlay();
   const adapters = new WeakMap();
+  // A name for each field, so the background can tell which field a
+  // suggestion taken or ignored belongs to. Only ever used inside this tab.
+  const fieldIds = new WeakMap();
+  let fieldCount = 0;
+  // Different on every page load, so the first box on the next page in this
+  // tab is never mistaken for the first box on this one.
+  const pageTag = Math.random().toString(36).slice(2, 10) || 'p';
+  const fieldIdFor = (adapter) => {
+    if (!fieldIds.has(adapter)) {
+      fieldCount += 1;
+      fieldIds.set(adapter, `${pageTag}-f${fieldCount}`);
+    }
+    return fieldIds.get(adapter);
+  };
 
   let settings = null;
   let siteEnabled = true;
@@ -182,6 +196,7 @@
         hrefs: frameHrefs(),
         wantAi,
         kind: adapter.kind,
+        fieldId: fieldIdFor(adapter),
         quickIssues: quickIssuesIn(adapter, text),
         aiIssues: aiIssuesIn(adapter, text),
       });
@@ -610,15 +625,34 @@
       return;
     }
     const before = adapter.getText();
+    // A sentence fix is the whole stretch with a full stop or a word added.
+    // Retyping all of it would lose any link or bold inside it in a rich
+    // editor, so only the part that actually changes is replaced.
+    let from = issue.start;
+    let to = issue.end;
+    let insert = replacement;
+    if (issue.category === 'sentence') {
+      const old = issue.text;
+      let p = 0;
+      while (p < old.length && p < replacement.length && old[p] === replacement[p]) p += 1;
+      let q = 0;
+      while (q < old.length - p && q < replacement.length - p
+        && old[old.length - 1 - q] === replacement[replacement.length - 1 - q]) q += 1;
+      from = issue.start + p;
+      to = issue.end - q;
+      insert = replacement.slice(p, replacement.length - q);
+    }
     quickSuppress += 1;
     let ok;
     try {
-      ok = adapter.replaceRange(issue.start, issue.end, replacement);
+      ok = adapter.replaceRange(from, to, insert);
     } finally {
       quickSuppress -= 1;
     }
     overlay.hideCard();
     if (!ok) return;
+    keptAfterFix(adapter, before, issue, replacement);
+    learnNote(adapter, 'accepted', issue, replacement);
     quickAfterFix(adapter, before, issue, replacement);
     const shift = replacement.length - (issue.end - issue.start);
     active.issues = (active.issues || [])
@@ -656,6 +690,29 @@
     scheduleCheck({ immediate: true });
   }
 
+  /**
+   * Tell the background a suggestion was taken or ignored, for "Learn how I
+   * write". A spelling fix from the built-in dictionary says nothing about
+   * how someone writes - it was a typo - so that one is left out; ignoring
+   * one does say something ("colour" on purpose).
+   */
+  function learnNote(adapter, action, issue, replacement) {
+    if (!settings || !settings.aiLearn) return;
+    if (action === 'accepted' && issue.source !== 'ai' && issue.category === 'spelling') return;
+    send({
+      type: 'learn-event',
+      fieldId: fieldIdFor(adapter),
+      hrefs: frameHrefs(),
+      action,
+      change: {
+        original: String(issue.text || '').slice(0, 160),
+        replacement: String(replacement || '').slice(0, 160),
+        kind: issue.category === 'style' || issue.category === 'advanced' ? 'clarity' : String(issue.category || ''),
+        note: String(issue.message || '').slice(0, 160),
+      },
+    });
+  }
+
   const cardHandlers = {
     onApply: applyFix,
     onAddWord: async (issue) => {
@@ -672,6 +729,7 @@
     },
     onIgnore: async (issue) => {
       overlay.hideCard();
+      if (active) learnNote(active.adapter, 'ignored', issue, (issue.replacements || [])[0] || '');
       await send({ type: 'ignore-issue', id: issue.id, text: issue.text });
       lastAiText = null;
       scheduleCheck({ immediate: true });
@@ -711,6 +769,37 @@
         edgeAfter: base[issue.end] || '',
       })),
     });
+  }
+
+  /**
+   * A fix Caret made itself, from a card. A sentence problem around the word
+   * that was fixed is still there - fixing the words first and the sentence
+   * after is the whole point of drawing them separately - so it is kept and
+   * stretched to fit, where any other edit inside it would drop it. Its own
+   * fix button goes, because that still has the old word in it.
+   */
+  function keptAfterFix(adapter, before, issue, replacement) {
+    const kept = aiKept.get(adapter);
+    if (!kept || !kept.issues.length) return;
+    aiIssuesIn(adapter, before);
+    if (kept.base !== before) return;
+    const after = adapter.getText();
+    const shift = replacement.length - (issue.end - issue.start);
+    if (after.length !== before.length + shift) return;
+    kept.issues = kept.issues.flatMap((other) => {
+      if (other.end <= issue.start) return [other];
+      if (other.start >= issue.end) return [{ ...other, start: other.start + shift, end: other.end + shift }];
+      // The sentence problem itself being fixed is gone; one around a word
+      // being fixed stays.
+      const same = other.start === issue.start && other.end === issue.end;
+      if (other.category === 'sentence' && !same
+          && other.start <= issue.start && other.end >= issue.end) {
+        const end = other.end + shift;
+        return [{ ...other, end, text: after.slice(other.start, end), replacements: [] }];
+      }
+      return [];
+    });
+    kept.base = after;
   }
 
   /** The kept findings, placed in the text as it is now. */
@@ -1039,6 +1128,13 @@
   on(document, 'mousemove', (event) => {
     if (!active || !enabled()) return;
     pointer = { x: event.clientX, y: event.clientY };
+    // Over Caret's own card or list: the underlines beneath it do not count.
+    const over = deepTarget(event);
+    if (overlay.cardContains(over) || overlay.panelContains(over)) {
+      clearTimeout(hoverTimer);
+      clearTimeout(hideTimer);
+      return;
+    }
     const hit = overlay.hitTest(pointer.x, pointer.y, 2);
     if (hit) {
       clearTimeout(hideTimer);
@@ -1064,12 +1160,19 @@
 
   on(document, 'mousedown', (event) => {
     if (!active || !enabled()) return;
+    // A press on the card's own buttons must reach them, not reopen a card
+    // for whatever underline happens to be under the button.
+    const pressed = deepTarget(event);
+    if (overlay.cardContains(pressed) || overlay.panelContains(pressed)) return;
     const hit = overlay.hitTest(event.clientX, event.clientY, 2);
     if (hit) {
       overlay.showCard({
         issue: hit.issue,
         rect: hit.rect,
-        sticky: true,
+        // A sentence highlight covers a lot of text, and a click inside it is
+        // usually to put the caret there and fix it: the card shows, but is
+        // not pinned open.
+        sticky: hit.issue.category !== 'sentence',
         canAddWord: hit.issue.category === 'spelling',
         handlers: cardHandlers,
       });
@@ -1137,7 +1240,10 @@
       if (message.name === 'show-suggestions') {
         const caret = active.adapter.caret();
         const entries = active.entries || [];
-        const at = caret === null ? null : entries.find((e) => caret >= e.issue.start && caret <= e.issue.end);
+        // The narrowest one: a word inside a sentence problem is the word.
+        const at = caret === null ? null : entries
+          .filter((e) => caret >= e.issue.start && caret <= e.issue.end)
+          .sort((a, b) => (a.issue.end - a.issue.start) - (b.issue.end - b.issue.start))[0];
         if (at) {
           overlay.showCard({
             issue: at.issue,
