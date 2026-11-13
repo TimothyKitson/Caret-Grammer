@@ -287,7 +287,7 @@ function paintQuick() {
   // always be turned off.
   box.disabled = !available && !on;
   $('quick-state').textContent = available
-    ? 'Works with the AI above on or off.'
+    ? "This is a smaller model. It's not as good as the free model, but it is great at spelling mistakes."
     : "This copy has no Caret key, so the quick check can't work. If someone gave "
       + 'you one, turn on AI above, pick Caret, and paste it there.';
 
